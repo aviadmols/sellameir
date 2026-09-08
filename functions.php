@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.4' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
+require_once get_stylesheet_directory() . '/inc/one-time-create-maor.php';
 
 /**
  * WooCommerce product modules.
