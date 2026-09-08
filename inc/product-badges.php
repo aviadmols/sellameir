@@ -73,6 +73,57 @@ function sella_badge_register_cpt() {
 add_action( 'init', 'sella_badge_register_cpt' );
 
 /**
+ * Restore WooCommerce "All Products" / "Add New" if a bad submenu registration removed them.
+ */
+function sella_restore_woocommerce_products_menu() {
+	global $submenu;
+
+	$parent = 'edit.php?post_type=product';
+	if ( empty( $submenu[ $parent ] ) || ! is_array( $submenu[ $parent ] ) ) {
+		return;
+	}
+
+	// Remove any leftover broken badge submenu entries under Products.
+	foreach ( $submenu[ $parent ] as $index => $item ) {
+		$slug = isset( $item[2] ) ? (string) $item[2] : '';
+		if ( 'edit.php?post_type=' . SELLA_BADGE_CPT === $slug || false !== strpos( $slug, 'sella_badge' ) ) {
+			unset( $submenu[ $parent ][ $index ] );
+		}
+	}
+	$submenu[ $parent ] = array_values( $submenu[ $parent ] );
+
+	$slugs = array();
+	foreach ( $submenu[ $parent ] as $item ) {
+		if ( isset( $item[2] ) ) {
+			$slugs[] = $item[2];
+		}
+	}
+
+	$prepend = array();
+
+	if ( ! in_array( 'edit.php?post_type=product', $slugs, true ) ) {
+		$prepend[] = array(
+			'כל המוצרים',
+			'edit_products',
+			'edit.php?post_type=product',
+		);
+	}
+
+	if ( ! in_array( 'post-new.php?post_type=product', $slugs, true ) ) {
+		$prepend[] = array(
+			'הוסף חדש',
+			'edit_products',
+			'post-new.php?post_type=product',
+		);
+	}
+
+	if ( ! empty( $prepend ) ) {
+		$submenu[ $parent ] = array_merge( $prepend, $submenu[ $parent ] );
+	}
+}
+add_action( 'admin_menu', 'sella_restore_woocommerce_products_menu', 9999 );
+
+/**
  * Meta box.
  */
 function sella_badge_add_meta_boxes() {
