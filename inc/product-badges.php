@@ -18,6 +18,51 @@ define( 'SELLA_BADGE_META_CATEGORIES', '_sella_badge_categories' );
 define( 'SELLA_BADGE_META_ENABLED', '_sella_badge_enabled' );
 
 /**
+ * Brand palette for badge background colors.
+ *
+ * @return array<string, array{label:string,text:string}>
+ */
+function sella_badge_color_palette() {
+	return array(
+		'#D7263D' => array(
+			'label' => 'Classic Crimson',
+			'text'  => '#ffffff',
+		),
+		'#F46036' => array(
+			'label' => 'Tiger Flame',
+			'text'  => '#ffffff',
+		),
+		'#746FED' => array(
+			'label' => 'Medium Slate Blue',
+			'text'  => '#ffffff',
+		),
+		'#1B998B' => array(
+			'label' => 'Verdigris',
+			'text'  => '#ffffff',
+		),
+		'#C5D86D' => array(
+			'label' => 'Lime Cream',
+			'text'  => '#1a1a1a',
+		),
+	);
+}
+
+/**
+ * Normalize a color to a palette hex (uppercase).
+ *
+ * @param string $color Color.
+ * @return string
+ */
+function sella_badge_sanitize_palette_color( $color ) {
+	$color   = strtoupper( sanitize_hex_color( $color ) ?: '' );
+	$palette = sella_badge_color_palette();
+	if ( isset( $palette[ $color ] ) ) {
+		return $color;
+	}
+	return '#D7263D';
+}
+
+/**
  * Register badge CPT (storage only — managed via custom admin page).
  */
 function sella_badge_register_cpt() {
@@ -79,11 +124,13 @@ function sella_badge_persist_meta( $post_id, $source ) {
 	$enabled = ! empty( $source['sella_badge_enabled'] ) ? '1' : '0';
 	update_post_meta( $post_id, SELLA_BADGE_META_ENABLED, $enabled );
 
-	$color = isset( $source['sella_badge_color'] ) ? sanitize_hex_color( wp_unslash( $source['sella_badge_color'] ) ) : '';
-	update_post_meta( $post_id, SELLA_BADGE_META_COLOR, $color ? $color : '#c45c26' );
+	$raw_color = isset( $source['sella_badge_color'] ) ? wp_unslash( $source['sella_badge_color'] ) : '';
+	$color     = sella_badge_sanitize_palette_color( $raw_color );
+	update_post_meta( $post_id, SELLA_BADGE_META_COLOR, $color );
 
-	$text_color = isset( $source['sella_badge_text_color'] ) ? sanitize_hex_color( wp_unslash( $source['sella_badge_text_color'] ) ) : '';
-	update_post_meta( $post_id, SELLA_BADGE_META_TEXT_COLOR, $text_color ? $text_color : '#ffffff' );
+	$palette    = sella_badge_color_palette();
+	$text_color = $palette[ $color ]['text'];
+	update_post_meta( $post_id, SELLA_BADGE_META_TEXT_COLOR, $text_color );
 
 	$scope = isset( $source['sella_badge_scope'] ) ? sanitize_key( wp_unslash( $source['sella_badge_scope'] ) ) : 'products';
 	if ( ! in_array( $scope, array( 'products', 'categories' ), true ) ) {
@@ -246,9 +293,10 @@ add_action( 'admin_menu', 'sella_restore_woocommerce_products_menu', 9999 );
  * @param int $badge_id Badge ID (0 = new).
  */
 function sella_badge_render_form_fields( $badge_id = 0 ) {
+	$palette    = sella_badge_color_palette();
 	$label      = $badge_id ? get_the_title( $badge_id ) : '';
-	$color      = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26' ) : '#c45c26';
-	$text_color = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff' ) : '#ffffff';
+	$color      = $badge_id ? sella_badge_sanitize_palette_color( get_post_meta( $badge_id, SELLA_BADGE_META_COLOR, true ) ) : '#D7263D';
+	$text_color = $palette[ $color ]['text'];
 	$scope      = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_SCOPE, true ) ?: 'products' ) : 'products';
 	$products   = $badge_id ? get_post_meta( $badge_id, SELLA_BADGE_META_PRODUCTS, true ) : array();
 	$categories = $badge_id ? get_post_meta( $badge_id, SELLA_BADGE_META_CATEGORIES, true ) : array();
@@ -296,12 +344,30 @@ function sella_badge_render_form_fields( $badge_id = 0 ) {
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="sella_badge_color">צבע רקע</label></th>
-				<td><input type="text" class="sella-color-field" name="sella_badge_color" id="sella_badge_color" value="<?php echo esc_attr( $color ); ?>" data-default-color="#c45c26" /></td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="sella_badge_text_color">צבע טקסט</label></th>
-				<td><input type="text" class="sella-color-field" name="sella_badge_text_color" id="sella_badge_text_color" value="<?php echo esc_attr( $text_color ); ?>" data-default-color="#ffffff" /></td>
+				<th scope="row">צבע תגית</th>
+				<td>
+					<input type="hidden" name="sella_badge_color" id="sella_badge_color" value="<?php echo esc_attr( $color ); ?>" />
+					<input type="hidden" name="sella_badge_text_color" id="sella_badge_text_color" value="<?php echo esc_attr( $text_color ); ?>" />
+					<div class="sella-badge-swatches" role="listbox" aria-label="בחירת צבע תגית">
+						<?php foreach ( $palette as $hex => $meta ) : ?>
+							<button
+								type="button"
+								class="sella-badge-swatch<?php echo $hex === $color ? ' is-selected' : ''; ?>"
+								style="background-color:<?php echo esc_attr( $hex ); ?>;"
+								data-color="<?php echo esc_attr( $hex ); ?>"
+								data-text="<?php echo esc_attr( $meta['text'] ); ?>"
+								title="<?php echo esc_attr( $meta['label'] . ' (' . $hex . ')' ); ?>"
+								aria-label="<?php echo esc_attr( $meta['label'] ); ?>"
+								aria-pressed="<?php echo $hex === $color ? 'true' : 'false'; ?>"
+							>
+								<span class="sella-badge-swatch-check">✓</span>
+							</button>
+						<?php endforeach; ?>
+					</div>
+					<p class="description sella-badge-swatch-label">
+						<?php echo esc_html( $palette[ $color ]['label'] . ' — ' . $color ); ?>
+					</p>
+				</td>
 			</tr>
 			<tr>
 				<th scope="row">תצוגה מקדימה</th>
@@ -429,8 +495,8 @@ function sella_badge_render_manage_page() {
 							while ( $query->have_posts() ) :
 								$query->the_post();
 								$bid        = get_the_ID();
-								$color      = get_post_meta( $bid, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26';
-								$text_color = get_post_meta( $bid, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff';
+								$color      = sella_badge_sanitize_palette_color( get_post_meta( $bid, SELLA_BADGE_META_COLOR, true ) );
+								$text_color = get_post_meta( $bid, SELLA_BADGE_META_TEXT_COLOR, true ) ?: sella_badge_color_palette()[ $color ]['text'];
 								$scope      = get_post_meta( $bid, SELLA_BADGE_META_SCOPE, true );
 								$enabled    = get_post_meta( $bid, SELLA_BADGE_META_ENABLED, true );
 								$enabled    = ( '' === $enabled ) ? '1' : $enabled;
@@ -483,20 +549,18 @@ function sella_badge_admin_assets( $hook ) {
 
 	wp_enqueue_style( 'woocommerce_admin_styles' );
 	wp_enqueue_script( 'wc-enhanced-select' );
-	wp_enqueue_style( 'wp-color-picker' );
-	wp_enqueue_script( 'wp-color-picker' );
 
 	wp_enqueue_style(
 		'sella-product-badges-admin',
 		get_stylesheet_directory_uri() . '/assets/css/product-badges-admin.css',
-		array( 'woocommerce_admin_styles', 'wp-color-picker' ),
+		array( 'woocommerce_admin_styles' ),
 		HELLO_ELEMENTOR_CHILD_VERSION
 	);
 
 	wp_enqueue_script(
 		'sella-product-badges-admin',
 		get_stylesheet_directory_uri() . '/assets/js/product-badges-admin.js',
-		array( 'jquery', 'wp-color-picker', 'wc-enhanced-select' ),
+		array( 'jquery', 'wc-enhanced-select' ),
 		HELLO_ELEMENTOR_CHILD_VERSION,
 		true
 	);
@@ -539,11 +603,18 @@ function sella_badge_get_all_enabled() {
 		$products   = get_post_meta( $post->ID, SELLA_BADGE_META_PRODUCTS, true );
 		$categories = get_post_meta( $post->ID, SELLA_BADGE_META_CATEGORIES, true );
 
+		$color      = sella_badge_sanitize_palette_color( get_post_meta( $post->ID, SELLA_BADGE_META_COLOR, true ) );
+		$palette    = sella_badge_color_palette();
+		$text_color = get_post_meta( $post->ID, SELLA_BADGE_META_TEXT_COLOR, true );
+		if ( ! $text_color ) {
+			$text_color = $palette[ $color ]['text'];
+		}
+
 		$badges[] = array(
 			'id'         => $post->ID,
 			'text'       => get_the_title( $post ),
-			'color'      => get_post_meta( $post->ID, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26',
-			'text_color' => get_post_meta( $post->ID, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff',
+			'color'      => $color,
+			'text_color' => $text_color,
 			'scope'      => get_post_meta( $post->ID, SELLA_BADGE_META_SCOPE, true ) ?: 'products',
 			'products'   => is_array( $products ) ? array_map( 'absint', $products ) : array(),
 			'categories' => is_array( $categories ) ? array_map( 'absint', $categories ) : array(),
