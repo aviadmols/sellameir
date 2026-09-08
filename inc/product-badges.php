@@ -21,39 +21,68 @@ define( 'SELLA_BADGE_META_ENABLED', '_sella_badge_enabled' );
  * Register badge CPT.
  */
 function sella_badge_register_cpt() {
+	$labels = array(
+		'name'               => 'תגיות מוצרים',
+		'singular_name'      => 'תגית מוצר',
+		'add_new'            => 'תגית חדשה',
+		'add_new_item'       => 'הוספת תגית',
+		'edit_item'          => 'עריכת תגית',
+		'new_item'           => 'תגית חדשה',
+		'view_item'          => 'צפייה בתגית',
+		'search_items'       => 'חיפוש תגיות',
+		'not_found'          => 'לא נמצאו תגיות',
+		'not_found_in_trash' => 'לא נמצאו תגיות בפח',
+		'menu_name'          => 'תגיות מוצרים',
+		'all_items'          => 'כל התגיות',
+	);
+
 	register_post_type(
 		SELLA_BADGE_CPT,
 		array(
-			'labels'              => array(
-				'name'               => 'תגיות מוצרים',
-				'singular_name'      => 'תגית מוצר',
-				'add_new'            => 'תגית חדשה',
-				'add_new_item'       => 'הוספת תגית',
-				'edit_item'          => 'עריכת תגית',
-				'new_item'           => 'תגית חדשה',
-				'view_item'          => 'צפייה בתגית',
-				'search_items'       => 'חיפוש תגיות',
-				'not_found'          => 'לא נמצאו תגיות',
-				'not_found_in_trash' => 'לא נמצאו תגיות בפח',
-				'menu_name'          => 'תגיות מוצרים',
-				'all_items'          => 'כל התגיות',
-			),
+			'labels'              => $labels,
 			'public'              => false,
+			'publicly_queryable'  => false,
 			'show_ui'             => true,
-			'show_in_menu'        => 'edit.php?post_type=product',
-			'capability_type'     => 'product',
+			'show_in_menu'        => true,
+			'menu_position'       => 56,
+			'menu_icon'           => 'dashicons-tag',
+			'capability_type'     => 'post',
 			'map_meta_cap'        => true,
+			'capabilities'        => array(
+				'edit_post'          => 'edit_products',
+				'read_post'          => 'edit_products',
+				'delete_post'        => 'edit_products',
+				'edit_posts'         => 'edit_products',
+				'edit_others_posts'  => 'edit_products',
+				'publish_posts'      => 'edit_products',
+				'read_private_posts' => 'edit_products',
+				'delete_posts'       => 'edit_products',
+				'create_posts'       => 'edit_products',
+			),
 			'hierarchical'        => false,
 			'supports'            => array( 'title', 'page-attributes' ),
 			'has_archive'         => false,
 			'rewrite'             => false,
 			'query_var'           => false,
 			'show_in_rest'        => false,
-			'menu_position'       => 56,
 		)
 	);
 }
 add_action( 'init', 'sella_badge_register_cpt' );
+
+/**
+ * Also list under WooCommerce Products menu for discoverability.
+ */
+function sella_badge_products_submenu() {
+	add_submenu_page(
+		'edit.php?post_type=product',
+		'תגיות מוצרים',
+		'תגיות מוצרים',
+		'edit_products',
+		'edit.php?post_type=' . SELLA_BADGE_CPT
+	);
+}
+add_action( 'admin_menu', 'sella_badge_products_submenu', 99 );
 
 /**
  * Meta box.

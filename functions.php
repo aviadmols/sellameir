@@ -14,17 +14,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.1.1' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.1.2' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
 /**
- * Book product fields (WooCommerce).
+ * WooCommerce product modules.
  */
-if ( class_exists( 'WooCommerce' ) ) {
+function sella_load_woocommerce_modules() {
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		return;
+	}
+
 	require_once get_stylesheet_directory() . '/inc/product-book-fields.php';
 	require_once get_stylesheet_directory() . '/inc/product-badges.php';
 }
+add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
 /**
  * Load child theme scripts & styles.
