@@ -19,6 +19,13 @@ define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.0.0' );
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
 /**
+ * Book product fields (WooCommerce).
+ */
+if ( class_exists( 'WooCommerce' ) ) {
+	require_once get_stylesheet_directory() . '/inc/product-book-fields.php';
+}
+
+/**
  * Load child theme scripts & styles.
  *
  * @return void
