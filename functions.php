@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.0.0' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.1.1' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
@@ -23,6 +23,7 @@ require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
  */
 if ( class_exists( 'WooCommerce' ) ) {
 	require_once get_stylesheet_directory() . '/inc/product-book-fields.php';
+	require_once get_stylesheet_directory() . '/inc/product-badges.php';
 }
 
 /**

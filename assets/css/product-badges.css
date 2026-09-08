@@ -1,0 +1,45 @@
+.sella-product-image-with-badges {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.sella-product-image-with-badges img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.book-3d-container,
+.book-card-item {
+  position: relative;
+}
+
+.sella-product-badges {
+  position: absolute;
+  top: 10px;
+  inset-inline-start: 10px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  max-width: calc(100% - 20px);
+}
+
+.sella-product-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  word-break: break-word;
+}
+
+.single-product .sella-product-badges {
+  top: 16px;
+  inset-inline-start: 16px;
+}
