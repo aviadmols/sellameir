@@ -39,50 +39,38 @@ function sella_badge_register_cpt() {
 	register_post_type(
 		SELLA_BADGE_CPT,
 		array(
-			'labels'              => $labels,
-			'public'              => false,
-			'publicly_queryable'  => false,
-			'show_ui'             => true,
-			'show_in_menu'        => true,
-			'menu_position'       => 56,
-			'menu_icon'           => 'dashicons-tag',
-			'capability_type'     => 'post',
-			'map_meta_cap'        => true,
-			'capabilities'        => array(
-				'edit_post'          => 'edit_products',
-				'read_post'          => 'edit_products',
-				'delete_post'        => 'edit_products',
-				'edit_posts'         => 'edit_products',
-				'edit_others_posts'  => 'edit_products',
-				'publish_posts'      => 'edit_products',
-				'read_private_posts' => 'edit_products',
-				'delete_posts'       => 'edit_products',
-				'create_posts'       => 'edit_products',
+			'labels'             => $labels,
+			'public'             => false,
+			'publicly_queryable' => false,
+			'show_ui'            => true,
+			// Top-level only — do NOT attach under Products via add_submenu_page(edit.php?...),
+			// that can break the WooCommerce products list screen.
+			'show_in_menu'       => true,
+			'menu_position'      => 58,
+			'menu_icon'          => 'dashicons-tag',
+			'capability_type'    => 'post',
+			'map_meta_cap'       => true,
+			'capabilities'       => array(
+				'edit_post'          => 'manage_woocommerce',
+				'read_post'          => 'manage_woocommerce',
+				'delete_post'        => 'manage_woocommerce',
+				'edit_posts'         => 'manage_woocommerce',
+				'edit_others_posts'  => 'manage_woocommerce',
+				'publish_posts'      => 'manage_woocommerce',
+				'read_private_posts' => 'manage_woocommerce',
+				'delete_posts'       => 'manage_woocommerce',
+				'create_posts'       => 'manage_woocommerce',
 			),
-			'hierarchical'        => false,
-			'supports'            => array( 'title', 'page-attributes' ),
-			'has_archive'         => false,
-			'rewrite'             => false,
-			'query_var'           => false,
-			'show_in_rest'        => false,
+			'hierarchical'       => false,
+			'supports'           => array( 'title', 'page-attributes' ),
+			'has_archive'        => false,
+			'rewrite'            => false,
+			'query_var'          => false,
+			'show_in_rest'       => false,
 		)
 	);
 }
 add_action( 'init', 'sella_badge_register_cpt' );
-
-/**
- * Also list under WooCommerce Products menu for discoverability.
- */
-function sella_badge_products_submenu() {
-	add_submenu_page(
-		'edit.php?post_type=product',
-		'תגיות מוצרים',
-		'תגיות מוצרים',
-		'edit_products',
-		'edit.php?post_type=' . SELLA_BADGE_CPT
-	);
-}
-add_action( 'admin_menu', 'sella_badge_products_submenu', 99 );
 
 /**
  * Meta box.

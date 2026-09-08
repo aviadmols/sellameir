@@ -10,11 +10,6 @@
   height: auto;
 }
 
-.book-3d-container,
-.book-card-item {
-  position: relative;
-}
-
 .sella-product-badges {
   position: absolute;
   top: 10px;
