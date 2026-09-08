@@ -12,7 +12,7 @@
   function updatePreview() {
     var bg = $('#sella_badge_color').val() || '#c45c26';
     var fg = $('#sella_badge_text_color').val() || '#ffffff';
-    var text = $('#title').val() || 'טקסט התגית';
+    var text = $('#sella_badge_label').val() || $('#title').val() || 'טקסט התגית';
     $('.sella-badge-preview').css({ background: bg, color: fg }).text(text);
   }
 
@@ -31,7 +31,7 @@
     });
 
     $('input[name="sella_badge_scope"]').on('change', toggleScopeRows);
-    $('#title').on('input keyup', updatePreview);
+    $('#sella_badge_label, #title').on('input keyup', updatePreview);
     toggleScopeRows();
     updatePreview();
 

@@ -18,48 +18,37 @@ define( 'SELLA_BADGE_META_CATEGORIES', '_sella_badge_categories' );
 define( 'SELLA_BADGE_META_ENABLED', '_sella_badge_enabled' );
 
 /**
- * Register badge CPT.
+ * Register badge CPT (storage only — managed via custom admin page).
  */
 function sella_badge_register_cpt() {
-	$labels = array(
-		'name'               => 'תגיות מוצרים',
-		'singular_name'      => 'תגית מוצר',
-		'add_new'            => 'תגית חדשה',
-		'add_new_item'       => 'הוספת תגית',
-		'edit_item'          => 'עריכת תגית',
-		'new_item'           => 'תגית חדשה',
-		'view_item'          => 'צפייה בתגית',
-		'search_items'       => 'חיפוש תגיות',
-		'not_found'          => 'לא נמצאו תגיות',
-		'not_found_in_trash' => 'לא נמצאו תגיות בפח',
-		'menu_name'          => 'תגיות מוצרים',
-		'all_items'          => 'כל התגיות',
-	);
-
 	register_post_type(
 		SELLA_BADGE_CPT,
 		array(
-			'labels'             => $labels,
+			'labels'             => array(
+				'name'          => 'תגיות לחנות',
+				'singular_name' => 'תגית לחנות',
+			),
 			'public'             => false,
 			'publicly_queryable' => false,
-			'show_ui'            => true,
-			// Top-level only — do NOT attach under Products via add_submenu_page(edit.php?...),
-			// that can break the WooCommerce products list screen.
-			'show_in_menu'       => true,
-			'menu_position'      => 58,
-			'menu_icon'          => 'dashicons-tag',
+			'show_ui'            => false,
+			'show_in_menu'       => false,
 			'capability_type'    => 'post',
-			'map_meta_cap'       => true,
+			'map_meta_cap'       => false,
 			'capabilities'       => array(
-				'edit_post'          => 'manage_woocommerce',
-				'read_post'          => 'manage_woocommerce',
-				'delete_post'        => 'manage_woocommerce',
-				'edit_posts'         => 'manage_woocommerce',
-				'edit_others_posts'  => 'manage_woocommerce',
-				'publish_posts'      => 'manage_woocommerce',
-				'read_private_posts' => 'manage_woocommerce',
-				'delete_posts'       => 'manage_woocommerce',
-				'create_posts'       => 'manage_woocommerce',
+				'edit_post'              => 'manage_woocommerce',
+				'read_post'              => 'manage_woocommerce',
+				'delete_post'            => 'manage_woocommerce',
+				'edit_posts'             => 'manage_woocommerce',
+				'edit_others_posts'      => 'manage_woocommerce',
+				'publish_posts'          => 'manage_woocommerce',
+				'read_private_posts'     => 'manage_woocommerce',
+				'delete_posts'           => 'manage_woocommerce',
+				'delete_others_posts'    => 'manage_woocommerce',
+				'delete_private_posts'   => 'manage_woocommerce',
+				'delete_published_posts' => 'manage_woocommerce',
+				'edit_private_posts'     => 'manage_woocommerce',
+				'edit_published_posts'   => 'manage_woocommerce',
+				'create_posts'           => 'manage_woocommerce',
 			),
 			'hierarchical'       => false,
 			'supports'           => array( 'title', 'page-attributes' ),
@@ -73,6 +62,144 @@ function sella_badge_register_cpt() {
 add_action( 'init', 'sella_badge_register_cpt' );
 
 /**
+ * Clear badge query cache after changes.
+ */
+function sella_badge_bust_cache() {
+	// Static caches reset per-request; this is a hook point for future object-cache.
+	wp_cache_delete( 'sella_badge_all_enabled', 'sella' );
+}
+
+/**
+ * Persist badge meta from request/array.
+ *
+ * @param int   $post_id Post ID.
+ * @param array $source  Source data (usually $_POST).
+ */
+function sella_badge_persist_meta( $post_id, $source ) {
+	$enabled = ! empty( $source['sella_badge_enabled'] ) ? '1' : '0';
+	update_post_meta( $post_id, SELLA_BADGE_META_ENABLED, $enabled );
+
+	$color = isset( $source['sella_badge_color'] ) ? sanitize_hex_color( wp_unslash( $source['sella_badge_color'] ) ) : '';
+	update_post_meta( $post_id, SELLA_BADGE_META_COLOR, $color ? $color : '#c45c26' );
+
+	$text_color = isset( $source['sella_badge_text_color'] ) ? sanitize_hex_color( wp_unslash( $source['sella_badge_text_color'] ) ) : '';
+	update_post_meta( $post_id, SELLA_BADGE_META_TEXT_COLOR, $text_color ? $text_color : '#ffffff' );
+
+	$scope = isset( $source['sella_badge_scope'] ) ? sanitize_key( wp_unslash( $source['sella_badge_scope'] ) ) : 'products';
+	if ( ! in_array( $scope, array( 'products', 'categories' ), true ) ) {
+		$scope = 'products';
+	}
+	update_post_meta( $post_id, SELLA_BADGE_META_SCOPE, $scope );
+
+	$products = array();
+	if ( ! empty( $source['sella_badge_products'] ) && is_array( $source['sella_badge_products'] ) ) {
+		$products = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_badge_products'] ) ) ) ) );
+	}
+	update_post_meta( $post_id, SELLA_BADGE_META_PRODUCTS, $products );
+
+	$categories = array();
+	if ( ! empty( $source['sella_badge_categories'] ) && is_array( $source['sella_badge_categories'] ) ) {
+		$categories = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_badge_categories'] ) ) ) ) );
+	}
+	update_post_meta( $post_id, SELLA_BADGE_META_CATEGORIES, $categories );
+
+	sella_badge_bust_cache();
+}
+
+/**
+ * Custom admin menu — this is where labels are created/edited.
+ */
+function sella_badge_register_admin_page() {
+	add_menu_page(
+		'תגיות לחנות',
+		'תגיות לחנות',
+		'manage_woocommerce',
+		'sella-shop-badges',
+		'sella_badge_render_manage_page',
+		'dashicons-tag',
+		58
+	);
+}
+add_action( 'admin_menu', 'sella_badge_register_admin_page' );
+
+/**
+ * Handle create / update / delete from the manage page.
+ */
+function sella_badge_handle_manage_actions() {
+	if ( ! is_admin() || ! current_user_can( 'manage_woocommerce' ) ) {
+		return;
+	}
+
+	if ( empty( $_POST['sella_badge_manage_action'] ) || empty( $_POST['_wpnonce'] ) ) {
+		return;
+	}
+
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'sella_badge_manage' ) ) {
+		return;
+	}
+
+	$action = sanitize_key( wp_unslash( $_POST['sella_badge_manage_action'] ) );
+
+	if ( 'delete' === $action ) {
+		$badge_id = isset( $_POST['badge_id'] ) ? absint( $_POST['badge_id'] ) : 0;
+		if ( $badge_id && SELLA_BADGE_CPT === get_post_type( $badge_id ) ) {
+			wp_trash_post( $badge_id );
+			sella_badge_bust_cache();
+		}
+		wp_safe_redirect( add_query_arg( array( 'page' => 'sella-shop-badges', 'deleted' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	if ( 'save' === $action ) {
+		$badge_id = isset( $_POST['badge_id'] ) ? absint( $_POST['badge_id'] ) : 0;
+		$label    = isset( $_POST['sella_badge_label'] ) ? sanitize_text_field( wp_unslash( $_POST['sella_badge_label'] ) ) : '';
+
+		if ( '' === $label ) {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'sella-shop-badges', 'error' => 'empty' ), admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		if ( $badge_id && SELLA_BADGE_CPT === get_post_type( $badge_id ) ) {
+			wp_update_post(
+				array(
+					'ID'         => $badge_id,
+					'post_title' => $label,
+					'post_status'=> 'publish',
+				)
+			);
+		} else {
+			$badge_id = wp_insert_post(
+				array(
+					'post_type'   => SELLA_BADGE_CPT,
+					'post_title'  => $label,
+					'post_status' => 'publish',
+				),
+				true
+			);
+			if ( is_wp_error( $badge_id ) ) {
+				wp_safe_redirect( add_query_arg( array( 'page' => 'sella-shop-badges', 'error' => 'save' ), admin_url( 'admin.php' ) ) );
+				exit;
+			}
+		}
+
+		sella_badge_persist_meta( $badge_id, $_POST );
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'     => 'sella-shop-badges',
+					'edited'   => (string) $badge_id,
+					'saved'    => '1',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+}
+add_action( 'admin_init', 'sella_badge_handle_manage_actions' );
+
+/**
  * Restore WooCommerce "All Products" / "Add New" if a bad submenu registration removed them.
  */
 function sella_restore_woocommerce_products_menu() {
@@ -83,7 +210,6 @@ function sella_restore_woocommerce_products_menu() {
 		return;
 	}
 
-	// Remove any leftover broken badge submenu entries under Products.
 	foreach ( $submenu[ $parent ] as $index => $item ) {
 		$slug = isset( $item[2] ) ? (string) $item[2] : '';
 		if ( 'edit.php?post_type=' . SELLA_BADGE_CPT === $slug || false !== strpos( $slug, 'sella_badge' ) ) {
@@ -102,19 +228,11 @@ function sella_restore_woocommerce_products_menu() {
 	$prepend = array();
 
 	if ( ! in_array( 'edit.php?post_type=product', $slugs, true ) ) {
-		$prepend[] = array(
-			'כל המוצרים',
-			'edit_products',
-			'edit.php?post_type=product',
-		);
+		$prepend[] = array( 'כל המוצרים', 'edit_products', 'edit.php?post_type=product' );
 	}
 
 	if ( ! in_array( 'post-new.php?post_type=product', $slugs, true ) ) {
-		$prepend[] = array(
-			'הוסף חדש',
-			'edit_products',
-			'post-new.php?post_type=product',
-		);
+		$prepend[] = array( 'הוסף חדש', 'edit_products', 'post-new.php?post_type=product' );
 	}
 
 	if ( ! empty( $prepend ) ) {
@@ -124,32 +242,18 @@ function sella_restore_woocommerce_products_menu() {
 add_action( 'admin_menu', 'sella_restore_woocommerce_products_menu', 9999 );
 
 /**
- * Meta box.
+ * Render fields for create/edit form.
+ *
+ * @param int $badge_id Badge ID (0 = new).
  */
-function sella_badge_add_meta_boxes() {
-	add_meta_box(
-		'sella_badge_settings',
-		'הגדרות תגית',
-		'sella_badge_render_meta_box',
-		SELLA_BADGE_CPT,
-		'normal',
-		'high'
-	);
-}
-add_action( 'add_meta_boxes', 'sella_badge_add_meta_boxes' );
-
-/**
- * @param WP_Post $post Post.
- */
-function sella_badge_render_meta_box( $post ) {
-	wp_nonce_field( 'sella_badge_save', 'sella_badge_nonce' );
-
-	$color      = get_post_meta( $post->ID, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26';
-	$text_color = get_post_meta( $post->ID, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff';
-	$scope      = get_post_meta( $post->ID, SELLA_BADGE_META_SCOPE, true ) ?: 'products';
-	$products   = get_post_meta( $post->ID, SELLA_BADGE_META_PRODUCTS, true );
-	$categories = get_post_meta( $post->ID, SELLA_BADGE_META_CATEGORIES, true );
-	$enabled    = get_post_meta( $post->ID, SELLA_BADGE_META_ENABLED, true );
+function sella_badge_render_form_fields( $badge_id = 0 ) {
+	$label      = $badge_id ? get_the_title( $badge_id ) : '';
+	$color      = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26' ) : '#c45c26';
+	$text_color = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff' ) : '#ffffff';
+	$scope      = $badge_id ? ( get_post_meta( $badge_id, SELLA_BADGE_META_SCOPE, true ) ?: 'products' ) : 'products';
+	$products   = $badge_id ? get_post_meta( $badge_id, SELLA_BADGE_META_PRODUCTS, true ) : array();
+	$categories = $badge_id ? get_post_meta( $badge_id, SELLA_BADGE_META_CATEGORIES, true ) : array();
+	$enabled    = $badge_id ? get_post_meta( $badge_id, SELLA_BADGE_META_ENABLED, true ) : '1';
 	$enabled    = ( '' === $enabled ) ? '1' : $enabled;
 
 	if ( ! is_array( $products ) ) {
@@ -158,7 +262,6 @@ function sella_badge_render_meta_box( $post ) {
 	if ( ! is_array( $categories ) ) {
 		$categories = array();
 	}
-
 	$products   = array_map( 'absint', $products );
 	$categories = array_map( 'absint', $categories );
 
@@ -174,12 +277,16 @@ function sella_badge_render_meta_box( $post ) {
 		$all_categories = array();
 	}
 
-	$preview_text = $post->post_title ? $post->post_title : 'טקסט התגית';
+	$preview = $label ? $label : 'טקסט התגית';
 	?>
 	<div class="sella-badge-admin" dir="rtl">
-		<p class="description">כותרת התגית למעלה היא הטקסט שיופיע על המוצר בחנות.</p>
-
 		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><label for="sella_badge_label">טקסט התגית (LABEL)</label></th>
+				<td>
+					<input type="text" class="regular-text" name="sella_badge_label" id="sella_badge_label" value="<?php echo esc_attr( $label ); ?>" required placeholder="למשל: חדש, מבצע, רבי מכר" />
+				</td>
+			</tr>
 			<tr>
 				<th scope="row"><label for="sella_badge_enabled">פעילה</label></th>
 				<td>
@@ -191,21 +298,17 @@ function sella_badge_render_meta_box( $post ) {
 			</tr>
 			<tr>
 				<th scope="row"><label for="sella_badge_color">צבע רקע</label></th>
-				<td>
-					<input type="text" class="sella-color-field" name="sella_badge_color" id="sella_badge_color" value="<?php echo esc_attr( $color ); ?>" data-default-color="#c45c26" />
-				</td>
+				<td><input type="text" class="sella-color-field" name="sella_badge_color" id="sella_badge_color" value="<?php echo esc_attr( $color ); ?>" data-default-color="#c45c26" /></td>
 			</tr>
 			<tr>
 				<th scope="row"><label for="sella_badge_text_color">צבע טקסט</label></th>
-				<td>
-					<input type="text" class="sella-color-field" name="sella_badge_text_color" id="sella_badge_text_color" value="<?php echo esc_attr( $text_color ); ?>" data-default-color="#ffffff" />
-				</td>
+				<td><input type="text" class="sella-color-field" name="sella_badge_text_color" id="sella_badge_text_color" value="<?php echo esc_attr( $text_color ); ?>" data-default-color="#ffffff" /></td>
 			</tr>
 			<tr>
 				<th scope="row">תצוגה מקדימה</th>
 				<td>
 					<span class="sella-badge-preview" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
-						<?php echo esc_html( $preview_text ); ?>
+						<?php echo esc_html( $preview ); ?>
 					</span>
 				</td>
 			</tr>
@@ -215,7 +318,7 @@ function sella_badge_render_meta_box( $post ) {
 					<fieldset>
 						<label style="display:block;margin-bottom:8px;">
 							<input type="radio" name="sella_badge_scope" value="products" <?php checked( $scope, 'products' ); ?> />
-							מוצרים ספציפיים (בחירה מרשימה)
+							מוצרים ספציפיים (בחירה מרשימה לפי שם)
 						</label>
 						<label style="display:block;">
 							<input type="radio" name="sella_badge_scope" value="categories" <?php checked( $scope, 'categories' ); ?> />
@@ -227,7 +330,7 @@ function sella_badge_render_meta_box( $post ) {
 			<tr class="sella-badge-scope-row" data-scope="products">
 				<th scope="row"><label for="sella_badge_products">מוצרים</label></th>
 				<td>
-					<select class="wc-product-search" multiple="multiple" style="width:100%;" id="sella_badge_products" name="sella_badge_products[]" data-placeholder="חפשו והוסיפו מוצרים לפי שם..." data-action="woocommerce_json_search_products" data-allow_clear="true">
+					<select class="wc-product-search" multiple="multiple" style="width:100%;max-width:640px;" id="sella_badge_products" name="sella_badge_products[]" data-placeholder="חפשו והוסיפו מוצרים לפי שם..." data-action="woocommerce_json_search_products" data-allow_clear="true">
 						<?php
 						foreach ( $products as $product_id ) {
 							$product = wc_get_product( $product_id );
@@ -238,20 +341,18 @@ function sella_badge_render_meta_box( $post ) {
 						}
 						?>
 					</select>
-					<p class="description">בחרו מהרשימה לפי שם המוצר — לא לפי מק״ט.</p>
 				</td>
 			</tr>
 			<tr class="sella-badge-scope-row" data-scope="categories">
 				<th scope="row"><label for="sella_badge_categories">קטגוריות</label></th>
 				<td>
-					<select id="sella_badge_categories" name="sella_badge_categories[]" multiple="multiple" class="sella-category-select" style="width:100%;min-height:140px;">
+					<select id="sella_badge_categories" name="sella_badge_categories[]" multiple="multiple" class="sella-category-select" style="width:100%;max-width:640px;min-height:140px;">
 						<?php foreach ( $all_categories as $term ) : ?>
 							<option value="<?php echo esc_attr( (string) $term->term_id ); ?>" <?php selected( in_array( (int) $term->term_id, $categories, true ) ); ?>>
 								<?php echo esc_html( $term->name . ' (' . (int) $term->count . ')' ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
-					<p class="description">בחרו קטגוריה אחת או יותר מהרשימה. התגית תופיע על כל המוצרים בקטגוריות שנבחרו.</p>
 				</td>
 			</tr>
 		</table>
@@ -260,64 +361,127 @@ function sella_badge_render_meta_box( $post ) {
 }
 
 /**
- * Save badge meta.
- *
- * @param int $post_id Post ID.
+ * Main manage page.
  */
-function sella_badge_save_meta( $post_id ) {
-	if ( ! isset( $_POST['sella_badge_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sella_badge_nonce'] ) ), 'sella_badge_save' ) ) {
-		return;
+function sella_badge_render_manage_page() {
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_die( 'אין הרשאה.' );
 	}
 
-	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-		return;
+	$edit_id = isset( $_GET['edited'] ) ? absint( $_GET['edited'] ) : 0;
+	if ( isset( $_GET['edit'] ) ) {
+		$edit_id = absint( $_GET['edit'] );
 	}
 
-	if ( SELLA_BADGE_CPT !== get_post_type( $post_id ) ) {
-		return;
-	}
+	$query = new WP_Query(
+		array(
+			'post_type'      => SELLA_BADGE_CPT,
+			'post_status'    => array( 'publish', 'draft' ),
+			'posts_per_page' => 100,
+			'orderby'        => array(
+				'menu_order' => 'ASC',
+				'title'      => 'ASC',
+			),
+		)
+	);
+	?>
+	<div class="wrap" dir="rtl">
+		<h1>תגיות לחנות</h1>
+		<p>כאן מגדירים את ה־LABEL שמופיע על הספרים בחנות: טקסט, צבע, ומוצרים/קטגוריות.</p>
 
-	if ( ! current_user_can( 'edit_post', $post_id ) ) {
-		return;
-	}
+		<?php if ( ! empty( $_GET['saved'] ) ) : ?>
+			<div class="notice notice-success is-dismissible"><p>התגית נשמרה בהצלחה.</p></div>
+		<?php endif; ?>
+		<?php if ( ! empty( $_GET['deleted'] ) ) : ?>
+			<div class="notice notice-success is-dismissible"><p>התגית הועברה לפח.</p></div>
+		<?php endif; ?>
+		<?php if ( ! empty( $_GET['error'] ) && 'empty' === $_GET['error'] ) : ?>
+			<div class="notice notice-error is-dismissible"><p>חובה למלא טקסט לתגית.</p></div>
+		<?php endif; ?>
 
-	$enabled = isset( $_POST['sella_badge_enabled'] ) ? '1' : '0';
-	update_post_meta( $post_id, SELLA_BADGE_META_ENABLED, $enabled );
+		<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:start;">
+			<div style="background:#fff;border:1px solid #c3c4c7;padding:16px 20px;">
+				<h2 style="margin-top:0;"><?php echo $edit_id ? 'עריכת תגית' : 'תגית חדשה'; ?></h2>
+				<form method="post">
+					<?php wp_nonce_field( 'sella_badge_manage' ); ?>
+					<input type="hidden" name="sella_badge_manage_action" value="save" />
+					<input type="hidden" name="badge_id" value="<?php echo esc_attr( (string) $edit_id ); ?>" />
+					<?php sella_badge_render_form_fields( $edit_id ); ?>
+					<?php submit_button( $edit_id ? 'עדכן תגית' : 'צור תגית' ); ?>
+					<?php if ( $edit_id ) : ?>
+						<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=sella-shop-badges' ) ); ?>">ביטול עריכה</a>
+					<?php endif; ?>
+				</form>
+			</div>
 
-	$color = isset( $_POST['sella_badge_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['sella_badge_color'] ) ) : '';
-	update_post_meta( $post_id, SELLA_BADGE_META_COLOR, $color ? $color : '#c45c26' );
-
-	$text_color = isset( $_POST['sella_badge_text_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['sella_badge_text_color'] ) ) : '';
-	update_post_meta( $post_id, SELLA_BADGE_META_TEXT_COLOR, $text_color ? $text_color : '#ffffff' );
-
-	$scope = isset( $_POST['sella_badge_scope'] ) ? sanitize_key( wp_unslash( $_POST['sella_badge_scope'] ) ) : 'products';
-	if ( ! in_array( $scope, array( 'products', 'categories' ), true ) ) {
-		$scope = 'products';
-	}
-	update_post_meta( $post_id, SELLA_BADGE_META_SCOPE, $scope );
-
-	$products = array();
-	if ( ! empty( $_POST['sella_badge_products'] ) && is_array( $_POST['sella_badge_products'] ) ) {
-		$products = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $_POST['sella_badge_products'] ) ) ) ) );
-	}
-	update_post_meta( $post_id, SELLA_BADGE_META_PRODUCTS, $products );
-
-	$categories = array();
-	if ( ! empty( $_POST['sella_badge_categories'] ) && is_array( $_POST['sella_badge_categories'] ) ) {
-		$categories = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $_POST['sella_badge_categories'] ) ) ) ) );
-	}
-	update_post_meta( $post_id, SELLA_BADGE_META_CATEGORIES, $categories );
+			<div style="background:#fff;border:1px solid #c3c4c7;padding:16px 20px;">
+				<h2 style="margin-top:0;">תגיות קיימות</h2>
+				<?php if ( ! $query->have_posts() ) : ?>
+					<p>עדיין אין תגיות. צרו את הראשונה בטופס.</p>
+				<?php else : ?>
+					<table class="widefat striped">
+						<thead>
+							<tr>
+								<th>תצוגה</th>
+								<th>שיוך</th>
+								<th>סטטוס</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php
+							while ( $query->have_posts() ) :
+								$query->the_post();
+								$bid        = get_the_ID();
+								$color      = get_post_meta( $bid, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26';
+								$text_color = get_post_meta( $bid, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff';
+								$scope      = get_post_meta( $bid, SELLA_BADGE_META_SCOPE, true );
+								$enabled    = get_post_meta( $bid, SELLA_BADGE_META_ENABLED, true );
+								$enabled    = ( '' === $enabled ) ? '1' : $enabled;
+								if ( 'categories' === $scope ) {
+									$cats  = get_post_meta( $bid, SELLA_BADGE_META_CATEGORIES, true );
+									$scope_label = 'קטגוריות (' . ( is_array( $cats ) ? count( $cats ) : 0 ) . ')';
+								} else {
+									$prods = get_post_meta( $bid, SELLA_BADGE_META_PRODUCTS, true );
+									$scope_label = 'מוצרים (' . ( is_array( $prods ) ? count( $prods ) : 0 ) . ')';
+								}
+								?>
+								<tr>
+									<td>
+										<span class="sella-badge-preview" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
+											<?php echo esc_html( get_the_title() ); ?>
+										</span>
+									</td>
+									<td><?php echo esc_html( $scope_label ); ?></td>
+									<td><?php echo '1' === $enabled ? 'פעילה' : 'כבויה'; ?></td>
+									<td style="white-space:nowrap;">
+										<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=sella-shop-badges&edit=' . $bid ) ); ?>">עריכה</a>
+										<form method="post" style="display:inline;" onsubmit="return confirm('למחוק את התגית?');">
+											<?php wp_nonce_field( 'sella_badge_manage' ); ?>
+											<input type="hidden" name="sella_badge_manage_action" value="delete" />
+											<input type="hidden" name="badge_id" value="<?php echo esc_attr( (string) $bid ); ?>" />
+											<button type="submit" class="button button-small button-link-delete">מחיקה</button>
+										</form>
+									</td>
+								</tr>
+							<?php endwhile; ?>
+							<?php wp_reset_postdata(); ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			</div>
+		</div>
+	</div>
+	<?php
 }
-add_action( 'save_post_' . SELLA_BADGE_CPT, 'sella_badge_save_meta' );
 
 /**
- * Admin assets.
+ * Admin assets for the manage page.
  *
  * @param string $hook Hook.
  */
 function sella_badge_admin_assets( $hook ) {
-	$screen = get_current_screen();
-	if ( ! $screen || SELLA_BADGE_CPT !== $screen->post_type ) {
+	if ( 'toplevel_page_sella-shop-badges' !== $hook ) {
 		return;
 	}
 
@@ -342,76 +506,6 @@ function sella_badge_admin_assets( $hook ) {
 	);
 }
 add_action( 'admin_enqueue_scripts', 'sella_badge_admin_assets' );
-
-/**
- * Admin columns.
- *
- * @param array $columns Columns.
- * @return array
- */
-function sella_badge_columns( $columns ) {
-	$new = array();
-	foreach ( $columns as $key => $label ) {
-		$new[ $key ] = $label;
-		if ( 'title' === $key ) {
-			$new['sella_badge_preview'] = 'תצוגה';
-			$new['sella_badge_scope']   = 'שיוך';
-			$new['sella_badge_status']  = 'סטטוס';
-		}
-	}
-	return $new;
-}
-add_filter( 'manage_' . SELLA_BADGE_CPT . '_posts_columns', 'sella_badge_columns' );
-
-/**
- * @param string $column Column.
- * @param int    $post_id Post ID.
- */
-function sella_badge_column_content( $column, $post_id ) {
-	if ( 'sella_badge_preview' === $column ) {
-		$color      = get_post_meta( $post_id, SELLA_BADGE_META_COLOR, true ) ?: '#c45c26';
-		$text_color = get_post_meta( $post_id, SELLA_BADGE_META_TEXT_COLOR, true ) ?: '#ffffff';
-		$title      = get_the_title( $post_id );
-		echo '<span class="sella-badge-preview" style="background:' . esc_attr( $color ) . ';color:' . esc_attr( $text_color ) . ';">' . esc_html( $title ) . '</span>';
-		return;
-	}
-
-	if ( 'sella_badge_scope' === $column ) {
-		$scope = get_post_meta( $post_id, SELLA_BADGE_META_SCOPE, true );
-		if ( 'categories' === $scope ) {
-			$cats = get_post_meta( $post_id, SELLA_BADGE_META_CATEGORIES, true );
-			$count = is_array( $cats ) ? count( $cats ) : 0;
-			echo esc_html( 'קטגוריות (' . $count . ')' );
-		} else {
-			$products = get_post_meta( $post_id, SELLA_BADGE_META_PRODUCTS, true );
-			$count    = is_array( $products ) ? count( $products ) : 0;
-			echo esc_html( 'מוצרים (' . $count . ')' );
-		}
-		return;
-	}
-
-	if ( 'sella_badge_status' === $column ) {
-		$enabled = get_post_meta( $post_id, SELLA_BADGE_META_ENABLED, true );
-		$enabled = ( '' === $enabled ) ? '1' : $enabled;
-		echo '1' === $enabled ? '<span style="color:#008a20;">פעילה</span>' : '<span style="color:#d63638;">כבויה</span>';
-	}
-}
-add_action( 'manage_' . SELLA_BADGE_CPT . '_posts_custom_column', 'sella_badge_column_content', 10, 2 );
-
-/**
- * Title placeholder.
- *
- * @param string $text Text.
- * @param string $post_type Type.
- * @return string
- */
-function sella_badge_enter_title( $text, $post_type ) {
-	if ( SELLA_BADGE_CPT === $post_type ) {
-		return 'טקסט התגית (למשל: חדש, מבצע, רבי מכר)';
-	}
-	return $text;
-}
-add_filter( 'enter_title_here', 'sella_badge_enter_title', 10, 2 );
 
 /**
  * Get all enabled badges.
