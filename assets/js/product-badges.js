@@ -33,30 +33,11 @@
       return String(btn.getAttribute('data-product_id'));
     }
 
-    var link = card.querySelector('a.book-link-wrapper[href*="/product/"], a[href*="/product/"]');
-    if (!link) {
-      return '';
-    }
-
-    // Fallback: data attribute if present on card.
     if (card.getAttribute('data-product_id')) {
       return String(card.getAttribute('data-product_id'));
     }
 
     return '';
-  }
-
-  function injectIntoTarget(target, badges) {
-    if (!target || target.querySelector('.sella-product-badges')) {
-      return;
-    }
-
-    var style = window.getComputedStyle(target);
-    if (style.position === 'static') {
-      target.style.position = 'relative';
-    }
-
-    target.insertAdjacentHTML('beforeend', buildBadgesHtml(badges));
   }
 
   function injectIntoCard(card, map) {
@@ -69,13 +50,15 @@
       return;
     }
 
-    var target =
-      card.querySelector('.book-3d-container') ||
-      card.querySelector('.book-3d') ||
-      card.querySelector('.book-link-wrapper') ||
-      card;
+    // Mount on the card itself — never inside .book-3d / perspective,
+    // otherwise the badge sits behind the cover and only shows on hover.
+    var target = card;
+    var style = window.getComputedStyle(target);
+    if (style.position === 'static') {
+      target.style.position = 'relative';
+    }
 
-    injectIntoTarget(target, map[id]);
+    target.insertAdjacentHTML('afterbegin', buildBadgesHtml(map[id]));
   }
 
   function applySingleProduct(map) {
@@ -93,12 +76,32 @@
       return;
     }
 
-    var target =
+    if (document.querySelector('.sella-product-badges')) {
+      return;
+    }
+
+    var host =
+      document.querySelector('.book-card-item') ||
       document.querySelector('.book-3d-container') ||
       document.querySelector('.single-book-3d') ||
       document.querySelector('.book-3d');
 
-    injectIntoTarget(target, map[id]);
+    if (!host) {
+      return;
+    }
+
+    // Prefer a non-3D wrapper if available.
+    var mount = host;
+    if (host.classList.contains('book-3d') || host.classList.contains('single-book-3d')) {
+      mount = host.parentElement || host;
+    }
+
+    var style = window.getComputedStyle(mount);
+    if (style.position === 'static') {
+      mount.style.position = 'relative';
+    }
+
+    mount.insertAdjacentHTML('afterbegin', buildBadgesHtml(map[id]));
   }
 
   function applyBadges(root) {

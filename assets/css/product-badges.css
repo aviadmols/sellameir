@@ -10,17 +10,25 @@
   height: auto;
 }
 
+/* Float above the 3D book effect — outside perspective/transform */
+.book-card-item {
+  position: relative;
+}
+
+.book-card-item > .sella-product-badges,
 .sella-product-badges {
   position: absolute;
   top: 10px;
   inset-inline-start: 10px;
-  z-index: 20;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
   pointer-events: none;
-  max-width: calc(100% - 20px);
+  max-width: min(70%, 180px);
+  transform: none !important;
+  perspective: none !important;
 }
 
 .sella-product-badge {
@@ -30,11 +38,13 @@
   font-weight: 700;
   line-height: 1.2;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   word-break: break-word;
+  transform: none !important;
 }
 
 .single-product .sella-product-badges {
   top: 16px;
   inset-inline-start: 16px;
+  z-index: 60;
 }
