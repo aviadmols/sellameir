@@ -187,9 +187,8 @@ function sella_badge_handle_manage_actions() {
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'page'     => 'sella-shop-badges',
-					'edited'   => (string) $badge_id,
-					'saved'    => '1',
+					'page'  => 'sella-shop-badges',
+					'saved' => '1',
 				),
 				admin_url( 'admin.php' )
 			)
@@ -307,7 +306,7 @@ function sella_badge_render_form_fields( $badge_id = 0 ) {
 			<tr>
 				<th scope="row">תצוגה מקדימה</th>
 				<td>
-					<span class="sella-badge-preview" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
+					<span class="sella-badge-preview sella-badge-preview--live" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
 						<?php echo esc_html( $preview ); ?>
 					</span>
 				</td>
@@ -368,10 +367,7 @@ function sella_badge_render_manage_page() {
 		wp_die( 'אין הרשאה.' );
 	}
 
-	$edit_id = isset( $_GET['edited'] ) ? absint( $_GET['edited'] ) : 0;
-	if ( isset( $_GET['edit'] ) ) {
-		$edit_id = absint( $_GET['edit'] );
-	}
+	$edit_id = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
 
 	$query = new WP_Query(
 		array(
@@ -448,7 +444,7 @@ function sella_badge_render_manage_page() {
 								?>
 								<tr>
 									<td>
-										<span class="sella-badge-preview" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
+										<span class="sella-badge-chip" style="background:<?php echo esc_attr( $color ); ?>;color:<?php echo esc_attr( $text_color ); ?>;">
 											<?php echo esc_html( get_the_title() ); ?>
 										</span>
 									</td>
