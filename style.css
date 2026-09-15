@@ -13,3 +13,50 @@ Tags: flexible-header, custom-colors, custom-menu, custom-logo, editor-style, fe
 */
 
 /* Add your custom styles here */
+
+/* Smart Cart — make item count clearly visible */
+.sc-trigger.sc-open-cart,
+.sc-header-icons .sc-trigger.sc-open-cart {
+  position: relative;
+  overflow: visible;
+}
+
+.sc-trigger.sc-open-cart .sc-trigger-count,
+.sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
+  top: -8px !important;
+  inset-inline-start: auto !important;
+  inset-inline-end: -10px !important;
+  left: auto !important;
+  right: -10px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  padding: 0 6px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  background: #d7263d !important;
+  border: 2px solid #fff !important;
+  border-radius: 999px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+html[dir="rtl"] .sc-trigger.sc-open-cart .sc-trigger-count,
+html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
+  right: auto !important;
+  left: -10px !important;
+  inset-inline-end: auto !important;
+  inset-inline-start: -10px !important;
+}
+
+.sc-trigger.sc-open-cart .sc-trigger-count.sc-trigger-count--empty,
+.sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count.sc-trigger-count--empty,
+.sc-trigger.sc-open-cart .sc-trigger-count[data-count="0"],
+.sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count[data-count="0"] {
+  display: none !important;
+}
