@@ -75,7 +75,9 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
    .book-card-item .book-add-to-cart-btn rules. */
 .elementor-2 .elementor-element.elementor-element-58cdf7d .book-card-item .book-action-area .book-add-to-cart-btn,
 .static-book-card .book-action-area .book-add-to-cart-btn {
-  display: inline-block !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Fallback design if the shortcode is used outside the homepage */
@@ -124,4 +126,18 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   box-sizing: border-box;
   z-index: 5;
   pointer-events: none;
+}
+
+/* Smart Cart — hide loading overlay / empty flash while the drawer is closing */
+.sc-root.sella-sc-closing .sc-drawer__loader {
+  display: none !important;
+}
+
+.sc-root.sella-sc-closing .sc-drawer.is-loading .sc-drawer__inner,
+.sc-root.sella-sc-closing .sc-drawer__inner {
+  visibility: visible !important;
+}
+
+.sc-root.sella-sc-closing .sc-empty {
+  display: none !important;
 }
