@@ -60,3 +60,56 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
 .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count[data-count="0"] {
   display: none !important;
 }
+
+/* Mobile header — Smart Cart search + cart icons (moved via JS) */
+.sella-mobile-icons-slot {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.sella-mobile-icons-slot .sc-header-icons {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+}
+
+.sella-mobile-icons-slot .sc-header-icons .sc-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.sella-mobile-icons-slot .sc-header-icons .sc-trigger svg,
+.sella-mobile-icons-slot .sc-header-icons .sc-trigger img,
+.sella-mobile-icons-slot .sc-header-icons .sc-trigger i {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+}
+
+@media (max-width: 767px) {
+  /* Keep the icons column aligned in one row with logo + hamburger */
+  .elementor-element-503a3c9 .elementor-element-bd991ad .elementor-widget-wrap,
+  .elementor-element-503a3c9 .elementor-element-bd991ad .e-con-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .sella-mobile-icons-slot .sc-header-icons .sc-trigger-count {
+    top: -6px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    font-size: 11px !important;
+    padding: 0 4px !important;
+  }
+}
