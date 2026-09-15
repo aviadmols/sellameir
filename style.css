@@ -183,6 +183,16 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   border-top: 1px solid #e7e7e7;
   box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.sella-sticky-product-cart.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .sella-sticky-product-cart__inner {
@@ -196,44 +206,49 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
 
 .sella-sticky-product-cart__details {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   min-width: 0;
 }
 
 .sella-sticky-product-cart__title {
   overflow: hidden;
   color: #171717;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .sella-sticky-product-cart__price {
   color: #171717;
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
 .sella-sticky-product-cart__button {
   flex: 0 0 auto;
   min-width: 190px;
-  padding: 13px 28px;
-  border: 0;
-  border-radius: 0;
+  padding: 12px 26px;
+  border: 1.7px solid #746fed;
+  border-radius: 50px;
   color: #fff;
-  background: #171717;
+  background: #746fed;
   font: inherit;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20px;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.3s, color 0.3s, opacity 0.3s;
 }
 
 .sella-sticky-product-cart__button:hover:not(:disabled) {
-  opacity: 0.82;
-  transform: translateY(-1px);
+  color: #746fed;
+  background: #fff;
 }
 
 .sella-sticky-product-cart__button:disabled {
@@ -256,13 +271,23 @@ body.sella-has-sticky-product-cart {
 
   .sella-sticky-product-cart__details {
     display: block;
+    flex: 1 1 auto;
     min-width: 0;
   }
 
   .sella-sticky-product-cart__title,
   .sella-sticky-product-cart__price {
     display: block;
+  }
+
+  .sella-sticky-product-cart__title {
     font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .sella-sticky-product-cart__price {
+    font-size: 14px;
+    line-height: 1.25;
   }
 
   .sella-sticky-product-cart__title {
@@ -272,7 +297,7 @@ body.sella-has-sticky-product-cart {
   .sella-sticky-product-cart__button {
     min-width: 145px;
     padding: 12px 16px;
-    font-size: 15px;
+    font-size: 16px;
   }
 
   body.sella-has-sticky-product-cart {

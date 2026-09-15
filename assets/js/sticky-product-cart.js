@@ -50,6 +50,13 @@
     document.body.classList.add('sella-has-sticky-product-cart');
     syncButton();
 
+    function syncVisibility() {
+      bar.classList.toggle('is-visible', window.scrollY > 80);
+    }
+
+    window.addEventListener('scroll', syncVisibility, { passive: true });
+    syncVisibility();
+
     if (window.MutationObserver) {
       new MutationObserver(syncButton).observe(originalButton, {
         attributes: true,
