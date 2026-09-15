@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.6' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.7' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
@@ -28,6 +28,7 @@ function sella_load_woocommerce_modules() {
 
 	require_once get_stylesheet_directory() . '/inc/product-book-fields.php';
 	require_once get_stylesheet_directory() . '/inc/product-badges.php';
+	require_once get_stylesheet_directory() . '/inc/home-books-cart.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 

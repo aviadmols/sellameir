@@ -61,6 +61,45 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   display: none !important;
 }
 
+/* Homepage books slider — add-to-cart button in static cards */
+.static-book-card .book-action-area {
+  display: flex !important;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* The homepage Elementor page CSS (post-2.css) hides the button inside this
+   widget with: .elementor-2 .elementor-element.elementor-element-58cdf7d
+   .book-card-item .book-add-to-cart-btn { display:none !important }.
+   Win with higher specificity; the pill design comes from the existing
+   .book-card-item .book-add-to-cart-btn rules. */
+.elementor-2 .elementor-element.elementor-element-58cdf7d .book-card-item .book-action-area .book-add-to-cart-btn,
+.static-book-card .book-action-area .book-add-to-cart-btn {
+  display: inline-block !important;
+}
+
+/* Fallback design if the shortcode is used outside the homepage */
+.static-book-card .book-action-area .book-add-to-cart-btn {
+  min-width: 140px;
+  padding: 10px 24px;
+  border: 1.7px solid #746fed;
+  border-radius: 50px;
+  color: #746fed;
+  background-color: transparent;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background-color 0.3s, color 0.3s, transform 0.2s;
+}
+
+.static-book-card .book-action-area .book-add-to-cart-btn:hover {
+  background-color: #746fed;
+  color: #fff;
+}
+
 /* Mobile header — Smart Cart search + cart icons (moved via JS) */
 .sella-mobile-icons-slot {
   display: inline-flex;
