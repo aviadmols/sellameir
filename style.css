@@ -149,26 +149,59 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  padding-inline: 128px;
+  padding: 0 140px;
   box-sizing: border-box;
+  color: #8a8a8a;
+  background: #fafafa;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .sc-topbar {
   position: absolute !important;
-  inset-block-start: 0;
-  inset-inline-start: 0;
+  inset: 0;
   z-index: 2;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   height: 48px;
-  padding-inline-start: 16px;
+  padding: 0 18px;
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
 .sc-login-link {
-  color: inherit;
-  font-size: 14px;
+  margin-inline-start: auto;
+  color: #171717;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1.2;
   white-space: nowrap;
+  pointer-events: auto;
+  transition: opacity 0.3s ease;
+}
+
+.sc-login-link:hover {
+  opacity: 0.65;
+}
+
+@media (max-width: 767px) {
+  .sc-announcement {
+    min-height: 46px;
+    padding: 0 112px;
+    font-size: 14px;
+  }
+
+  .sc-topbar {
+    height: 46px;
+    padding: 0 12px;
+  }
+
+  .sc-login-link {
+    font-size: 14px;
+  }
 }
 
 /* Product pages — persistent add-to-cart action for mobile and desktop. */
