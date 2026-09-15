@@ -56,6 +56,16 @@ function hello_elementor_child_scripts_styles() {
 		true
 	);
 
+	if ( function_exists( 'is_product' ) && is_product() ) {
+		wp_enqueue_script(
+			'sella-sticky-product-cart',
+			get_stylesheet_directory_uri() . '/assets/js/sticky-product-cart.js',
+			[],
+			HELLO_ELEMENTOR_CHILD_VERSION,
+			true
+		);
+	}
+
 }
 add_action( 'wp_enqueue_scripts', 'hello_elementor_child_scripts_styles', 20 );
 

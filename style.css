@@ -138,6 +138,115 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   visibility: visible !important;
 }
 
+/* Product pages — persistent add-to-cart action for mobile and desktop. */
+.sella-sticky-product-cart {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #e7e7e7;
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.sella-sticky-product-cart__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.sella-sticky-product-cart__details {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sella-sticky-product-cart__title {
+  overflow: hidden;
+  color: #171717;
+  font-size: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sella-sticky-product-cart__price {
+  color: #171717;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.sella-sticky-product-cart__button {
+  flex: 0 0 auto;
+  min-width: 190px;
+  padding: 13px 28px;
+  border: 0;
+  border-radius: 0;
+  color: #fff;
+  background: #171717;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sella-sticky-product-cart__button:hover:not(:disabled) {
+  opacity: 0.82;
+  transform: translateY(-1px);
+}
+
+.sella-sticky-product-cart__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+body.sella-has-sticky-product-cart {
+  padding-bottom: 78px;
+}
+
+@media (max-width: 767px) {
+  .sella-sticky-product-cart {
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .sella-sticky-product-cart__inner {
+    gap: 10px;
+  }
+
+  .sella-sticky-product-cart__details {
+    display: block;
+    min-width: 0;
+  }
+
+  .sella-sticky-product-cart__title,
+  .sella-sticky-product-cart__price {
+    display: block;
+    font-size: 14px;
+  }
+
+  .sella-sticky-product-cart__title {
+    max-width: 42vw;
+  }
+
+  .sella-sticky-product-cart__button {
+    min-width: 145px;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  body.sella-has-sticky-product-cart {
+    padding-bottom: 68px;
+  }
+}
+
 .sc-root.sella-sc-closing .sc-empty {
   display: none !important;
 }
