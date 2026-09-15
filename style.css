@@ -14,7 +14,7 @@ Tags: flexible-header, custom-colors, custom-menu, custom-logo, editor-style, fe
 
 /* Add your custom styles here */
 
-/* Smart Cart — make item count clearly visible */
+/* Smart Cart — subtle item count: white circle, black text */
 .sc-trigger.sc-open-cart,
 .sc-header-icons .sc-trigger.sc-open-cart {
   position: relative;
@@ -23,25 +23,25 @@ Tags: flexible-header, custom-colors, custom-menu, custom-logo, editor-style, fe
 
 .sc-trigger.sc-open-cart .sc-trigger-count,
 .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
-  top: -8px !important;
+  top: -5px !important;
   inset-inline-start: auto !important;
-  inset-inline-end: -10px !important;
+  inset-inline-end: -7px !important;
   left: auto !important;
-  right: -10px !important;
-  min-width: 22px !important;
-  height: 22px !important;
-  padding: 0 6px !important;
+  right: -7px !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  padding: 0 4px !important;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  font-size: 12px !important;
-  font-weight: 800 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
   line-height: 1 !important;
-  color: #fff !important;
-  background: #d7263d !important;
-  border: 2px solid #fff !important;
+  color: #000 !important;
+  background: #fff !important;
+  border: none !important;
   border-radius: 999px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
   z-index: 5;
   box-sizing: border-box;
 }
@@ -49,9 +49,9 @@ Tags: flexible-header, custom-colors, custom-menu, custom-logo, editor-style, fe
 html[dir="rtl"] .sc-trigger.sc-open-cart .sc-trigger-count,
 html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   right: auto !important;
-  left: -10px !important;
+  left: -7px !important;
   inset-inline-end: auto !important;
-  inset-inline-start: -10px !important;
+  inset-inline-start: -7px !important;
 }
 
 .sc-trigger.sc-open-cart .sc-trigger-count.sc-trigger-count--empty,
@@ -100,55 +100,28 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   color: #fff;
 }
 
-/* Mobile header — Smart Cart search + cart icons (moved via JS) */
-.sella-mobile-icons-slot {
-  display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
+/* Mobile header — cart count badge on the existing sibolet cart icon */
+.sibolet-header-icons .elementor-icon-list-item {
+  position: relative;
 }
 
-.sella-mobile-icons-slot .sc-header-icons {
-  display: inline-flex !important;
-  align-items: center;
-  gap: 14px;
-  margin: 0;
-}
-
-.sella-mobile-icons-slot .sc-header-icons .sc-trigger {
+.sella-mobile-cart-count {
+  position: absolute;
+  top: -5px;
+  inset-inline-start: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.sella-mobile-icons-slot .sc-header-icons .sc-trigger svg,
-.sella-mobile-icons-slot .sc-header-icons .sc-trigger img,
-.sella-mobile-icons-slot .sc-header-icons .sc-trigger i {
-  width: 24px;
-  height: 24px;
-  font-size: 24px;
-}
-
-@media (max-width: 767px) {
-  /* Keep the icons column aligned in one row with logo + hamburger */
-  .elementor-element-503a3c9 .elementor-element-bd991ad .elementor-widget-wrap,
-  .elementor-element-503a3c9 .elementor-element-bd991ad .e-con-inner {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-    gap: 10px;
-  }
-
-  .sella-mobile-icons-slot .sc-header-icons .sc-trigger-count {
-    top: -6px !important;
-    min-width: 18px !important;
-    height: 18px !important;
-    font-size: 11px !important;
-    padding: 0 4px !important;
-  }
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #000;
+  background: #fff;
+  border-radius: 999px;
+  box-sizing: border-box;
+  z-index: 5;
+  pointer-events: none;
 }
