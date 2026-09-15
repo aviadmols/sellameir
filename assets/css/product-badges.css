@@ -54,3 +54,11 @@
   inset-inline-start: 16px;
   z-index: 60;
 }
+
+/* Badges belong to catalogue/product views, not cart or checkout summaries. */
+.woocommerce-cart .sella-product-badges,
+.woocommerce-checkout .sella-product-badges,
+.woocommerce-cart .sella-product-image-with-badges,
+.woocommerce-checkout .sella-product-image-with-badges {
+  display: none !important;
+}

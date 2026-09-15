@@ -766,6 +766,10 @@ function sella_badge_filter_product_image( $image, $product ) {
 		return $image;
 	}
 
+	if ( ( function_exists( 'is_cart' ) && is_cart() ) || ( function_exists( 'is_checkout' ) && is_checkout() ) ) {
+		return $image;
+	}
+
 	if ( ! $product instanceof WC_Product ) {
 		return $image;
 	}
