@@ -29,6 +29,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/product-book-fields.php';
 	require_once get_stylesheet_directory() . '/inc/product-badges.php';
 	require_once get_stylesheet_directory() . '/inc/home-books-cart.php';
+	require_once get_stylesheet_directory() . '/inc/sella-upsell-popups.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 

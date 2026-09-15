@@ -1,0 +1,50 @@
+.sella-upsell-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+  max-width: 1440px;
+}
+
+.sella-upsell-admin-panel {
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+}
+
+.sella-upsell-admin-panel h2 {
+  margin-top: 0;
+}
+
+.sella-upsell-admin .form-table th {
+  width: 180px;
+}
+
+.sella-upsell-admin .description {
+  margin-top: 8px;
+}
+
+.sella-upsell-admin .select2-selection__rendered > li.select2-selection__choice {
+  cursor: grab;
+}
+
+.sella-upsell-admin .select2-selection__rendered > li.select2-selection__choice:active {
+  cursor: grabbing;
+}
+
+.sella-upsell-delay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 12px;
+}
+
+.sella-upsell-delay input {
+  width: 70px;
+}
+
+@media (max-width: 900px) {
+  .sella-upsell-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

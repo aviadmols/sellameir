@@ -1,0 +1,201 @@
+:root {
+  --sella-upsell-ink: #171717;
+  --sella-upsell-paper: #fff;
+  --sella-upsell-rule: #dedede;
+}
+
+.sella-upsell-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sella-upsell-popup.is-open {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sella-upsell-popup__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.sella-upsell-popup.is-open .sella-upsell-popup__overlay {
+  opacity: 1;
+}
+
+.sella-upsell-popup__panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(410px, 94vw);
+  padding: 72px 28px 28px;
+  overflow-y: auto;
+  color: var(--sella-upsell-ink);
+  background: var(--sella-upsell-paper);
+  box-shadow: -16px 0 44px rgba(0, 0, 0, 0.12);
+  transform: translateX(105%);
+  transition: transform 0.5s ease;
+}
+
+.sella-upsell-popup.is-open .sella-upsell-popup__panel {
+  transform: translateX(0);
+}
+
+.sella-upsell-popup__close {
+  position: absolute;
+  inset-block-start: 18px;
+  inset-inline-start: 20px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--sella-upsell-rule);
+  border-radius: 0;
+  color: var(--sella-upsell-ink);
+  background: transparent;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.5s ease;
+}
+
+.sella-upsell-popup__close:hover {
+  color: var(--sella-upsell-paper);
+  background: var(--sella-upsell-ink);
+}
+
+.sella-upsell-popup__eyebrow {
+  margin: 0 0 8px;
+  color: #777;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+.sella-upsell-popup__title {
+  margin: 0 0 26px;
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sella-upsell-popup__viewport {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: 330px;
+}
+
+.sella-upsell-popup__track {
+  width: 100%;
+}
+
+.sella-upsell-popup__slide {
+  text-align: center;
+}
+
+.sella-upsell-popup__image {
+  display: block;
+  width: min(230px, 75%);
+  aspect-ratio: 3 / 4;
+  margin: 0 auto 24px;
+  object-fit: contain;
+  border-radius: 7px;
+  box-shadow: rgb(0 0 0 / 16%) 0 28px 32px -25px, rgb(0 0 0 / 6%) 0 2px 12px 0;
+}
+
+.sella-upsell-popup__product-name {
+  margin: 0 auto 8px;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.sella-upsell-popup__price {
+  min-height: 24px;
+  margin: 0 0 22px;
+  font-size: 18px;
+}
+
+.sella-upsell-popup__add {
+  width: 100%;
+  padding: 14px 20px;
+  border: 1px solid var(--sella-upsell-ink);
+  border-radius: 0;
+  color: var(--sella-upsell-paper);
+  background: var(--sella-upsell-ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.5s ease;
+}
+
+.sella-upsell-popup__add:hover:not(:disabled) {
+  color: var(--sella-upsell-ink);
+  background: var(--sella-upsell-paper);
+}
+
+.sella-upsell-popup__add:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.sella-upsell-popup__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.sella-upsell-popup__arrow {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--sella-upsell-rule);
+  border-radius: 0;
+  color: var(--sella-upsell-ink);
+  background: var(--sella-upsell-paper);
+  font-size: 21px;
+  cursor: pointer;
+}
+
+.sella-upsell-popup__arrow:hover {
+  color: var(--sella-upsell-paper);
+  background: var(--sella-upsell-ink);
+}
+
+.sella-upsell-popup__counter {
+  min-width: 50px;
+  color: #777;
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (max-width: 767px) {
+  .sella-upsell-popup__panel {
+    width: min(100%, 390px);
+    padding: 64px 20px 22px;
+  }
+
+  .sella-upsell-popup__viewport {
+    min-height: 300px;
+  }
+
+  .sella-upsell-popup__image {
+    width: min(190px, 62%);
+    margin-bottom: 18px;
+  }
+
+  .sella-upsell-popup__product-name {
+    font-size: 21px;
+  }
+}

@@ -2,10 +2,11 @@
   'use strict';
 
   function boot() {
-    var form = document.querySelector('form.cart');
-    var originalButton = form && form.querySelector('.single_add_to_cart_button');
+    var originalButton = document.querySelector(
+      '.single_add_to_cart_button, button[name="add-to-cart"], a.add_to_cart_button'
+    );
 
-    if (!form || !originalButton || document.querySelector('.sella-sticky-product-cart')) {
+    if (!originalButton || document.querySelector('.sella-sticky-product-cart')) {
       return;
     }
 
