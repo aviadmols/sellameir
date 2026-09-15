@@ -43,6 +43,7 @@
     function toggleScopeProducts() {
       var scope = $('#sella_upsell_scope').val();
       $('.sella-upsell-scope-products').prop('hidden', scope !== 'products');
+      $('.sella-upsell-scope-pages').prop('hidden', scope !== 'pages');
     }
 
     $('#sella_upsell_scope').on('change', toggleScopeProducts);

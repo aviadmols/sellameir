@@ -70,6 +70,23 @@ function hello_elementor_child_scripts_styles() {
 }
 add_action( 'wp_enqueue_scripts', 'hello_elementor_child_scripts_styles', 20 );
 
+/**
+ * Add a product thumbnail to checkout order-review rows.
+ *
+ * @param string $product_name Product name HTML.
+ * @param array  $cart_item Cart item data.
+ * @return string
+ */
+function sella_checkout_product_thumbnail( $product_name, $cart_item ) {
+	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || empty( $cart_item['data'] ) || ! is_a( $cart_item['data'], 'WC_Product' ) ) {
+		return $product_name;
+	}
+
+	$image = $cart_item['data']->get_image( array( 72, 92 ), array( 'class' => 'sella-checkout-product-image' ) );
+	return '<span class="sella-checkout-product">' . $image . '<span class="sella-checkout-product-name">' . $product_name . '</span></span>';
+}
+add_filter( 'woocommerce_cart_item_name', 'sella_checkout_product_thumbnail', 20, 2 );
+
 
 add_filter('upload_mimes', function ($mimes) {
     $mimes['json'] = 'application/json';

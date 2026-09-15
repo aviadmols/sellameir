@@ -17,6 +17,9 @@ define( 'SELLA_UPSELL_META_DELAY', '_sella_upsell_delay' );
 define( 'SELLA_UPSELL_META_FREQUENCY', '_sella_upsell_frequency' );
 define( 'SELLA_UPSELL_META_SCOPE', '_sella_upsell_scope' );
 define( 'SELLA_UPSELL_META_SCOPE_PRODUCTS', '_sella_upsell_scope_products' );
+define( 'SELLA_UPSELL_META_SCOPE_PAGES', '_sella_upsell_scope_pages' );
+define( 'SELLA_UPSELL_META_PRODUCT_CATEGORIES', '_sella_upsell_product_categories' );
+define( 'SELLA_UPSELL_META_PRODUCT_TAGS', '_sella_upsell_product_tags' );
 
 /**
  * Register private storage for popup definitions.
@@ -94,7 +97,9 @@ function sella_upsell_options() {
 			'product'        => 'בדפי מוצר',
 			'shop'           => 'בחנות ובקטגוריות',
 			'cart'           => 'בדף הסל',
+			'checkout'       => 'בדף התשלום',
 			'products'       => 'רק בדפי ספרים מסוימים',
+			'pages'          => 'רק בעמודים ספציפיים',
 		),
 	);
 }
@@ -138,6 +143,21 @@ function sella_upsell_save_meta( $post_id, $source ) {
 		$scope_products = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_upsell_scope_products'] ) ) ) ) );
 	}
 
+	$scope_pages = array();
+	if ( ! empty( $source['sella_upsell_scope_pages'] ) && is_array( $source['sella_upsell_scope_pages'] ) ) {
+		$scope_pages = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_upsell_scope_pages'] ) ) ) ) );
+	}
+
+	$product_categories = array();
+	if ( ! empty( $source['sella_upsell_product_categories'] ) && is_array( $source['sella_upsell_product_categories'] ) ) {
+		$product_categories = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_upsell_product_categories'] ) ) ) ) );
+	}
+
+	$product_tags = array();
+	if ( ! empty( $source['sella_upsell_product_tags'] ) && is_array( $source['sella_upsell_product_tags'] ) ) {
+		$product_tags = array_values( array_unique( array_filter( array_map( 'absint', wp_unslash( $source['sella_upsell_product_tags'] ) ) ) ) );
+	}
+
 	update_post_meta( $post_id, SELLA_UPSELL_META_ENABLED, $enabled );
 	update_post_meta( $post_id, SELLA_UPSELL_META_PRODUCTS, array_values( array_unique( $products ) ) );
 	update_post_meta( $post_id, SELLA_UPSELL_META_TRIGGER, $trigger );
@@ -145,6 +165,9 @@ function sella_upsell_save_meta( $post_id, $source ) {
 	update_post_meta( $post_id, SELLA_UPSELL_META_FREQUENCY, $freq );
 	update_post_meta( $post_id, SELLA_UPSELL_META_SCOPE, $scope );
 	update_post_meta( $post_id, SELLA_UPSELL_META_SCOPE_PRODUCTS, $scope_products );
+	update_post_meta( $post_id, SELLA_UPSELL_META_SCOPE_PAGES, $scope_pages );
+	update_post_meta( $post_id, SELLA_UPSELL_META_PRODUCT_CATEGORIES, $product_categories );
+	update_post_meta( $post_id, SELLA_UPSELL_META_PRODUCT_TAGS, $product_tags );
 }
 
 /**
@@ -216,8 +239,19 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 	$frequency      = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_FREQUENCY, true ) : 'session';
 	$scope          = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_SCOPE, true ) : 'all';
 	$scope_products = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_SCOPE_PRODUCTS, true ) : array();
+	$scope_pages    = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_SCOPE_PAGES, true ) : array();
+	$product_cats   = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_PRODUCT_CATEGORIES, true ) : array();
+	$product_tags   = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_PRODUCT_TAGS, true ) : array();
 	$products       = is_array( $products ) ? array_map( 'absint', $products ) : array();
 	$scope_products = is_array( $scope_products ) ? array_map( 'absint', $scope_products ) : array();
+	$scope_pages    = is_array( $scope_pages ) ? array_map( 'absint', $scope_pages ) : array();
+	$product_cats   = is_array( $product_cats ) ? array_map( 'absint', $product_cats ) : array();
+	$product_tags   = is_array( $product_tags ) ? array_map( 'absint', $product_tags ) : array();
+	$categories     = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
+	$tags           = get_terms( array( 'taxonomy' => 'product_tag', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
+	$pages          = get_pages( array( 'sort_column' => 'post_title', 'sort_order' => 'ASC', 'post_status' => 'publish' ) );
+	$categories     = is_wp_error( $categories ) ? array() : $categories;
+	$tags           = is_wp_error( $tags ) ? array() : $tags;
 	?>
 	<div class="sella-upsell-admin" dir="rtl">
 		<table class="form-table" role="presentation">
@@ -238,6 +272,21 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 						<?php endforeach; ?>
 					</select>
 					<p class="description">גררו את הספרים בתוך הרשימה כדי לשנות את הסדר.</p>
+				</td>
+			</tr>
+			<tr>
+				<th>מקור הספרים</th>
+				<td>
+					<p><strong>מוצרים שנבחרו ידנית</strong> נשארים בסדר הסליידר שבחרתם.</p>
+					<label for="sella_upsell_product_categories">קטגוריות ספרים</label><br />
+					<select id="sella_upsell_product_categories" name="sella_upsell_product_categories[]" multiple="multiple" style="width:100%;max-width:700px;min-height:110px;">
+						<?php foreach ( $categories as $term ) : ?><option value="<?php echo esc_attr( (string) $term->term_id ); ?>" <?php selected( in_array( (int) $term->term_id, $product_cats, true ) ); ?>><?php echo esc_html( $term->name ); ?></option><?php endforeach; ?>
+					</select>
+					<br /><label for="sella_upsell_product_tags">תגיות ספרים</label><br />
+					<select id="sella_upsell_product_tags" name="sella_upsell_product_tags[]" multiple="multiple" style="width:100%;max-width:700px;min-height:110px;">
+						<?php foreach ( $tags as $term ) : ?><option value="<?php echo esc_attr( (string) $term->term_id ); ?>" <?php selected( in_array( (int) $term->term_id, $product_tags, true ) ); ?>><?php echo esc_html( $term->name ); ?></option><?php endforeach; ?>
+					</select>
+					<p class="description">המוצרים מהקטגוריות והתגיות מצטרפים אחרי המוצרים הידניים, ללא כפילויות.</p>
 				</td>
 			</tr>
 			<tr>
@@ -262,6 +311,12 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 							<?php foreach ( $scope_products as $product_id ) : $product = wc_get_product( $product_id ); if ( ! $product ) { continue; } ?>
 								<option value="<?php echo esc_attr( (string) $product_id ); ?>" selected="selected"><?php echo esc_html( wp_strip_all_tags( $product->get_formatted_name() ) ); ?></option>
 							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="sella-upsell-scope-pages" <?php echo 'pages' === $scope ? '' : 'hidden'; ?> style="margin-top:10px;">
+						<label for="sella_upsell_scope_pages">עמודים להצגה</label><br />
+						<select id="sella_upsell_scope_pages" name="sella_upsell_scope_pages[]" multiple="multiple" style="width:100%;max-width:700px;min-height:140px;">
+							<?php foreach ( $pages as $page ) : ?><option value="<?php echo esc_attr( (string) $page->ID ); ?>" <?php selected( in_array( (int) $page->ID, $scope_pages, true ) ); ?>><?php echo esc_html( $page->post_title ); ?></option><?php endforeach; ?>
 						</select>
 					</div>
 				</td>
@@ -342,12 +397,61 @@ function sella_upsell_admin_assets( $hook ) {
 add_action( 'admin_enqueue_scripts', 'sella_upsell_admin_assets' );
 
 /**
+ * Build the ordered product list for a popup.
+ *
+ * @param int $popup_id Popup ID.
+ * @return array<int, int>
+ */
+function sella_upsell_get_product_ids( $popup_id ) {
+	$ids = get_post_meta( $popup_id, SELLA_UPSELL_META_PRODUCTS, true );
+	$ids = is_array( $ids ) ? array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) ) : array();
+
+	$tax_query = array( 'relation' => 'OR' );
+	$categories = get_post_meta( $popup_id, SELLA_UPSELL_META_PRODUCT_CATEGORIES, true );
+	$tags       = get_post_meta( $popup_id, SELLA_UPSELL_META_PRODUCT_TAGS, true );
+	if ( is_array( $categories ) && ! empty( $categories ) ) {
+		$tax_query[] = array(
+			'taxonomy' => 'product_cat',
+			'field'    => 'term_id',
+			'terms'    => array_map( 'absint', $categories ),
+		);
+	}
+	if ( is_array( $tags ) && ! empty( $tags ) ) {
+		$tax_query[] = array(
+			'taxonomy' => 'product_tag',
+			'field'    => 'term_id',
+			'terms'    => array_map( 'absint', $tags ),
+		);
+	}
+
+	if ( count( $tax_query ) > 1 ) {
+		$taxonomy_ids = get_posts(
+			array(
+				'post_type'              => 'product',
+				'post_status'            => 'publish',
+				'posts_per_page'         => -1,
+				'fields'                 => 'ids',
+				'orderby'                => 'menu_order title',
+				'order'                  => 'ASC',
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'tax_query'              => $tax_query,
+			)
+		);
+		$ids = array_values( array_unique( array_merge( $ids, array_map( 'absint', $taxonomy_ids ) ) ) );
+	}
+
+	return $ids;
+}
+
+/**
  * Return enabled popups that match the current page.
  *
  * @return array<int, array<string, mixed>>
  */
 function sella_upsell_get_active() {
-	if ( ! class_exists( 'WooCommerce' ) || ( function_exists( 'is_checkout' ) && is_checkout() ) ) {
+	if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'WC' ) || ! WC()->cart ) {
 		return array();
 	}
 
@@ -358,6 +462,8 @@ function sella_upsell_get_active() {
 		$scope_context = 'shop';
 	} elseif ( function_exists( 'is_cart' ) && is_cart() ) {
 		$scope_context = 'cart';
+	} elseif ( function_exists( 'is_checkout' ) && is_checkout() ) {
+		$scope_context = 'checkout';
 	}
 
 	$query = new WP_Query(
@@ -389,7 +495,7 @@ function sella_upsell_get_active() {
 		}
 
 		$scope = get_post_meta( $post->ID, SELLA_UPSELL_META_SCOPE, true ) ?: 'all';
-		if ( 'all' !== $scope && 'products' !== $scope && $scope !== $scope_context ) {
+		if ( 'all' !== $scope && 'products' !== $scope && 'pages' !== $scope && $scope !== $scope_context ) {
 			continue;
 		}
 		if ( 'products' === $scope ) {
@@ -402,10 +508,17 @@ function sella_upsell_get_active() {
 				continue;
 			}
 		}
+		if ( 'pages' === $scope ) {
+			$allowed = get_post_meta( $post->ID, SELLA_UPSELL_META_SCOPE_PAGES, true );
+			$current = get_queried_object_id();
+			if ( ! is_array( $allowed ) || ! in_array( absint( $current ), array_map( 'absint', $allowed ), true ) ) {
+				continue;
+			}
+		}
 
 		$items = array();
-		$product_ids = get_post_meta( $post->ID, SELLA_UPSELL_META_PRODUCTS, true );
-		foreach ( is_array( $product_ids ) ? $product_ids : array() as $product_id ) {
+		$product_ids = sella_upsell_get_product_ids( $post->ID );
+		foreach ( $product_ids as $product_id ) {
 			$product_id = absint( $product_id );
 			if ( ! $product_id || in_array( $product_id, $cart_ids, true ) ) {
 				continue;
