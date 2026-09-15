@@ -57,6 +57,14 @@ function hello_elementor_child_scripts_styles() {
 		true
 	);
 
+	wp_enqueue_script(
+		'sella-store-notifications',
+		get_stylesheet_directory_uri() . '/assets/js/sella-store-notifications.js',
+		[],
+		HELLO_ELEMENTOR_CHILD_VERSION,
+		true
+	);
+
 	if ( function_exists( 'is_product' ) && is_product() ) {
 		wp_enqueue_script(
 			'sella-sticky-product-cart',

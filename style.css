@@ -417,6 +417,136 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
 }
 
 /* Product pages — persistent add-to-cart action for mobile and desktop. */
+.woocommerce-notices-wrapper {
+  position: fixed;
+  inset-inline-end: 20px;
+  inset-block-end: 20px;
+  z-index: 2100;
+  width: min(390px, calc(100vw - 40px));
+  pointer-events: none;
+}
+
+.woocommerce-notices-wrapper .woocommerce-message,
+.woocommerce-notices-wrapper .woocommerce-info,
+.woocommerce-notices-wrapper .woocommerce-error {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 58px;
+  margin: 0 0 10px;
+  padding: 17px 46px 17px 48px;
+  overflow: hidden;
+  border: 1px solid #d8d8d8;
+  border-inline-start: 4px solid #2d8a5a;
+  border-radius: 4px;
+  color: #171717;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  font-size: 15px;
+  line-height: 1.45;
+  pointer-events: auto;
+  transform: translateX(120%);
+  animation: sella-notification-in 0.45s ease forwards;
+  box-sizing: border-box;
+}
+
+.woocommerce-notices-wrapper .woocommerce-message::before,
+.woocommerce-notices-wrapper .woocommerce-info::before,
+.woocommerce-notices-wrapper .woocommerce-error::before {
+  position: absolute;
+  inset-inline-start: 17px;
+  inset-block-start: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #fff;
+  background: #2d8a5a;
+  content: '✓';
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.woocommerce-notices-wrapper .woocommerce-info {
+  border-inline-start-color: #746fed;
+}
+
+.woocommerce-notices-wrapper .woocommerce-info::before {
+  background: #746fed;
+  content: 'i';
+  font-family: Georgia, serif;
+}
+
+.woocommerce-notices-wrapper .woocommerce-error {
+  border-inline-start-color: #d7263d;
+}
+
+.woocommerce-notices-wrapper .woocommerce-error::before {
+  background: #d7263d;
+  content: '!';
+}
+
+.woocommerce-notices-wrapper .woocommerce-message a,
+.woocommerce-notices-wrapper .woocommerce-info a,
+.woocommerce-notices-wrapper .woocommerce-error a {
+  display: inline-block;
+  margin-inline-start: 8px;
+  color: #746fed;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.sella-notification-close {
+  position: absolute;
+  inset-inline-end: 12px;
+  inset-block-start: 10px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  color: #777;
+  background: transparent;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sella-notification-close:hover {
+  color: #171717;
+}
+
+.woocommerce-notices-wrapper .is-dismissing {
+  animation: sella-notification-out 0.35s ease forwards;
+}
+
+@keyframes sella-notification-in {
+  from { opacity: 0; transform: translateX(120%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes sella-notification-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(120%); }
+}
+
+@media (max-width: 767px) {
+  .woocommerce-notices-wrapper {
+    inset-inline-end: 12px;
+    inset-block-end: 12px;
+    width: calc(100vw - 24px);
+  }
+
+  .woocommerce-notices-wrapper .woocommerce-message,
+  .woocommerce-notices-wrapper .woocommerce-info,
+  .woocommerce-notices-wrapper .woocommerce-error {
+    padding: 15px 40px 15px 44px;
+    font-size: 14px;
+  }
+}
+
 .sella-sticky-product-cart {
   position: fixed;
   right: 0;
