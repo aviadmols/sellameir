@@ -32,6 +32,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-upsell-popups.php';
 	require_once get_stylesheet_directory() . '/inc/sella-back-in-stock.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shop-banners.php';
+	require_once get_stylesheet_directory() . '/inc/sella-unlimited-stock.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
