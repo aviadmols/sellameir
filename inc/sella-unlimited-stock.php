@@ -189,7 +189,7 @@ function sella_us_render_admin_page() {
 	$updated = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
 	$running = $after && sella_us_pending_product_ids( $after, 1 );
 	$pending = $running ? array() : sella_us_pending_product_ids();
-	$options = wc_get_stock_status_options();
+	$options = wc_get_product_stock_status_options();
 	?>
 	<div class="wrap" dir="rtl">
 		<h1>מלאי בלתי מוגבל</h1>

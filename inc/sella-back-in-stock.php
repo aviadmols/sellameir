@@ -804,7 +804,7 @@ function sella_bis_admin_product_info( $product_id ) {
 	}
 
 	$edit_id = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id();
-	$options = wc_get_stock_status_options();
+	$options = wc_get_product_stock_status_options();
 	$status  = $product->get_stock_status();
 
 	$cache[ $product_id ] = array(
