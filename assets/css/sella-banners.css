@@ -1,0 +1,119 @@
+/* Shop banners — swipeable slider above the product grid. */
+.sella-banners {
+  position: relative;
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto 28px;
+}
+
+.sella-banners[hidden] {
+  display: none !important;
+}
+
+.sella-banners__viewport {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.sella-banners__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sella-banners__track::-webkit-scrollbar {
+  display: none;
+}
+
+.sella-banners__slide {
+  flex: 0 0 100%;
+  display: block;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.sella-banners__slide img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.sella-banners__arrow {
+  position: absolute;
+  inset-block-start: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #171717;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.sella-banners__arrow:hover {
+  background: #fff;
+}
+
+.sella-banners__arrow--prev {
+  inset-inline-start: 12px;
+}
+
+.sella-banners__arrow--next {
+  inset-inline-end: 12px;
+}
+
+.sella-banners__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.sella-banners__dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #d4d4dd;
+  cursor: pointer;
+  transition: background-color 0.25s ease, width 0.25s ease;
+}
+
+.sella-banners__dot.is-active {
+  width: 22px;
+  border-radius: 4px;
+  background: #746fed;
+}
+
+@media (max-width: 767px) {
+  .sella-banners {
+    width: calc(100% - 24px);
+    margin-bottom: 20px;
+  }
+
+  /* A wide banner is short on a phone, so arrows would cover it — swipe and
+     dots are enough there. */
+  .sella-banners__arrow {
+    display: none;
+  }
+
+  .sella-banners__dots {
+    margin-top: 10px;
+  }
+}

@@ -48,5 +48,13 @@
 
     $('#sella_upsell_scope').on('change', toggleScopeProducts);
     toggleScopeProducts();
+
+    function toggleCartRule() {
+      var rule = $('#sella_upsell_cart_rule').val();
+      $('.sella-upsell-cart-match').prop('hidden', rule !== 'contains' && rule !== 'not_contains');
+    }
+
+    $('#sella_upsell_cart_rule').on('change', toggleCartRule);
+    toggleCartRule();
   });
 })(jQuery);

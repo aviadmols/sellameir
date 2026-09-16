@@ -1072,3 +1072,66 @@ body.sella-has-sticky-product-cart {
   outline: 2px solid rgba(116, 111, 237, 0.35);
   outline-offset: 2px;
 }
+
+/* Docked shop search — the Smart Cart panel opens inside the filter bar
+   (assets/js/sella-shop-search.js moves the whole #sc-search root in here). */
+.sibolet-archive-filter-bar.sella-search-host {
+  position: relative;
+}
+
+body.sella-search-docked-open.sc-search-open {
+  overflow: visible;
+}
+
+#sc-search.sella-search-docked {
+  position: absolute;
+  inset: auto;
+  inset-block-start: calc(100% + 10px);
+  inset-inline-start: 0;
+  width: 100%;
+  height: auto;
+}
+
+/* Docked, the panel is a dropdown: no dimming, and no second search field —
+   the shopper types in the archive field and the script forwards the term. */
+#sc-search.sella-search-docked .sc-search__backdrop,
+#sc-search.sella-search-docked .sc-search__bar {
+  display: none;
+}
+
+#sc-search.sella-search-docked .sc-search__panel {
+  width: 100%;
+  max-width: none;
+  max-height: min(72vh, 620px);
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  #sc-search.sella-search-docked .sc-search__panel {
+    max-height: min(68vh, 520px);
+  }
+}
+
+/* Sticky product bar — price under the title, sale price included. */
+.sella-sticky-product-cart__price {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.sella-sticky-product-cart__price del {
+  color: #8a8a8a;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+
+.sella-sticky-product-cart__price ins {
+  color: #171717;
+  background: none;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sella-sticky-product-cart__price .screen-reader-text {
+  display: none;
+}

@@ -26,13 +26,51 @@
     var price = bar.querySelector('.sella-sticky-product-cart__price');
     var stickyButton = bar.querySelector('.sella-sticky-product-cart__button');
     var productTitle = document.querySelector('.product_title');
-    var productPrice = document.querySelector('.summary .price');
 
     title.textContent = productTitle ? productTitle.textContent.trim() : '';
-    if (productPrice) {
-      price.innerHTML = productPrice.innerHTML;
-    }
     stickyButton.textContent = originalButton.textContent.trim() || 'הוספה לסל';
+
+    /**
+     * The product template is built in Elementor, so there is no .summary
+     * wrapper — look through the places the price widget actually renders,
+     * most specific first (a comma list would return whichever comes first
+     * in the document, which can be a related product).
+     */
+    function findPrice() {
+      var selectors = [
+        '.woocommerce-variation-price .price',
+        '.elementor-widget-woocommerce-product-price .price',
+        '.summary .price',
+        '.entry-summary .price',
+        '.product .price'
+      ];
+
+      for (var i = 0; i < selectors.length; i++) {
+        var found = document.querySelector(selectors[i]);
+        if (found && found.offsetParent !== null) {
+          return found;
+        }
+      }
+      return null;
+    }
+
+    function syncPrice() {
+      var source = findPrice();
+      if (!source) {
+        price.innerHTML = '';
+        return;
+      }
+
+      // Keep <del>/<ins> so the sale price reads as a sale, but drop
+      // WooCommerce's screen-reader sentences.
+      var clone = source.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll('.screen-reader-text'), function (node) {
+        node.parentNode.removeChild(node);
+      });
+      price.innerHTML = clone.innerHTML.trim();
+    }
+
+    syncPrice();
 
     function syncButton() {
       stickyButton.disabled = originalButton.disabled;
@@ -67,7 +105,10 @@
     }
 
     if (window.jQuery) {
-      window.jQuery(document.body).on('found_variation reset_data hide_variation show_variation', syncButton);
+      window.jQuery(document.body).on('found_variation reset_data hide_variation show_variation', function () {
+        syncButton();
+        syncPrice();
+      });
     }
   }
 

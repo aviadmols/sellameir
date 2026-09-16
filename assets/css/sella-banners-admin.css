@@ -1,0 +1,102 @@
+.sella-banners-admin .sella-banner-rows {
+  display: grid;
+  gap: 14px;
+  max-width: 1080px;
+}
+
+.sella-banner-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 16px 18px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.sella-banner-row__handle {
+  color: #a7aaad;
+  font-size: 18px;
+  line-height: 1.6;
+  cursor: grab;
+  user-select: none;
+}
+
+.sella-banner-row__handle:active {
+  cursor: grabbing;
+}
+
+.sella-banner-row__media {
+  display: grid;
+  gap: 16px;
+}
+
+.sella-banner-pick__label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.sella-banner-pick__preview {
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px dashed #c3c4c7;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.sella-banner-pick__preview.is-empty {
+  min-height: 56px;
+}
+
+.sella-banner-pick__preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.sella-banner-pick__clear {
+  margin-inline-start: 10px;
+  color: #b32d2e;
+}
+
+.sella-banner-row__fields {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.sella-banner-row__fields label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.sella-banner-row__fields input[type="url"],
+.sella-banner-row__fields input[type="text"] {
+  width: 100%;
+  font-weight: 400;
+}
+
+.sella-banner-row__toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.sella-banner-row__remove {
+  justify-self: start;
+  color: #b32d2e;
+}
+
+@media (max-width: 782px) {
+  .sella-banner-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sella-banner-row__handle {
+    display: none;
+  }
+}

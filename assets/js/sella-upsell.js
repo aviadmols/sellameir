@@ -169,16 +169,50 @@
     render();
   }
 
+  /**
+   * Books already added stay out of every popup for the rest of the visit,
+   * even after a reload or a server refresh.
+   */
+  var ADDED_KEY = 'sella-upsell-added';
+  var added = loadAdded();
+
+  function loadAdded() {
+    var map = {};
+    try {
+      var stored = JSON.parse(window.sessionStorage.getItem(ADDED_KEY) || '[]');
+      for (var i = 0; i < stored.length; i++) {
+        map[String(stored[i])] = true;
+      }
+    } catch (e) {
+      /* Private browsing: the list simply starts empty. */
+    }
+    return map;
+  }
+
+  function markAdded(productId) {
+    added[String(productId)] = true;
+    try {
+      window.sessionStorage.setItem(ADDED_KEY, JSON.stringify(Object.keys(added)));
+    } catch (e) {
+      /* Nothing to do; the in-memory list still holds for this page. */
+    }
+  }
+
+  function pruneAdded() {
+    for (var i = 0; i < popups.length; i++) {
+      popups[i].items = popups[i].items.filter(function (item) {
+        return !added[String(item.id)];
+      });
+    }
+  }
+
   function removeFromAllPopups(productId) {
     productId = String(productId || '');
     if (!productId) {
       return;
     }
-    for (var i = 0; i < popups.length; i++) {
-      popups[i].items = popups[i].items.filter(function (item) {
-        return String(item.id) !== productId;
-      });
-    }
+    markAdded(productId);
+    pruneAdded();
   }
 
   function openPopup(popup) {
@@ -225,7 +259,10 @@
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: 'action=sella_upsell_add&nonce=' + encodeURIComponent(data.nonce) + '&product_id=' + encodeURIComponent(item.id) + '&quantity=1'
+      body: 'action=sella_upsell_add&nonce=' + encodeURIComponent(data.nonce) +
+        '&product_id=' + encodeURIComponent(item.id) +
+        '&popup_id=' + encodeURIComponent(activePopup.id) +
+        '&quantity=1'
     }).then(function (response) {
       return response.json();
     });
@@ -240,6 +277,8 @@
       button.textContent = labels.added || 'נוסף לסל!';
 
       var reloading = syncStore(response.data, button);
+
+      // Out of the slider for good — the shopper already has it.
       removeFromAllPopups(item.id);
 
       window.setTimeout(function () {
@@ -250,7 +289,11 @@
           closePopup();
           return;
         }
+        // Removing the item shifted the next one into this slot.
         currentIndex = Math.min(currentIndex, activePopup.items.length - 1);
+        nodes.card.classList.remove('is-swapping');
+        void nodes.card.offsetWidth;
+        nodes.card.classList.add('is-swapping');
         render();
       }, 900);
     }).catch(function () {
@@ -313,6 +356,65 @@
     return false;
   }
 
+  /**
+   * Cart rules are decided on the server, so after the cart changes the popup
+   * list is stale. Ask for a fresh one before deciding what to show.
+   */
+  function refreshPopups(done) {
+    if (!data.refreshUrl) {
+      if (done) {
+        done();
+      }
+      return;
+    }
+
+    var context = data.context || {};
+
+    window.fetch(data.refreshUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: 'nonce=' + encodeURIComponent(data.nonce) +
+        '&scope=' + encodeURIComponent(context.scope || 'all') +
+        '&object_id=' + encodeURIComponent(context.object_id || 0)
+    }).then(function (response) {
+      return response.json();
+    }).then(function (response) {
+      if (response && response.success && response.data && response.data.popups) {
+        popups = response.data.popups;
+        pruneAdded();
+        resyncOpen();
+      }
+      if (done) {
+        done();
+      }
+    }).catch(function () {
+      if (done) {
+        done();
+      }
+    });
+  }
+
+  /** A refresh hands back new popup objects; point an open popup at its new self. */
+  function resyncOpen() {
+    if (!activePopup || !root || root.hidden) {
+      return;
+    }
+
+    for (var i = 0; i < popups.length; i++) {
+      if (popups[i].id === activePopup.id) {
+        activePopup = popups[i];
+        if (!activePopup.items.length) {
+          closePopup();
+          return;
+        }
+        currentIndex = Math.min(currentIndex, activePopup.items.length - 1);
+        render();
+        return;
+      }
+    }
+  }
+
   function nextEligible() {
     for (var i = 0; i < popups.length; i++) {
       if (popups[i].items.length && canShow(popups[i])) {
@@ -336,6 +438,9 @@
   }
 
   function boot() {
+    // Books added earlier in this visit never come back into the slider.
+    pruneAdded();
+
     if (!popups.length) {
       return;
     }
@@ -377,9 +482,17 @@
         }
         var productId = button && (button.value || button.getAttribute('data-product_id') || button.getAttribute('data-product-id'));
         removeFromAllPopups(productId);
-        if (hasTrigger('add_to_cart')) {
-          showEligible();
-        }
+
+        // The cart just changed, so re-run the cart rules before showing anything.
+        refreshPopups(function () {
+          if (hasTrigger('add_to_cart')) {
+            showEligible();
+          }
+        });
+      });
+
+      window.jQuery(document.body).on('updated_cart_totals wc_cart_emptied', function () {
+        refreshPopups();
       });
     }
   }
