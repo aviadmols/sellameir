@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.12' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.14' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
@@ -30,6 +30,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/product-badges.php';
 	require_once get_stylesheet_directory() . '/inc/home-books-cart.php';
 	require_once get_stylesheet_directory() . '/inc/sella-upsell-popups.php';
+	require_once get_stylesheet_directory() . '/inc/sella-back-in-stock.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
@@ -75,6 +76,16 @@ function hello_elementor_child_scripts_styles() {
 		);
 	}
 
+	if ( function_exists( 'is_checkout' ) && is_checkout() && ! is_order_received_page() ) {
+		wp_enqueue_script(
+			'sella-checkout-fields',
+			get_stylesheet_directory_uri() . '/assets/js/sella-checkout-fields.js',
+			[ 'jquery' ],
+			HELLO_ELEMENTOR_CHILD_VERSION,
+			true
+		);
+	}
+
 }
 add_action( 'wp_enqueue_scripts', 'hello_elementor_child_scripts_styles', 20 );
 
@@ -90,10 +101,26 @@ function sella_checkout_product_thumbnail( $product_name, $cart_item ) {
 		return $product_name;
 	}
 
-	$image = $cart_item['data']->get_image( array( 72, 92 ), array( 'class' => 'sella-checkout-product-image' ) );
-	return '<span class="sella-checkout-product">' . $image . '<span class="sella-checkout-product-name">' . $product_name . '</span></span>';
+	$image    = $cart_item['data']->get_image( array( 72, 92 ), array( 'class' => 'sella-checkout-product-image' ) );
+	$quantity = isset( $cart_item['quantity'] ) ? absint( $cart_item['quantity'] ) : 0;
+	$badge    = $quantity > 0 ? '<span class="sella-checkout-product-qty">' . esc_html( (string) $quantity ) . '</span>' : '';
+
+	return '<span class="sella-checkout-product">'
+		. '<span class="sella-checkout-product-media">' . $image . $badge . '</span>'
+		. '<span class="sella-checkout-product-name">' . $product_name . '</span>'
+		. '</span>';
 }
 add_filter( 'woocommerce_cart_item_name', 'sella_checkout_product_thumbnail', 20, 2 );
+
+/**
+ * Drop the "× 2" line under the product name — the badge on the cover says it.
+ *
+ * @return string
+ */
+function sella_checkout_hide_inline_quantity() {
+	return '';
+}
+add_filter( 'woocommerce_checkout_cart_item_quantity', 'sella_checkout_hide_inline_quantity', 20 );
 
 
 add_filter('upload_mimes', function ($mimes) {

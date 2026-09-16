@@ -1,0 +1,161 @@
+/* Back-in-stock notification form (product pages). */
+.sella-bis {
+  width: 100%;
+  max-width: 520px;
+  margin-block: 14px 8px;
+  color: #171717;
+  font-family: inherit;
+  text-align: start;
+  box-sizing: border-box;
+}
+
+.sella-bis[hidden],
+.sella-bis [hidden] {
+  display: none !important;
+}
+
+.sella-bis__title {
+  margin: 0 0 4px;
+  color: #171717;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sella-bis__text {
+  margin: 0 0 12px;
+  color: #555;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+/* Next to an existing "out of stock" notice the title would repeat it. */
+.sella-bis--no-title .sella-bis__title,
+.sella-bis.is-subscribed .sella-bis__text {
+  display: none;
+}
+
+/* Extra specificity beats Hello/Elementor kit input and button resets. */
+.sella-bis .sella-bis__form {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0;
+}
+
+.sella-bis .sella-bis__form .sella-bis__input[type="email"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 12px;
+  color: #171717;
+  background: #f9fafa;
+  box-shadow: none;
+  font: inherit;
+  font-size: 17px;
+  line-height: 20px;
+  text-align: start;
+  outline: none;
+  box-sizing: border-box;
+  transition: box-shadow 0.3s ease;
+}
+
+.sella-bis .sella-bis__form .sella-bis__input[type="email"]:not(:placeholder-shown) {
+  direction: ltr;
+  text-align: right;
+}
+
+.sella-bis .sella-bis__form .sella-bis__input[type="email"]:focus {
+  box-shadow: 0 0 0 2px rgba(116, 111, 237, 0.35);
+}
+
+.sella-bis .sella-bis__form .sella-bis__input[type="email"]::placeholder {
+  color: #8a8a8a;
+  opacity: 1;
+}
+
+.sella-bis .sella-bis__form .sella-bis__button {
+  flex: 0 0 auto;
+  min-width: 150px;
+  margin: 0;
+  padding: 12px 26px;
+  border: 1.7px solid #746fed;
+  border-radius: 50px;
+  color: #fff;
+  background: #746fed;
+  box-shadow: none;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s, opacity 0.3s;
+}
+
+.sella-bis .sella-bis__form .sella-bis__button:hover:not(:disabled),
+.sella-bis .sella-bis__form .sella-bis__button:focus-visible {
+  color: #746fed;
+  background: #fff;
+}
+
+.sella-bis .sella-bis__form .sella-bis__button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.sella-bis__message {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.sella-bis__message:empty {
+  display: none;
+}
+
+.sella-bis__message.is-error {
+  color: #d7263d;
+}
+
+.sella-bis__message.is-success {
+  padding: 14px 16px;
+  border-radius: 12px;
+  color: #171717;
+  background: rgba(116, 111, 237, 0.08);
+  font-weight: 600;
+}
+
+/* Screen-reader label and honeypot field. */
+.sella-bis .sella-bis__sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .sella-bis {
+    max-width: none;
+  }
+
+  .sella-bis .sella-bis__form {
+    flex-direction: column;
+  }
+
+  .sella-bis .sella-bis__form .sella-bis__button {
+    width: 100%;
+    min-width: 0;
+  }
+}

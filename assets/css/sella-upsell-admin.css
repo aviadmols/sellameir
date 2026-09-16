@@ -48,3 +48,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+.sella-upsell-admin .sella-upsell-count {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #f6f7f7;
+}

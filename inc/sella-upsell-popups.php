@@ -20,6 +20,13 @@ define( 'SELLA_UPSELL_META_SCOPE_PRODUCTS', '_sella_upsell_scope_products' );
 define( 'SELLA_UPSELL_META_SCOPE_PAGES', '_sella_upsell_scope_pages' );
 define( 'SELLA_UPSELL_META_PRODUCT_CATEGORIES', '_sella_upsell_product_categories' );
 define( 'SELLA_UPSELL_META_PRODUCT_TAGS', '_sella_upsell_product_tags' );
+define( 'SELLA_UPSELL_META_AUDIENCE', '_sella_upsell_audience' );
+
+/**
+ * Cap on books sent to the browser per popup, so a whole category does not
+ * end up inlined on every page load.
+ */
+define( 'SELLA_UPSELL_MAX_ITEMS', 30 );
 
 /**
  * Register private storage for popup definitions.
@@ -92,6 +99,11 @@ function sella_upsell_options() {
 			'day'        => 'פעם אחת ביום',
 			'once'       => 'פעם אחת בלבד',
 		),
+		'audiences'  => array(
+			'all'        => 'כל הגולשים',
+			'logged_in'  => 'רק משתמשים רשומים (מחוברים)',
+			'logged_out' => 'רק גולשים שאינם רשומים',
+		),
 		'scopes'     => array(
 			'all'            => 'בכל האתר',
 			'product'        => 'בדפי מוצר',
@@ -116,9 +128,13 @@ function sella_upsell_save_meta( $post_id, $source ) {
 	$trigger = isset( $source['sella_upsell_trigger'] ) ? sanitize_key( wp_unslash( $source['sella_upsell_trigger'] ) ) : 'delay';
 	$scope   = isset( $source['sella_upsell_scope'] ) ? sanitize_key( wp_unslash( $source['sella_upsell_scope'] ) ) : 'all';
 	$freq    = isset( $source['sella_upsell_frequency'] ) ? sanitize_key( wp_unslash( $source['sella_upsell_frequency'] ) ) : 'session';
+	$audience = isset( $source['sella_upsell_audience'] ) ? sanitize_key( wp_unslash( $source['sella_upsell_audience'] ) ) : 'all';
 
 	if ( ! isset( $options['triggers'][ $trigger ] ) ) {
 		$trigger = 'delay';
+	}
+	if ( ! isset( $options['audiences'][ $audience ] ) ) {
+		$audience = 'all';
 	}
 	if ( ! isset( $options['scopes'][ $scope ] ) ) {
 		$scope = 'all';
@@ -168,6 +184,7 @@ function sella_upsell_save_meta( $post_id, $source ) {
 	update_post_meta( $post_id, SELLA_UPSELL_META_SCOPE_PAGES, $scope_pages );
 	update_post_meta( $post_id, SELLA_UPSELL_META_PRODUCT_CATEGORIES, $product_categories );
 	update_post_meta( $post_id, SELLA_UPSELL_META_PRODUCT_TAGS, $product_tags );
+	update_post_meta( $post_id, SELLA_UPSELL_META_AUDIENCE, $audience );
 }
 
 /**
@@ -242,6 +259,9 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 	$scope_pages    = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_SCOPE_PAGES, true ) : array();
 	$product_cats   = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_PRODUCT_CATEGORIES, true ) : array();
 	$product_tags   = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_PRODUCT_TAGS, true ) : array();
+	$audience       = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_AUDIENCE, true ) : 'all';
+	$audience       = isset( $options['audiences'][ $audience ] ) ? $audience : 'all';
+	$live_count     = $upsell_id ? sella_upsell_count_items( $upsell_id ) : 0;
 	$products       = is_array( $products ) ? array_map( 'absint', $products ) : array();
 	$scope_products = is_array( $scope_products ) ? array_map( 'absint', $scope_products ) : array();
 	$scope_pages    = is_array( $scope_pages ) ? array_map( 'absint', $scope_pages ) : array();
@@ -287,6 +307,22 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 						<?php foreach ( $tags as $term ) : ?><option value="<?php echo esc_attr( (string) $term->term_id ); ?>" <?php selected( in_array( (int) $term->term_id, $product_tags, true ) ); ?>><?php echo esc_html( $term->name ); ?></option><?php endforeach; ?>
 					</select>
 					<p class="description">המוצרים מהקטגוריות והתגיות מצטרפים אחרי המוצרים הידניים, ללא כפילויות.</p>
+					<?php if ( $upsell_id ) : ?>
+						<p class="sella-upsell-count">
+							<strong>סה"כ ספרים שיוצגו בפופאפ הזה: <?php echo esc_html( (string) $live_count ); ?></strong>
+							<?php if ( $live_count > SELLA_UPSELL_MAX_ITEMS ) : ?>
+								<br /><span class="description">בסליידר עצמו יוצגו <?php echo esc_html( (string) SELLA_UPSELL_MAX_ITEMS ); ?> הספרים הראשונים, כדי לא להכביד על טעינת האתר.</span>
+							<?php endif; ?>
+							<br /><span class="description">הספירה כוללת רק ספרים שניתן לקנות ושקיימים במלאי, ומתעדכנת אחרי שמירה.</span>
+						</p>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="sella_upsell_audience">למי להציג</label></th>
+				<td>
+					<select id="sella_upsell_audience" name="sella_upsell_audience"><?php foreach ( $options['audiences'] as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $audience, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select>
+					<p class="description">"רשומים" = גולשים שמחוברים לחשבון באתר. אפשר ליצור פופאפ אחד לרשומים ופופאפ אחר לגולשים אנונימיים.</p>
 				</td>
 			</tr>
 			<tr>
@@ -336,6 +372,7 @@ function sella_upsell_render_admin_page() {
 	}
 
 	$edit_id = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
+	$options = sella_upsell_options();
 	$query   = new WP_Query(
 		array(
 			'post_type'      => SELLA_UPSELL_CPT,
@@ -366,9 +403,9 @@ function sella_upsell_render_admin_page() {
 			<div class="sella-upsell-admin-panel">
 				<h2>פופאפים קיימים</h2>
 				<?php if ( ! $query->have_posts() ) : ?><p>עדיין לא נוצרו פופאפים.</p><?php else : ?>
-				<table class="widefat striped"><thead><tr><th>שם</th><th>ספרים</th><th>טריגר</th><th>סטטוס</th><th></th></tr></thead><tbody>
-				<?php while ( $query->have_posts() ) : $query->the_post(); $id = get_the_ID(); $ids = get_post_meta( $id, SELLA_UPSELL_META_PRODUCTS, true ); $trigger_key = get_post_meta( $id, SELLA_UPSELL_META_TRIGGER, true ); $is_enabled = get_post_meta( $id, SELLA_UPSELL_META_ENABLED, true ); ?>
-					<tr><td><strong><?php echo esc_html( get_the_title() ); ?></strong></td><td><?php echo esc_html( is_array( $ids ) ? (string) count( $ids ) : '0' ); ?></td><td><?php echo esc_html( $options['triggers'][ $trigger_key ] ?? 'אחרי השהיה' ); ?></td><td><?php echo '1' === $is_enabled ? 'פעיל' : 'כבוי'; ?></td><td style="white-space:nowrap;"><a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=sella-upsell-popups&edit=' . $id ) ); ?>">עריכה</a><form method="post" style="display:inline;"><?php wp_nonce_field( 'sella_upsell_manage' ); ?><input type="hidden" name="sella_upsell_action" value="delete" /><input type="hidden" name="upsell_id" value="<?php echo esc_attr( (string) $id ); ?>" /><button type="submit" class="button button-small button-link-delete">מחיקה</button></form></td></tr>
+				<table class="widefat striped"><thead><tr><th>שם</th><th>ספרים</th><th>טריגר</th><th>קהל</th><th>סטטוס</th><th></th></tr></thead><tbody>
+				<?php while ( $query->have_posts() ) : $query->the_post(); $id = get_the_ID(); $count = sella_upsell_count_items( $id ); $trigger_key = get_post_meta( $id, SELLA_UPSELL_META_TRIGGER, true ); $audience_key = get_post_meta( $id, SELLA_UPSELL_META_AUDIENCE, true ); $is_enabled = get_post_meta( $id, SELLA_UPSELL_META_ENABLED, true ); ?>
+					<tr><td><strong><?php echo esc_html( get_the_title() ); ?></strong></td><td><?php echo esc_html( (string) $count ); ?><?php if ( $count > SELLA_UPSELL_MAX_ITEMS ) : ?> <span class="description">(מוצגים <?php echo esc_html( (string) SELLA_UPSELL_MAX_ITEMS ); ?>)</span><?php endif; ?></td><td><?php echo esc_html( $options['triggers'][ $trigger_key ] ?? 'אחרי השהיה' ); ?></td><td><?php echo esc_html( $options['audiences'][ $audience_key ] ?? 'כל הגולשים' ); ?></td><td><?php echo '1' === $is_enabled ? 'פעיל' : 'כבוי'; ?></td><td style="white-space:nowrap;"><a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=sella-upsell-popups&edit=' . $id ) ); ?>">עריכה</a><form method="post" style="display:inline;"><?php wp_nonce_field( 'sella_upsell_manage' ); ?><input type="hidden" name="sella_upsell_action" value="delete" /><input type="hidden" name="upsell_id" value="<?php echo esc_attr( (string) $id ); ?>" /><button type="submit" class="button button-small button-link-delete">מחיקה</button></form></td></tr>
 				<?php endwhile; wp_reset_postdata(); ?>
 				</tbody></table>
 				<?php endif; ?>
@@ -446,6 +483,69 @@ function sella_upsell_get_product_ids( $popup_id ) {
 }
 
 /**
+ * Format a price as plain text, without WooCommerce's screen-reader wrappers
+ * or HTML entities - the popup prints it as text, not as markup.
+ *
+ * @param float $amount Price.
+ * @return string
+ */
+function sella_upsell_format_price( $amount ) {
+	return trim( html_entity_decode( wp_strip_all_tags( wc_price( (float) $amount ) ), ENT_QUOTES, 'UTF-8' ) );
+}
+
+/**
+ * Build the popup slides: purchasable, in-stock books only.
+ *
+ * @param int             $popup_id Popup ID.
+ * @param array<int, int> $exclude  Product IDs to skip (what is already in the cart).
+ * @param int             $limit    Maximum slides, 0 for all.
+ * @return array<int, array<string, mixed>>
+ */
+function sella_upsell_collect_items( $popup_id, $exclude = array(), $limit = 0 ) {
+	$items = array();
+
+	foreach ( sella_upsell_get_product_ids( $popup_id ) as $product_id ) {
+		$product_id = absint( $product_id );
+		if ( ! $product_id || in_array( $product_id, $exclude, true ) ) {
+			continue;
+		}
+
+		$product = wc_get_product( $product_id );
+		if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() || ! $product->is_type( 'simple' ) ) {
+			continue;
+		}
+
+		$price   = wc_get_price_to_display( $product );
+		$regular = wc_get_price_to_display( $product, array( 'price' => $product->get_regular_price() ) );
+
+		$items[] = array(
+			'id'      => $product_id,
+			'name'    => $product->get_name(),
+			'url'     => get_permalink( $product_id ),
+			'price'   => sella_upsell_format_price( $price ),
+			'regular' => ( $product->is_on_sale() && $regular > $price ) ? sella_upsell_format_price( $regular ) : '',
+			'image'   => wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_thumbnail' ) ?: wc_placeholder_img_src( 'woocommerce_thumbnail' ),
+		);
+
+		if ( $limit && count( $items ) >= $limit ) {
+			break;
+		}
+	}
+
+	return $items;
+}
+
+/**
+ * How many books a popup would show right now, ignoring the cart.
+ *
+ * @param int $popup_id Popup ID.
+ * @return int
+ */
+function sella_upsell_count_items( $popup_id ) {
+	return count( sella_upsell_collect_items( $popup_id ) );
+}
+
+/**
  * Return enabled popups that match the current page.
  *
  * @return array<int, array<string, mixed>>
@@ -494,6 +594,14 @@ function sella_upsell_get_active() {
 			continue;
 		}
 
+		$audience = get_post_meta( $post->ID, SELLA_UPSELL_META_AUDIENCE, true ) ?: 'all';
+		if ( 'logged_in' === $audience && ! is_user_logged_in() ) {
+			continue;
+		}
+		if ( 'logged_out' === $audience && is_user_logged_in() ) {
+			continue;
+		}
+
 		$scope = get_post_meta( $post->ID, SELLA_UPSELL_META_SCOPE, true ) ?: 'all';
 		if ( 'all' !== $scope && 'products' !== $scope && 'pages' !== $scope && $scope !== $scope_context ) {
 			continue;
@@ -516,24 +624,7 @@ function sella_upsell_get_active() {
 			}
 		}
 
-		$items = array();
-		$product_ids = sella_upsell_get_product_ids( $post->ID );
-		foreach ( $product_ids as $product_id ) {
-			$product_id = absint( $product_id );
-			if ( ! $product_id || in_array( $product_id, $cart_ids, true ) ) {
-				continue;
-			}
-			$product = wc_get_product( $product_id );
-			if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() || ! $product->is_type( 'simple' ) ) {
-				continue;
-			}
-			$items[] = array(
-				'id'    => $product_id,
-				'name'  => $product->get_name(),
-				'price' => wp_strip_all_tags( $product->get_price_html() ),
-				'image' => wp_get_attachment_image_url( $product->get_image_id(), 'medium' ) ?: wc_placeholder_img_src( 'medium' ),
-			);
-		}
+		$items = sella_upsell_collect_items( $post->ID, $cart_ids, SELLA_UPSELL_MAX_ITEMS );
 		if ( empty( $items ) ) {
 			continue;
 		}
@@ -565,18 +656,78 @@ function sella_upsell_frontend_assets() {
 		'sella-upsell',
 		'sellaUpsellData',
 		array(
-			'popups' => $popups,
-			'ajaxUrl' => WC_AJAX::get_endpoint( 'add_to_cart' ),
-			'cartUrl' => wc_get_cart_url(),
-			'currency' => get_woocommerce_currency_symbol(),
-			'labels' => array(
-				'add'     => 'הוספה לסל',
-				'added'   => 'נוסף לסל',
-				'next'    => 'הבא',
-				'previous'=> 'הקודם',
-				'close'   => 'סגירה',
+			'popups'     => $popups,
+			'ajaxUrl'    => WC_AJAX::get_endpoint( 'sella_upsell_add' ),
+			'nonce'      => wp_create_nonce( 'sella_upsell_add' ),
+			'cartUrl'    => wc_get_cart_url(),
+			'isCart'     => function_exists( 'is_cart' ) && is_cart(),
+			'isCheckout' => function_exists( 'is_checkout' ) && is_checkout() && ! is_order_received_page(),
+			'labels'     => array(
+				'add'      => 'הוספה לסל',
+				'adding'   => 'מוסיף...',
+				'added'    => 'נוסף לסל!',
+				'error'    => 'לא הצלחנו להוסיף לסל',
+				'next'     => 'הבא',
+				'previous' => 'הקודם',
+				'close'    => 'סגירה',
 			),
 		)
 	);
 }
 add_action( 'wp_enqueue_scripts', 'sella_upsell_frontend_assets', 30 );
+
+/**
+ * Add a popup book to the cart and report back what the page needs to refresh.
+ */
+function sella_upsell_ajax_add_to_cart() {
+	check_ajax_referer( 'sella_upsell_add', 'nonce' );
+
+	if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+		wp_send_json_error( array( 'message' => 'החנות אינה זמינה כרגע.' ) );
+	}
+
+	$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+	$quantity   = isset( $_POST['quantity'] ) ? max( 1, absint( $_POST['quantity'] ) ) : 1;
+	$product    = $product_id ? wc_get_product( $product_id ) : false;
+
+	if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
+		wp_send_json_error( array( 'message' => 'הספר אינו זמין לרכישה.' ) );
+	}
+
+	$added = WC()->cart->add_to_cart( $product_id, $quantity );
+	if ( ! $added ) {
+		$notices = wc_get_notices( 'error' );
+		wc_clear_notices();
+		wp_send_json_error(
+			array(
+				'message' => ! empty( $notices[0]['notice'] ) ? wp_strip_all_tags( $notices[0]['notice'] ) : 'לא הצלחנו להוסיף את הספר לסל.',
+			)
+		);
+	}
+
+	WC()->cart->calculate_totals();
+	if ( WC()->session ) {
+		WC()->session->set( 'refresh_totals', true );
+	}
+	wc_clear_notices();
+
+	ob_start();
+	woocommerce_mini_cart();
+	$mini_cart = ob_get_clean();
+
+	wp_send_json_success(
+		array(
+			'productId' => $product_id,
+			'cartCount' => WC()->cart->get_cart_contents_count(),
+			'cartHash'  => WC()->cart->get_cart_hash(),
+			'fragments' => apply_filters(
+				'woocommerce_add_to_cart_fragments',
+				array(
+					'div.widget_shopping_cart_content' => '<div class="widget_shopping_cart_content">' . $mini_cart . '</div>',
+				)
+			),
+		)
+	);
+}
+/* WooCommerce's own AJAX endpoint: front-end context, cart and session ready. */
+add_action( 'wc_ajax_sella_upsell_add', 'sella_upsell_ajax_add_to_cart' );

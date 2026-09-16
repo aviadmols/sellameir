@@ -1,201 +1,275 @@
-:root {
-  --sella-upsell-ink: #171717;
-  --sella-upsell-paper: #fff;
-  --sella-upsell-rule: #dedede;
-}
-
-.sella-upsell-popup {
+/* Upsell — compact floating card, bottom corner. */
+.sella-upsell {
+  --sella-upsell-accent: #746fed;
+  --sella-upsell-ink: #1a1a1a;
   position: fixed;
-  inset: 0;
-  z-index: 1100;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.sella-upsell-popup.is-open {
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.sella-upsell-popup__overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+  inset-block-end: 24px;
+  inset-inline-start: 24px;
+  z-index: 1500;
+  width: min(420px, calc(100vw - 48px));
+  font-family: inherit;
   opacity: 0;
-  transition: opacity 0.5s ease;
+  transform: translateY(20px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
-.sella-upsell-popup.is-open .sella-upsell-popup__overlay {
+.sella-upsell[hidden] {
+  display: none !important;
+}
+
+.sella-upsell.is-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stay clear of the sticky add-to-cart bar on product pages. */
+body:has(.sella-sticky-product-cart.is-visible) .sella-upsell {
+  inset-block-end: 96px;
+}
+
+.sella-upsell__card {
+  position: relative;
+  padding: 22px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+
+.sella-upsell__close {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #aaa;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.sella-upsell__close:hover {
+  color: #333;
+  background: #f3f3f3;
+}
+
+.sella-upsell__content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sella-upsell.is-open .sella-upsell__card.is-swapping .sella-upsell__content {
+  animation: sella-upsell-swap 0.3s ease;
+}
+
+@keyframes sella-upsell-swap {
+  from {
+    opacity: 0.25;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sella-upsell__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sella-upsell__tag {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding-inline-end: 26px;
+  color: var(--sella-upsell-accent);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.sella-upsell__tag[hidden] {
+  display: none;
+}
+
+.sella-upsell .sella-upsell__name {
+  margin: 0 0 6px;
+  color: var(--sella-upsell-ink);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.sella-upsell__price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: #555;
+  font-size: 17px;
+  line-height: 1.3;
+  text-align: start;
+}
+
+.sella-upsell__price-now {
+  color: var(--sella-upsell-ink);
+  font-weight: 600;
+}
+
+.sella-upsell__price-was {
+  color: #999;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+
+.sella-upsell__price-was[hidden] {
+  display: none;
+}
+
+/* Extra specificity beats the Hello/Elementor button reset. */
+.sella-upsell .sella-upsell__btn {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding: 12px 32px;
+  border: 1.7px solid var(--sella-upsell-accent);
+  border-radius: 50px;
+  color: #fff;
+  background: var(--sella-upsell-accent);
+  box-shadow: none;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s, opacity 0.3s, border-color 0.3s;
+}
+
+.sella-upsell .sella-upsell__btn:hover:not(:disabled),
+.sella-upsell .sella-upsell__btn:focus-visible {
+  color: var(--sella-upsell-accent);
+  background: #fff;
+}
+
+.sella-upsell .sella-upsell__btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.sella-upsell .sella-upsell__btn.is-added {
+  border-color: #2d8a5a;
+  color: #fff;
+  background: #2d8a5a;
   opacity: 1;
 }
 
-.sella-upsell-popup__panel {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
-  display: flex;
-  flex-direction: column;
-  width: min(410px, 94vw);
-  padding: 72px 28px 28px;
-  overflow-y: auto;
-  color: var(--sella-upsell-ink);
-  background: var(--sella-upsell-paper);
-  box-shadow: -16px 0 44px rgba(0, 0, 0, 0.12);
-  transform: translateX(105%);
-  transition: transform 0.5s ease;
+.sella-upsell .sella-upsell__btn.is-error {
+  border-color: #d7263d;
+  color: #d7263d;
+  background: #fff;
+  font-size: 15px;
 }
 
-.sella-upsell-popup.is-open .sella-upsell-popup__panel {
-  transform: translateX(0);
-}
-
-.sella-upsell-popup__close {
-  position: absolute;
-  inset-block-start: 18px;
-  inset-inline-start: 20px;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border: 1px solid var(--sella-upsell-rule);
-  border-radius: 0;
-  color: var(--sella-upsell-ink);
-  background: transparent;
-  font-size: 25px;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.5s ease;
-}
-
-.sella-upsell-popup__close:hover {
-  color: var(--sella-upsell-paper);
-  background: var(--sella-upsell-ink);
-}
-
-.sella-upsell-popup__eyebrow {
-  margin: 0 0 8px;
-  color: #777;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 1px;
-}
-
-.sella-upsell-popup__title {
-  margin: 0 0 26px;
-  font-size: clamp(26px, 5vw, 38px);
-  font-weight: 900;
-  line-height: 1;
-}
-
-.sella-upsell-popup__viewport {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  min-height: 330px;
-}
-
-.sella-upsell-popup__track {
-  width: 100%;
-}
-
-.sella-upsell-popup__slide {
-  text-align: center;
-}
-
-.sella-upsell-popup__image {
+.sella-upsell__cover {
+  flex: 0 0 auto;
   display: block;
-  width: min(230px, 75%);
-  aspect-ratio: 3 / 4;
-  margin: 0 auto 24px;
-  object-fit: contain;
-  border-radius: 7px;
-  box-shadow: rgb(0 0 0 / 16%) 0 28px 32px -25px, rgb(0 0 0 / 6%) 0 2px 12px 0;
+  width: 96px;
+  line-height: 0;
 }
 
-.sella-upsell-popup__product-name {
-  margin: 0 auto 8px;
-  font-size: 23px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.sella-upsell-popup__price {
-  min-height: 24px;
-  margin: 0 0 22px;
-  font-size: 18px;
-}
-
-.sella-upsell-popup__add {
+.sella-upsell__cover-img {
   width: 100%;
-  padding: 14px 20px;
-  border: 1px solid var(--sella-upsell-ink);
-  border-radius: 0;
-  color: var(--sella-upsell-paper);
-  background: var(--sella-upsell-ink);
-  font: inherit;
-  font-size: 17px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.5s ease;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  border-radius: 7px;
+  object-fit: contain;
+  box-shadow: rgb(0 0 0 / 16%) 0 18px 24px -18px, rgb(0 0 0 / 8%) 0 2px 10px 0;
 }
 
-.sella-upsell-popup__add:hover:not(:disabled) {
-  color: var(--sella-upsell-ink);
-  background: var(--sella-upsell-paper);
-}
-
-.sella-upsell-popup__add:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-
-.sella-upsell-popup__controls {
+.sella-upsell__nav {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
-  margin-top: 30px;
+  gap: 10px;
+  margin-top: 14px;
 }
 
-.sella-upsell-popup__arrow {
-  width: 38px;
-  height: 38px;
+.sella-upsell__nav[hidden] {
+  display: none;
+}
+
+.sella-upsell .sella-upsell__arrow {
+  width: 30px;
+  height: 30px;
   padding: 0;
-  border: 1px solid var(--sella-upsell-rule);
-  border-radius: 0;
-  color: var(--sella-upsell-ink);
-  background: var(--sella-upsell-paper);
-  font-size: 21px;
+  border: 1px solid #e4e4e4;
+  border-radius: 50%;
+  color: #555;
+  background: #fff;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.sella-upsell-popup__arrow:hover {
-  color: var(--sella-upsell-paper);
-  background: var(--sella-upsell-ink);
+.sella-upsell .sella-upsell__arrow:hover {
+  border-color: var(--sella-upsell-accent);
+  color: #fff;
+  background: var(--sella-upsell-accent);
 }
 
-.sella-upsell-popup__counter {
-  min-width: 50px;
-  color: #777;
-  font-size: 14px;
-  text-align: center;
+.sella-upsell__counter {
+  direction: ltr;
+  color: #999;
+  font-size: 13px;
 }
 
-@media (max-width: 767px) {
-  .sella-upsell-popup__panel {
-    width: min(100%, 390px);
-    padding: 64px 20px 22px;
+@media (max-width: 600px) {
+  .sella-upsell {
+    inset-inline: 12px;
+    inset-block-end: 12px;
+    width: auto;
   }
 
-  .sella-upsell-popup__viewport {
-    min-height: 300px;
+  body:has(.sella-sticky-product-cart.is-visible) .sella-upsell {
+    inset-block-end: 88px;
   }
 
-  .sella-upsell-popup__image {
-    width: min(190px, 62%);
-    margin-bottom: 18px;
+  .sella-upsell__card {
+    padding: 18px;
   }
 
-  .sella-upsell-popup__product-name {
-    font-size: 21px;
+  .sella-upsell__content {
+    gap: 14px;
+  }
+
+  .sella-upsell .sella-upsell__name {
+    font-size: 19px;
+  }
+
+  .sella-upsell__cover {
+    width: 78px;
+  }
+
+  .sella-upsell .sella-upsell__btn {
+    width: 100%;
+    padding: 12px 20px;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sella-upsell,
+  .sella-upsell__content {
+    transition: opacity 0.2s ease;
+    transform: none;
+    animation: none;
   }
 }

@@ -1,0 +1,84 @@
+.sella-bis-admin-panel {
+  max-width: 1440px;
+  margin-block: 20px;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  box-sizing: border-box;
+}
+
+.sella-bis-admin-panel h2 {
+  margin-top: 0;
+}
+
+.sella-bis-admin .widefat td,
+.sella-bis-admin .widefat th {
+  vertical-align: middle;
+}
+
+.sella-bis-admin .sella-bis-num {
+  text-align: center;
+}
+
+.sella-bis-admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 14px;
+}
+
+.sella-bis-admin-actions {
+  white-space: nowrap;
+}
+
+.sella-bis-admin-actions form {
+  display: inline;
+  margin-inline-start: 4px;
+}
+
+.sella-bis-muted {
+  color: #787c82;
+}
+
+.sella-bis-status {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 50px;
+  color: #50575e;
+  background: #f0f0f1;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.sella-bis-status--pending {
+  color: #4b45c9;
+  background: rgba(116, 111, 237, 0.12);
+}
+
+.sella-bis-status--sent {
+  color: #1d6b43;
+  background: #e6f4ec;
+}
+
+.sella-bis-status--unsubscribed {
+  color: #787c82;
+  background: #f6f7f7;
+}
+
+.sella-bis-admin .tablenav {
+  height: auto;
+  margin-block-start: 12px;
+}
+
+.sella-bis-admin .tablenav-pages {
+  float: none;
+}
+
+@media (max-width: 782px) {
+  .sella-bis-admin-panel {
+    padding: 16px;
+    overflow-x: auto;
+  }
+}

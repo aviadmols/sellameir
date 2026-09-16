@@ -3,11 +3,12 @@
 
   var data = window.sellaUpsellData || {};
   var popups = data.popups || [];
+  var labels = data.labels || {};
   var activePopup = null;
   var currentIndex = 0;
   var root = null;
-  var overlay = null;
-  var card = null;
+  var nodes = {};
+  var hideTimer = null;
 
   function storageFor(frequency) {
     if (frequency === 'session') {
@@ -29,64 +30,96 @@
       return true;
     }
 
-    var key = 'sella-upsell-' + popup.id;
-    var seen = storage.getItem(key);
-    if (!seen) {
+    try {
+      var seen = storage.getItem('sella-upsell-' + popup.id);
+      if (!seen) {
+        return true;
+      }
+      if (popup.frequency === 'day') {
+        return seen !== new Date().toISOString().slice(0, 10);
+      }
+      return false;
+    } catch (e) {
       return true;
     }
-    if (popup.frequency === 'day') {
-      return seen !== new Date().toISOString().slice(0, 10);
-    }
-    return false;
   }
 
   function markShown(popup) {
     var storage = storageFor(popup.frequency);
-    if (storage) {
+    if (!storage) {
+      return;
+    }
+    try {
       storage.setItem('sella-upsell-' + popup.id, popup.frequency === 'day' ? new Date().toISOString().slice(0, 10) : '1');
+    } catch (e) {
+      /* Private browsing: show it again next time. */
     }
   }
 
   function build() {
     root = document.createElement('aside');
-    root.className = 'sella-upsell-popup';
+    root.className = 'sella-upsell';
     root.setAttribute('dir', document.documentElement.getAttribute('dir') || 'rtl');
-    root.setAttribute('aria-hidden', 'true');
+    root.hidden = true;
     root.innerHTML =
-      '<div class="sella-upsell-popup__overlay" data-upsell-close></div>' +
-      '<section class="sella-upsell-popup__panel" role="dialog" aria-modal="true" aria-label="הצעה מיוחדת">' +
-        '<button type="button" class="sella-upsell-popup__close" data-upsell-close aria-label="סגירה">&times;</button>' +
-        '<p class="sella-upsell-popup__eyebrow">מעניין לקרוא ביחד עם</p>' +
-        '<h2 class="sella-upsell-popup__title"></h2>' +
-        '<div class="sella-upsell-popup__viewport">' +
-          '<div class="sella-upsell-popup__track"></div>' +
+      '<div class="sella-upsell__card" role="dialog" aria-label="הצעה מיוחדת">' +
+        '<button type="button" class="sella-upsell__close" data-upsell-close aria-label="' + (labels.close || 'סגירה') + '">&times;</button>' +
+        '<div class="sella-upsell__content">' +
+          '<div class="sella-upsell__text">' +
+            '<span class="sella-upsell__tag"></span>' +
+            '<h3 class="sella-upsell__name"></h3>' +
+            '<p class="sella-upsell__price">' +
+              '<span class="sella-upsell__price-now"></span>' +
+              '<del class="sella-upsell__price-was"></del>' +
+            '</p>' +
+            '<button type="button" class="sella-upsell__btn" data-upsell-add></button>' +
+          '</div>' +
+          '<a class="sella-upsell__cover" href="#" tabindex="-1" aria-hidden="true">' +
+            '<img class="sella-upsell__cover-img" src="" alt="" loading="lazy" />' +
+          '</a>' +
         '</div>' +
-        '<div class="sella-upsell-popup__controls">' +
-          '<button type="button" class="sella-upsell-popup__arrow" data-upsell-prev aria-label="הקודם">&#8594;</button>' +
-          '<span class="sella-upsell-popup__counter"></span>' +
-          '<button type="button" class="sella-upsell-popup__arrow" data-upsell-next aria-label="הבא">&#8592;</button>' +
+        '<div class="sella-upsell__nav">' +
+          '<button type="button" class="sella-upsell__arrow" data-upsell-prev aria-label="' + (labels.previous || 'הקודם') + '">&#8594;</button>' +
+          '<span class="sella-upsell__counter"></span>' +
+          '<button type="button" class="sella-upsell__arrow" data-upsell-next aria-label="' + (labels.next || 'הבא') + '">&#8592;</button>' +
         '</div>' +
-      '</section>';
+      '</div>';
     document.body.appendChild(root);
-    overlay = root.querySelector('.sella-upsell-popup__overlay');
-    card = root.querySelector('.sella-upsell-popup__panel');
+
+    nodes = {
+      card: root.querySelector('.sella-upsell__card'),
+      tag: root.querySelector('.sella-upsell__tag'),
+      name: root.querySelector('.sella-upsell__name'),
+      priceNow: root.querySelector('.sella-upsell__price-now'),
+      priceWas: root.querySelector('.sella-upsell__price-was'),
+      button: root.querySelector('.sella-upsell__btn'),
+      cover: root.querySelector('.sella-upsell__cover'),
+      coverImg: root.querySelector('.sella-upsell__cover-img'),
+      nav: root.querySelector('.sella-upsell__nav'),
+      counter: root.querySelector('.sella-upsell__counter')
+    };
 
     root.addEventListener('click', function (event) {
-      var close = event.target.closest('[data-upsell-close]');
-      if (close) {
+      if (event.target.closest('[data-upsell-close]')) {
         closePopup();
         return;
       }
-      var add = event.target.closest('[data-upsell-add]');
-      if (add) {
-        addToCart(add);
+      if (event.target.closest('[data-upsell-add]')) {
+        addToCart(event.target.closest('[data-upsell-add]'));
         return;
       }
       if (event.target.closest('[data-upsell-prev]')) {
         move(-1);
+        return;
       }
       if (event.target.closest('[data-upsell-next]')) {
         move(1);
+      }
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && root.classList.contains('is-open')) {
+        closePopup();
       }
     });
   }
@@ -96,36 +129,33 @@
       return;
     }
 
-    var title = root.querySelector('.sella-upsell-popup__title');
-    var track = root.querySelector('.sella-upsell-popup__track');
-    var counter = root.querySelector('.sella-upsell-popup__counter');
     var item = activePopup.items[currentIndex];
-    title.textContent = activePopup.title;
-    track.innerHTML = '';
-
     if (!item) {
       closePopup();
       return;
     }
 
-    var slide = document.createElement('article');
-    slide.className = 'sella-upsell-popup__slide';
-    slide.innerHTML =
-      '<img class="sella-upsell-popup__image" src="' + escapeHtml(item.image) + '" alt="" />' +
-      '<h3 class="sella-upsell-popup__product-name">' + escapeHtml(item.name) + '</h3>' +
-      '<p class="sella-upsell-popup__price">' + escapeHtml(item.price) + '</p>' +
-      '<button type="button" class="sella-upsell-popup__add" data-upsell-add data-product-id="' + item.id + '">' + escapeHtml(data.labels.add) + '</button>';
-    track.appendChild(slide);
-    counter.textContent = (currentIndex + 1) + ' / ' + activePopup.items.length;
+    var total = activePopup.items.length;
+
+    nodes.tag.textContent = activePopup.title || '';
+    nodes.tag.hidden = !activePopup.title;
+    nodes.name.textContent = item.name;
+    nodes.priceNow.textContent = item.price || '';
+    nodes.priceWas.textContent = item.regular || '';
+    nodes.priceWas.hidden = !item.regular;
+    nodes.coverImg.src = item.image;
+    nodes.coverImg.alt = item.name;
+    nodes.cover.href = item.url || '#';
+    nodes.counter.textContent = total > 1 ? currentIndex + 1 + ' / ' + total : '';
+    nodes.nav.hidden = total < 2;
+
+    resetButton();
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  function resetButton() {
+    nodes.button.disabled = false;
+    nodes.button.className = 'sella-upsell__btn';
+    nodes.button.textContent = labels.add || 'הוספה לסל';
   }
 
   function move(direction) {
@@ -133,6 +163,9 @@
       return;
     }
     currentIndex = (currentIndex + direction + activePopup.items.length) % activePopup.items.length;
+    nodes.card.classList.remove('is-swapping');
+    void nodes.card.offsetWidth;
+    nodes.card.classList.add('is-swapping');
     render();
   }
 
@@ -149,19 +182,24 @@
   }
 
   function openPopup(popup) {
-    if (!popup || !popup.items.length) {
+    if (!popup || !popup.items.length || (root && root.classList.contains('is-open'))) {
       return;
     }
     if (!root) {
       build();
     }
+    window.clearTimeout(hideTimer);
     activePopup = popup;
     currentIndex = 0;
     markShown(popup);
     render();
-    root.classList.add('is-open');
-    root.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('sella-upsell-is-open');
+    root.hidden = false;
+    /* Let the browser paint the hidden state before transitioning in. */
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        root.classList.add('is-open');
+      });
+    });
   }
 
   function closePopup() {
@@ -169,52 +207,115 @@
       return;
     }
     root.classList.remove('is-open');
-    root.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('sella-upsell-is-open');
+    hideTimer = window.setTimeout(function () {
+      root.hidden = true;
+    }, 400);
   }
 
   function addToCart(button) {
-    var productId = button.getAttribute('data-product-id');
-    if (!productId || button.disabled) {
+    var item = activePopup && activePopup.items[currentIndex];
+    if (!item || button.disabled) {
       return;
     }
+
     button.disabled = true;
-    button.textContent = 'מוסיף...';
+    button.textContent = labels.adding || 'מוסיף...';
 
-    window.jQuery.ajax({
-      url: data.ajaxUrl,
-      type: 'POST',
-      data: { product_id: productId, quantity: 1 },
-    }).done(function (response) {
-      if (response && response.error) {
-        button.disabled = false;
-        button.textContent = data.labels.add;
-        return;
-      }
-
-      if (response && response.fragments) {
-        window.jQuery.each(response.fragments, function (key, value) {
-          window.jQuery(key).replaceWith(value);
-        });
-      }
-      window.jQuery(document.body).trigger('added_to_cart', [response.fragments || {}, response.cart_hash || '', button]);
-      removeFromAllPopups(productId);
-      activePopup.items.splice(currentIndex, 1);
-      if (!activePopup.items.length) {
-        closePopup();
-        return;
-      }
-      currentIndex = Math.min(currentIndex, activePopup.items.length - 1);
-      render();
-    }).fail(function () {
-      button.disabled = false;
-      button.textContent = data.labels.add;
+    var request = window.fetch(data.ajaxUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: 'action=sella_upsell_add&nonce=' + encodeURIComponent(data.nonce) + '&product_id=' + encodeURIComponent(item.id) + '&quantity=1'
+    }).then(function (response) {
+      return response.json();
     });
+
+    request.then(function (response) {
+      if (!response || !response.success) {
+        failed(button, response && response.data && response.data.message);
+        return;
+      }
+
+      button.className = 'sella-upsell__btn is-added';
+      button.textContent = labels.added || 'נוסף לסל!';
+
+      var reloading = syncStore(response.data, button);
+      removeFromAllPopups(item.id);
+
+      window.setTimeout(function () {
+        if (reloading) {
+          return;
+        }
+        if (!activePopup.items.length) {
+          closePopup();
+          return;
+        }
+        currentIndex = Math.min(currentIndex, activePopup.items.length - 1);
+        render();
+      }, 900);
+    }).catch(function () {
+      failed(button);
+    });
+  }
+
+  function failed(button, message) {
+    button.disabled = false;
+    button.className = 'sella-upsell__btn is-error';
+    button.textContent = message || labels.error || 'לא הצלחנו להוסיף לסל';
+    window.setTimeout(resetButton, 2600);
+  }
+
+  /**
+   * Push the new cart into whatever the current page is showing.
+   * Returns true when the page is about to reload.
+   */
+  function syncStore(payload, button) {
+    var $ = window.jQuery;
+    payload = payload || {};
+
+    if ($ && payload.fragments) {
+      $.each(payload.fragments, function (key, value) {
+        try {
+          $(key).replaceWith(value);
+        } catch (e) {
+          /* A theme may not render this fragment. */
+        }
+      });
+    }
+
+    if ($) {
+      $(document.body).trigger('added_to_cart', [payload.fragments || {}, payload.cartHash || '', $(button)]);
+      $(document.body).trigger('wc_fragment_refresh');
+    }
+
+    var store = window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function' ? window.wp.data.dispatch('wc/store/cart') : null;
+    var isBlock = !!document.querySelector('.wc-block-cart, .wc-block-checkout');
+
+    if (isBlock && store && typeof store.invalidateResolutionForStore === 'function') {
+      store.invalidateResolutionForStore();
+      return false;
+    }
+
+    /* Classic checkout re-renders the whole order review, new line included. */
+    if (data.isCheckout && $ && document.querySelector('form.checkout')) {
+      $(document.body).trigger('update_checkout');
+      return false;
+    }
+
+    /* The classic cart table is server rendered only, so reload to show the new row. */
+    if (data.isCart || data.isCheckout) {
+      window.setTimeout(function () {
+        window.location.reload();
+      }, 900);
+      return true;
+    }
+
+    return false;
   }
 
   function nextEligible() {
     for (var i = 0; i < popups.length; i++) {
-      if (canShow(popups[i])) {
+      if (popups[i].items.length && canShow(popups[i])) {
         return popups[i];
       }
     }
@@ -222,10 +323,16 @@
   }
 
   function showEligible() {
-    var popup = nextEligible();
-    if (popup) {
-      openPopup(popup);
+    openPopup(nextEligible());
+  }
+
+  function hasTrigger(name) {
+    for (var i = 0; i < popups.length; i++) {
+      if (popups[i].trigger === name) {
+        return true;
+      }
     }
+    return false;
   }
 
   function boot() {
@@ -233,55 +340,45 @@
       return;
     }
 
-    var delayed = [];
+    if (hasTrigger('immediate')) {
+      showEligible();
+    }
+
     for (var i = 0; i < popups.length; i++) {
-      var popup = popups[i];
-      if (popup.trigger === 'immediate') {
-        showEligible();
+      if (popups[i].trigger === 'delay') {
+        window.setTimeout(showEligible, Math.max(0, parseInt(popups[i].delay, 10) || 0) * 1000);
         break;
       }
-      if (popup.trigger === 'delay') {
-        delayed.push(popup);
-      }
-    }
-    if (delayed.length) {
-      window.setTimeout(showEligible, Math.max(0, parseInt(delayed[0].delay, 10) || 0) * 1000);
     }
 
-    window.addEventListener('scroll', function () {
-      if ((window.scrollY + window.innerHeight) / document.documentElement.scrollHeight > 0.62) {
-        for (var i = 0; i < popups.length; i++) {
-          if (popups[i].trigger === 'scroll') {
-            showEligible();
-            break;
-          }
+    if (hasTrigger('scroll')) {
+      window.addEventListener('scroll', function () {
+        if ((window.scrollY + window.innerHeight) / document.documentElement.scrollHeight > 0.62) {
+          showEligible();
         }
-      }
-    }, { passive: true });
+      }, { passive: true });
+    }
 
-    document.addEventListener('mouseleave', function (event) {
-      if (event.clientY <= 0) {
-        for (var i = 0; i < popups.length; i++) {
-          if (popups[i].trigger === 'exit_intent') {
-            showEligible();
-            break;
-          }
+    if (hasTrigger('exit_intent')) {
+      document.addEventListener('mouseleave', function (event) {
+        if (event.clientY <= 0) {
+          showEligible();
         }
-      }
-    });
+      });
+    }
 
     if (window.jQuery) {
       window.jQuery(document.body).on('added_to_cart', function (event, fragments, cartHash, button) {
         if (button && button.jquery) {
           button = button[0];
         }
+        if (button && button.closest && button.closest('.sella-upsell')) {
+          return;
+        }
         var productId = button && (button.value || button.getAttribute('data-product_id') || button.getAttribute('data-product-id'));
         removeFromAllPopups(productId);
-        for (var i = 0; i < popups.length; i++) {
-          if (popups[i].trigger === 'add_to_cart') {
-            showEligible();
-            break;
-          }
+        if (hasTrigger('add_to_cart')) {
+          showEligible();
         }
       });
     }

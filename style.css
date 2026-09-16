@@ -197,90 +197,433 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   margin-inline: auto;
 }
 
-.woocommerce-checkout #customer_details,
-.woocommerce-checkout #order_review {
-  border: 1px solid #e8e8e8;
-  background: #fff;
-}
-
-.woocommerce-checkout #customer_details {
-  padding: clamp(20px, 3vw, 38px);
+.woocommerce-checkout form.checkout {
+  --sella-field-height: 60px;
+  --sella-field-bg: #f7f7f9;
+  --sella-field-border: #e7e7ee;
+  --sella-field-border-hover: #cfcfdb;
+  --sella-field-label: #7b7f8a;
+  --sella-field-text: #171717;
+  --sella-accent: #746fed;
+  --sella-accent-ring: rgba(116, 111, 237, 0.16);
+  --sella-error: #d7263d;
 }
 
 .woocommerce-checkout #order_review_heading {
-  margin: 28px 0 14px;
+  margin: 0 0 14px;
   font-size: 25px;
   font-weight: 800;
-}
-
-.woocommerce-checkout #order_review {
-  padding: clamp(18px, 3vw, 30px);
 }
 
 .woocommerce-checkout .woocommerce-billing-fields h3,
 .woocommerce-checkout #ship-to-different-address {
   margin-top: 0;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
   font-size: 25px;
   font-weight: 800;
 }
 
-.woocommerce-checkout .form-row label {
+/* Checkout fields — two-column grid instead of floats. */
+.woocommerce-checkout form.checkout #customer_details .woocommerce-billing-fields__field-wrapper,
+.woocommerce-checkout form.checkout #customer_details .woocommerce-shipping-fields__field-wrapper,
+.woocommerce-checkout form.checkout #customer_details .woocommerce-additional-fields__field-wrapper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row {
+  position: relative;
+  grid-column: 1 / -1;
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row-first,
+.woocommerce-checkout form.checkout #customer_details .form-row-last {
+  grid-column: auto;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .woocommerce-input-wrapper {
   display: block;
-  margin-bottom: 7px;
-  color: #555;
-  font-size: 14px;
+  margin: 0;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row label {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--sella-field-label);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .required {
+  color: var(--sella-error);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .optional {
+  font-size: 0.88em;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .input-text,
+.woocommerce-checkout form.checkout #customer_details .form-row select,
+.woocommerce-checkout form.checkout .e-coupon-box .form-row .input-text {
+  display: block;
+  width: 100%;
+  min-height: var(--sella-field-height);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1.5px solid var(--sella-field-border);
+  border-radius: 14px;
+  color: var(--sella-field-text);
+  background-color: var(--sella-field-bg);
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b7f8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 16px center;
+  background-size: 18px;
+  padding-inline-end: 44px;
+}
+
+/* Beats the Elementor page CSS, which sizes selects with an extra class. */
+.woocommerce-checkout form.checkout #customer_details .form-row .woocommerce-input-wrapper select:not([multiple]) {
+  font-size: 16px;
+}
+
+html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .form-row select {
+  background-position: right 16px center;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .country_to_state--single {
+  cursor: default;
+  background-image: none;
+  padding-inline-end: 16px;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row textarea.input-text {
+  min-height: 116px;
+  padding-block: 12px;
+  resize: vertical;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .input-text:hover,
+.woocommerce-checkout form.checkout #customer_details .form-row select:hover,
+.woocommerce-checkout form.checkout .e-coupon-box .form-row .input-text:hover {
+  border-color: var(--sella-field-border-hover);
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row .input-text:focus,
+.woocommerce-checkout form.checkout #customer_details .form-row select:focus,
+.woocommerce-checkout form.checkout .e-coupon-box .form-row .input-text:focus {
+  border-color: var(--sella-accent);
+  background-color: #fff;
+  box-shadow: 0 0 0 4px var(--sella-accent-ring);
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row.woocommerce-invalid .input-text,
+.woocommerce-checkout form.checkout #customer_details .form-row.woocommerce-invalid select {
+  border-color: var(--sella-error);
+  background-color: #fff;
+}
+
+.woocommerce-checkout form.checkout #customer_details .form-row.woocommerce-invalid .input-text:focus,
+.woocommerce-checkout form.checkout #customer_details .form-row.woocommerce-invalid select:focus {
+  box-shadow: 0 0 0 4px rgba(215, 38, 61, 0.12);
+}
+
+.woocommerce-checkout form.checkout #customer_details .checkout-inline-error-message,
+.woocommerce-checkout form.checkout #customer_details .lets-address__hint {
+  margin: 6px 4px 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.woocommerce-checkout form.checkout #customer_details .checkout-inline-error-message {
+  color: var(--sella-error);
+}
+
+/* Floating labels — enabled by assets/js/sella-checkout-fields.js, which adds
+   .sella-float-field to each row and toggles .is-filled from the field value. */
+.woocommerce-checkout form.checkout #customer_details .sella-float-field label {
+  position: absolute;
+  top: calc(var(--sella-field-height) / 2);
+  inset-inline: 17px;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field .input-text,
+.woocommerce-checkout form.checkout #customer_details .sella-float-field select {
+  padding-top: 25px;
+  padding-bottom: 7px;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field textarea.input-text {
+  padding-top: 32px;
+  padding-bottom: 10px;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field--textarea label {
+  top: 30px;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field .input-text::placeholder {
+  color: transparent;
+  transition: color 0.2s ease;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field .input-text:focus::placeholder {
+  color: #a4a8b1;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field.is-filled label,
+.woocommerce-checkout form.checkout #customer_details .sella-float-field:focus-within label {
+  top: 17px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
-.woocommerce-checkout .form-row input,
-.woocommerce-checkout .form-row select,
-.woocommerce-checkout .form-row textarea {
-  min-height: 46px;
-  padding: 11px 13px;
-  border: 1px solid #d9d9d9;
-  border-radius: 0;
-  box-sizing: border-box;
+.woocommerce-checkout form.checkout #customer_details .sella-float-field--textarea.is-filled label,
+.woocommerce-checkout form.checkout #customer_details .sella-float-field--textarea:focus-within label {
+  top: 17px;
 }
 
-.woocommerce-checkout .form-row input:focus,
-.woocommerce-checkout .form-row select:focus,
-.woocommerce-checkout .form-row textarea:focus {
-  border-color: #746fed;
-  outline: 0;
-  box-shadow: 0 0 0 2px rgba(116, 111, 237, 0.12);
+.woocommerce-checkout form.checkout #customer_details .sella-float-field:focus-within label {
+  color: var(--sella-accent);
 }
 
-.woocommerce-checkout .woocommerce-checkout-review-order-table {
+.woocommerce-checkout form.checkout #customer_details .sella-float-field.woocommerce-invalid label {
+  color: var(--sella-error);
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-float-field input:-webkit-autofill {
+  animation: sella-autofill-start 0.01s;
+}
+
+@keyframes sella-autofill-start {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+.woocommerce-checkout form.checkout .e-coupon-box .form-row .input-text::placeholder {
+  color: var(--sella-field-label);
+}
+
+.woocommerce-checkout form.checkout #terms {
+  width: 18px;
+  height: 18px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  accent-color: var(--sella-accent);
+}
+
+/* Checkout panels are flat like the cart page — no drop shadows anywhere. */
+.woocommerce-checkout [class*="e-checkout__order_review"],
+.woocommerce-checkout .e-coupon-box,
+.woocommerce-checkout .woocommerce-checkout-payment,
+.woocommerce-checkout .col-1,
+.woocommerce-checkout .col-2,
+.woocommerce-checkout .woocommerce-billing-fields,
+.woocommerce-checkout .woocommerce-shipping-fields,
+.woocommerce-checkout .woocommerce-additional-fields,
+.woocommerce-checkout .woocommerce-terms-and-conditions,
+.woocommerce-checkout #payment {
+  box-shadow: none !important;
+}
+
+.woocommerce-checkout #order_review .woocommerce-checkout-review-order-table {
+  width: 100%;
   border: 0;
   border-collapse: collapse;
 }
 
-.woocommerce-checkout .woocommerce-checkout-review-order-table th,
-.woocommerce-checkout .woocommerce-checkout-review-order-table td {
-  padding: 14px 0;
-  border-color: #ededed;
+/* Column headers: quiet, with a single rule under them, as on the cart. */
+.woocommerce-checkout .woocommerce-checkout-review-order-table thead th {
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+  color: #6b6b6b;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table thead th.product-total {
+  text-align: end;
+}
+
+@media (min-width: 768px) {
+  .woocommerce-checkout #order_review .woocommerce-checkout-review-order-table .product-total {
+    width: 1%;
+    white-space: nowrap;
+  }
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table tbody td {
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
 }
 
+.woocommerce-checkout .woocommerce-checkout-review-order-table tbody td.product-total {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* The quantity rides on the cover as a badge instead of sitting under the name. */
+.woocommerce-checkout .woocommerce-checkout-review-order-table .product-quantity {
+  display: none;
+}
+
 .sella-checkout-product {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+}
+
+.sella-checkout-product-media {
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 0;
 }
 
 .sella-checkout-product-image {
   display: block;
-  flex: 0 0 54px;
-  width: 54px;
-  height: 70px;
+  width: 56px;
+  height: 72px;
+  border-radius: 6px;
+  background: #f7f7f9;
+  box-shadow: none;
   object-fit: contain;
-  border-radius: 5px;
-  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.1);
+}
+
+.sella-checkout-product-qty {
+  position: absolute;
+  inset-block-start: -8px;
+  inset-inline-end: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  color: #fff;
+  background: #171717;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 22px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .sella-checkout-product-name {
   min-width: 0;
+  color: #171717;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot th,
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot td {
+  padding: 13px 0;
+  border: 0;
+  border-top: 1px solid #f0f0f0;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: start;
+  vertical-align: middle;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot td {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot tr:first-child th,
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot tr:first-child td {
+  border-top: 0;
+}
+
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot .order-total th,
+.woocommerce-checkout .woocommerce-checkout-review-order-table tfoot .order-total td {
+  padding-top: 16px;
+  border-top: 1px solid #e5e5e5;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+/* Mobile order summary toggle — built by assets/js/sella-checkout-fields.js. */
+.sella-order-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 15px 0;
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+  color: #171717;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sella-order-toggle__label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.sella-order-toggle__chevron {
+  width: 9px;
+  height: 9px;
+  margin-block-start: -4px;
+  /* Physical sides: a logical pair would mirror into a sideways chevron in RTL. */
+  border-right: 2px solid #171717;
+  border-bottom: 2px solid #171717;
+  transform: rotate(45deg);
+  transition: transform 0.3s ease, margin 0.3s ease;
+}
+
+.sella-order-toggle[aria-expanded="true"] .sella-order-toggle__chevron {
+  margin-block-start: 3px;
+  transform: rotate(-135deg);
+}
+
+.sella-order-toggle__total {
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .woocommerce-checkout #payment {
@@ -311,26 +654,34 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
     padding: 0 14px 28px;
   }
 
-  .woocommerce-checkout #customer_details,
-  .woocommerce-checkout #order_review {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  /* Elementor sets 35px section padding; tighten it so half-width fields keep their labels. */
+  body.woocommerce-checkout .elementor-element.elementor-widget-woocommerce-checkout-page {
+    --sections-padding: 24px 16px;
   }
 
-  .woocommerce-checkout #customer_details {
-    padding: 20px 16px 8px;
-  }
-
-  .woocommerce-checkout #order_review_heading {
-    margin: 24px 0 12px;
+  .woocommerce-checkout #order_review_heading,
+  .woocommerce-checkout .woocommerce-billing-fields h3 {
     font-size: 22px;
   }
 
-  .woocommerce-checkout #order_review {
-    padding: 16px;
+  .woocommerce-checkout form.checkout #customer_details .sella-float-field label {
+    font-size: 15px;
+  }
+
+  .woocommerce-checkout form.checkout #customer_details .woocommerce-billing-fields__field-wrapper,
+  .woocommerce-checkout form.checkout #customer_details .woocommerce-shipping-fields__field-wrapper,
+  .woocommerce-checkout form.checkout #customer_details .woocommerce-additional-fields__field-wrapper {
+    gap: 12px 10px;
+  }
+
+  /* Required fields carry an asterisk, so drop "(optional)" to fit half-width rows. */
+  .woocommerce-checkout form.checkout #customer_details .sella-float-field .optional {
+    display: none;
   }
 
   .woocommerce-checkout .woocommerce-checkout-review-order-table,
   .woocommerce-checkout .woocommerce-checkout-review-order-table tbody,
+  .woocommerce-checkout .woocommerce-checkout-review-order-table tfoot,
   .woocommerce-checkout .woocommerce-checkout-review-order-table tr,
   .woocommerce-checkout .woocommerce-checkout-review-order-table td {
     display: block;
@@ -350,9 +701,32 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
     padding: 12px 0;
   }
 
+  .woocommerce-checkout .woocommerce-checkout-review-order-table tbody td,
   .woocommerce-checkout .woocommerce-checkout-review-order-table tr.cart_item td {
     padding: 0;
     border: 0;
+  }
+
+  /* Order summary collapses behind the toggle, Shopify style. */
+  .woocommerce-checkout .e-checkout__order_review #order_review_heading {
+    display: none;
+  }
+
+  .sella-order-toggle {
+    display: flex;
+  }
+
+  .woocommerce-checkout .e-checkout__order_review #order_review {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.35s ease;
+  }
+
+  .woocommerce-checkout .e-checkout__order_review.is-open #order_review {
+    max-height: 1600px;
+    margin-top: 6px;
+    opacity: 1;
   }
 
   .woocommerce-checkout .woocommerce-checkout-review-order-table tr.cart_item .product-name {
@@ -385,13 +759,16 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   }
 
   .sella-checkout-product {
-    gap: 10px;
+    gap: 12px;
   }
 
   .sella-checkout-product-image {
-    flex-basis: 48px;
-    width: 48px;
-    height: 64px;
+    width: 50px;
+    height: 66px;
+  }
+
+  .sella-checkout-product-name {
+    font-size: 15px;
   }
 
   .woocommerce-checkout #payment {
