@@ -1135,3 +1135,33 @@ body.sella-search-docked-open.sc-search-open {
 .sella-sticky-product-cart__price .screen-reader-text {
   display: none;
 }
+
+/* Media hub (/media/) — on mobile the filter buttons stay on one row and scroll
+   sideways. The page's Elementor CSS sets these rules with !important. */
+@media (max-width: 767px) {
+  /* A wrapping flex line is as wide as its widest item, so the one-row strip
+     would widen the whole page. This column never wraps anyway. */
+  .sm-hub-v2-wrapper.mode-archive .sm-hub-v2-container > .sm-hub-v2-header {
+    flex-wrap: nowrap !important;
+  }
+
+  /* The padding keeps the button shadows from being clipped by the scroll box;
+     the negative margin cancels it so the layout does not move. */
+  .sm-hub-v2-header .sm-hub-v2-filters {
+    flex-wrap: nowrap !important;
+    margin: -8px -10px -14px;
+    padding: 8px 10px 14px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .sm-hub-v2-header .sm-hub-v2-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sm-hub-v2-header .sm-hub-v2-filter-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
