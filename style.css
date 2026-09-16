@@ -1060,3 +1060,15 @@ body.sella-has-sticky-product-cart {
 .sc-root.sella-sc-closing .sc-empty {
   display: none !important;
 }
+
+/* Shop filter bar — the archive search field opens the site search overlay
+   (assets/js/sella-shop-search.js), so it behaves like a button. */
+#sibolet-book-search.sella-shop-search-trigger {
+  cursor: pointer;
+}
+
+#sibolet-book-search.sella-shop-search-trigger:focus,
+#sibolet-book-search.sella-shop-search-trigger:focus-visible {
+  outline: 2px solid rgba(116, 111, 237, 0.35);
+  outline-offset: 2px;
+}

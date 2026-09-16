@@ -180,17 +180,18 @@ body:has(.sella-sticky-product-cart.is-visible) .sella-upsell {
 
 .sella-upsell__cover {
   flex: 0 0 auto;
+  /* Before the text: in RTL the first flex item sits on the right. */
+  order: -1;
   display: block;
   width: 96px;
   line-height: 0;
 }
 
+/* No fixed ratio and no object-fit — the cover shows whole, at its own proportions. */
 .sella-upsell__cover-img {
   width: 100%;
   height: auto;
-  aspect-ratio: 3 / 4;
   border-radius: 7px;
-  object-fit: contain;
   box-shadow: rgb(0 0 0 / 16%) 0 18px 24px -18px, rgb(0 0 0 / 8%) 0 2px 10px 0;
 }
 

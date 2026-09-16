@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.14' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.15' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
@@ -65,6 +65,16 @@ function hello_elementor_child_scripts_styles() {
 		HELLO_ELEMENTOR_CHILD_VERSION,
 		true
 	);
+
+	if ( function_exists( 'is_shop' ) && ( is_shop() || is_product_taxonomy() ) ) {
+		wp_enqueue_script(
+			'sella-shop-search',
+			get_stylesheet_directory_uri() . '/assets/js/sella-shop-search.js',
+			[],
+			HELLO_ELEMENTOR_CHILD_VERSION,
+			true
+		);
+	}
 
 	if ( function_exists( 'is_product' ) && is_product() ) {
 		wp_enqueue_script(

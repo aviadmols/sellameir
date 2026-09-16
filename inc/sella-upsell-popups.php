@@ -524,7 +524,8 @@ function sella_upsell_collect_items( $popup_id, $exclude = array(), $limit = 0 )
 			'url'     => get_permalink( $product_id ),
 			'price'   => sella_upsell_format_price( $price ),
 			'regular' => ( $product->is_on_sale() && $regular > $price ) ? sella_upsell_format_price( $regular ) : '',
-			'image'   => wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_thumbnail' ) ?: wc_placeholder_img_src( 'woocommerce_thumbnail' ),
+			/* "medium" keeps the cover's own proportions; woocommerce_thumbnail is hard-cropped square. */
+			'image'   => wp_get_attachment_image_url( $product->get_image_id(), 'medium' ) ?: wc_placeholder_img_src( 'medium' ),
 		);
 
 		if ( $limit && count( $items ) >= $limit ) {
