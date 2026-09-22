@@ -1,0 +1,267 @@
+/* Checkout offers admin (inc/sella-checkout-offers.php). */
+.sella-offer-admin {
+  max-width: 1180px;
+}
+
+.sella-offer-admin [hidden] {
+  display: none !important;
+}
+
+.sella-offer-lead {
+  max-width: 760px;
+  color: #50575e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* List */
+.sella-offer-table {
+  margin-top: 16px;
+}
+
+.sella-offer-table th,
+.sella-offer-table td {
+  vertical-align: middle;
+}
+
+.sella-offer-table .sella-offer-table__cover {
+  width: 52px;
+}
+
+.sella-offer-table__cover img {
+  display: block;
+  width: 44px;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.sella-offer-table tr.is-disabled .sella-offer-table__cover,
+.sella-offer-table tr.is-disabled .sella-offer-table__book,
+.sella-offer-table tr.is-disabled .sella-offer-table__price,
+.sella-offer-table tr.is-disabled .sella-offer-table__rule {
+  opacity: 0.5;
+}
+
+.sella-offer-table__headline {
+  display: block;
+  margin-top: 3px;
+  color: #646970;
+}
+
+.sella-offer-warning {
+  display: block;
+  margin-top: 4px;
+  color: #b32d2e;
+  font-weight: 600;
+}
+
+.sella-offer-table__price {
+  white-space: nowrap;
+}
+
+.sella-offer-table__price del {
+  margin-inline-start: 6px;
+  color: #8c8f94;
+}
+
+.sella-offer-status {
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sella-offer-status.is-on {
+  color: #1e6b43;
+  background: #d8f0e2;
+}
+
+.sella-offer-status.is-off {
+  color: #50575e;
+  background: #e5e5e5;
+}
+
+.sella-offer-table__actions {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.sella-offer-table__actions form {
+  display: inline;
+}
+
+.sella-offer-empty {
+  margin-top: 16px;
+  padding: 36px 24px;
+  border: 1px dashed #c3c4c7;
+  background: #fff;
+  text-align: center;
+}
+
+.sella-offer-empty p {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.sella-offer-settings {
+  max-width: 760px;
+  margin-top: 28px;
+  padding: 4px 22px 18px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+}
+
+.sella-offer-settings select {
+  vertical-align: baseline;
+}
+
+/* Edit form */
+.sella-offer-back {
+  display: inline-block;
+  margin-top: 10px;
+  text-decoration: none;
+}
+
+.sella-offer-edit__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.sella-offer-section {
+  margin-bottom: 18px;
+  padding: 20px 24px 6px;
+  border: 1px solid #c3c4c7;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.sella-offer-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  font-size: 16px;
+}
+
+.sella-offer-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  background: #746fed;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sella-offer-field {
+  margin: 0 0 18px;
+}
+
+.sella-offer-field > label,
+.sella-offer-field__label,
+.sella-offer-rule-match > label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.sella-offer-rule-match > label:not(:first-child) {
+  margin-top: 14px;
+}
+
+.sella-offer-field input[type="text"],
+.sella-offer-field textarea {
+  width: 100%;
+  max-width: 560px;
+}
+
+.sella-offer-field .description {
+  margin-top: 6px;
+}
+
+.sella-offer-price-input {
+  width: 130px;
+}
+
+.sella-offer-regular {
+  display: inline-block;
+  margin: 10px 0 0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: #f0f0f1;
+}
+
+.sella-offer-product-error {
+  margin: 8px 0 0;
+  color: #b32d2e;
+  font-weight: 600;
+}
+
+.sella-offer-rule-match {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 4px;
+  background: #f6f7f7;
+}
+
+.sella-offer-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.sella-offer-note {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-inline-start: 3px solid #746fed;
+  background: #f5f4fe;
+  color: #3c434a;
+}
+
+.sella-offer-check {
+  font-weight: 600;
+}
+
+.sella-offer-submit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sella-offer-edit__preview {
+  position: sticky;
+  top: 46px;
+}
+
+.sella-offer-edit__preview h2 {
+  margin: 0 0 10px;
+  color: #50575e;
+  font-size: 14px;
+}
+
+/* A dimmed backdrop, as on the site. */
+.sella-offer-preview {
+  padding: 22px 18px;
+  border-radius: 8px;
+  background: #8b8b90;
+}
+
+@media (max-width: 1100px) {
+  .sella-offer-edit__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sella-offer-edit__preview {
+    position: static;
+    max-width: 520px;
+  }
+}
