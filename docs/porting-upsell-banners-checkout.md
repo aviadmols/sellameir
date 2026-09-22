@@ -54,10 +54,11 @@ add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 ### עיצוב הצ'קאאוט
 | נתיב | תוכן |
 |---|---|
-| `style.css` שורות **190–777** | כל עיצוב הצ'קאאוט: שדות, floating labels, פירוט הזמנה, טוגל מובייל, מדיה קווארי |
+| `style.css` שורות **190–805** | כל עיצוב הצ'קאאוט: שדות, floating labels, פירוט הזמנה, טוגל מובייל, מדיה קווארי |
 | `style.css` שורות **1115–1137** | מחיר בסרגל הסטיקי של דף מוצר (אופציונלי) |
 | `assets/js/sella-checkout-fields.js` | floating labels + טוגל סיכום ההזמנה במובייל (146 שורות) |
-| `functions.php` | שלושה פילטרים + enqueue (ראו 3.3) |
+| `functions.php` | שני פילטרים + enqueue (ראו 4.3) |
+| `inc/sella-customer-fields.php` | טלפון חובה + צ'קבוקס אישור תוכן שיווקי (ראו 4.3) |
 
 ---
 
@@ -162,10 +163,11 @@ var TARGET = '.books-grid-section, .store-archive-section';
 2. **פירוט הזמנה שטוח** — בלי הצללות, כותרות שקטות, קווים דקים. בנוי להיראות כמו דף הסל.
 3. **כמות כבאדג' על העטיפה** במקום "× 2" מתחת לשם.
 4. **סיכום הזמנה מתקפל במובייל** — כפתור עם שם, חץ וסכום, פותח וסוגר את `#order_review`.
-5. **טלפון כשדה חובה.**
+5. **טלפון כשדה חובה** — בצ'קאאוט, בכתובות ובפרטי החשבון.
+6. **צ'קבוקס אישור תוכן שיווקי** — בצ'קאאוט ובפרטי החשבון, לא מסומן כברירת מחדל. נשמר ב-user meta `sella_marketing_consent` (`1`/`0`) ועל ההזמנה ב-`_sella_marketing_consent` (`yes`/`no`), ומוצג באדמין בהזמנה ובפרופיל המשתמש.
 
 ### 4.2 CSS
-העתיקו מ-`style.css` את שורות **190–777**. הבלוק פותח במשתנים:
+העתיקו מ-`style.css` את שורות **190–805**. הבלוק פותח במשתנים:
 ```css
 .woocommerce-checkout form.checkout {
   --sella-field-height: 60px;
@@ -181,9 +183,10 @@ var TARGET = '.books-grid-section, .store-archive-section';
 ```php
 sella_checkout_product_thumbnail()    // woocommerce_cart_item_name — תמונה + באדג' כמות
 sella_checkout_hide_inline_quantity() // woocommerce_checkout_cart_item_quantity → ''
-sella_require_billing_phone()         // woocommerce_billing_fields — טלפון חובה
 // + enqueue של sella-checkout-fields.js כש-is_checkout() && ! is_order_received_page()
 ```
+
+טלפון החובה ואישור התוכן השיווקי יושבים בקובץ נפרד — להעתיק את `inc/sella-customer-fields.php` כמו שהוא ולטעון אותו עם `require_once`. דורש WooCommerce 8.7 ומעלה בשביל ה-hook `woocommerce_edit_account_form_fields` (בגרסה ישנה יותר השדות פשוט לא יופיעו בפרטי החשבון, והשמירה תמשיך לעבוד).
 
 ### 4.4 ההנחות על המבנה — לבדוק לפני העברה
 ה-CSS וה-JS מכוונים ל-markup של widget הצ'קאאוט של Elementor Pro:

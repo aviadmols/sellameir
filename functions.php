@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.17' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.18' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 
@@ -33,6 +33,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-back-in-stock.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shop-banners.php';
 	require_once get_stylesheet_directory() . '/inc/sella-unlimited-stock.php';
+	require_once get_stylesheet_directory() . '/inc/sella-customer-fields.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
@@ -123,20 +124,6 @@ function sella_checkout_product_thumbnail( $product_name, $cart_item ) {
 		. '</span>';
 }
 add_filter( 'woocommerce_cart_item_name', 'sella_checkout_product_thumbnail', 20, 2 );
-
-/**
- * The phone number is needed for delivery updates, so it is not optional.
- *
- * @param array $fields Billing fields.
- * @return array
- */
-function sella_require_billing_phone( $fields ) {
-	if ( isset( $fields['billing_phone'] ) ) {
-		$fields['billing_phone']['required'] = true;
-	}
-	return $fields;
-}
-add_filter( 'woocommerce_billing_fields', 'sella_require_billing_phone', 20 );
 
 /**
  * Drop the "× 2" line under the product name — the badge on the cover says it.

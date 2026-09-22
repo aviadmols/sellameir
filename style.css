@@ -442,6 +442,34 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   accent-color: var(--sella-accent);
 }
 
+/* Marketing opt-in (inc/sella-customer-fields.php) — checkout and Account details. */
+.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent label.checkbox,
+.woocommerce-account form.edit-account .sella-marketing-consent label.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: #171717;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent .input-checkbox,
+.woocommerce-account form.edit-account .sella-marketing-consent .input-checkbox {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--sella-accent, #746fed);
+}
+
+/* An opt-in is optional by nature; the "(optional)" tag only adds noise. */
+.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent .optional {
+  display: none;
+}
+
 /* Checkout panels are flat like the cart page — no drop shadows anywhere. */
 .woocommerce-checkout [class*="e-checkout__order_review"],
 .woocommerce-checkout .e-coupon-box,
