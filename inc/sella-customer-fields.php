@@ -3,7 +3,8 @@
  * Customer contact fields: a required phone and opt-in to marketing content.
  *
  * Phone — required wherever the customer edits it:
- * - Checkout and My Account > Addresses both build on woocommerce_billing_fields.
+ * - Checkout and My Account > Addresses: WooCommerce's "Phone field" setting is
+ *   forced to "required" (see sella_require_phone_setting()).
  * - My Account > Account details gets its own phone field, stored as billing_phone.
  *
  * Marketing consent — an unchecked-by-default checkbox on checkout and on
@@ -23,16 +24,18 @@ define( 'SELLA_MARKETING_CONSENT_LABEL', 'אני מאשר/ת לקבל תוכן �
 /**
  * The phone number is needed for delivery updates, so it is not optional.
  *
- * @param array $fields Billing fields.
- * @return array
+ * Forced through WooCommerce's own "Phone field" setting rather than by
+ * editing the billing fields: the setting also feeds the country locale,
+ * which WooCommerce's address script re-applies in the browser on load and
+ * would otherwise flip the field back to optional. It covers the shipping
+ * phone too, when the order ships to a different address.
+ *
+ * @return string
  */
-function sella_require_billing_phone( $fields ) {
-	if ( isset( $fields['billing_phone'] ) ) {
-		$fields['billing_phone']['required'] = true;
-	}
-	return $fields;
+function sella_require_phone_setting() {
+	return 'required';
 }
-add_filter( 'woocommerce_billing_fields', 'sella_require_billing_phone', 20 );
+add_filter( 'pre_option_woocommerce_checkout_phone_field', 'sella_require_phone_setting' );
 
 /**
  * Whether a customer has opted in to marketing content.
