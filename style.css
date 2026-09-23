@@ -120,22 +120,23 @@ body.logged-in .sella-account-label--member {
 
   /* The mobile header's icon column was sized for icons: keep the logo, the
      icons, the button and the burger on one line and let that column take the
-     room the logo column does not use. */
-  .elementor-container:has(> .elementor-column a.sella-account-link) {
+     room the logo column does not use. Only the header's inner row: the outer
+     section holding it also contains the button and must keep its full width. */
+  .elementor-inner-section > .elementor-container:has(> .elementor-inner-column a.sella-account-link) {
     flex-wrap: nowrap;
   }
 
-  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column {
+  .elementor-inner-section > .elementor-container:has(> .elementor-inner-column a.sella-account-link) > .elementor-inner-column {
     width: auto !important;
     flex: 0 0 auto;
   }
 
-  .elementor-container > .elementor-column:has(a.sella-account-link) {
+  .elementor-inner-section > .elementor-container > .elementor-inner-column:has(a.sella-account-link) {
     flex: 1 1 auto;
     min-width: 0;
   }
 
-  .elementor-column:has(a.sella-account-link) > .elementor-widget-wrap {
+  .elementor-inner-column:has(a.sella-account-link) > .elementor-widget-wrap {
     flex-wrap: nowrap;
     justify-content: flex-end;
     align-items: center;
@@ -151,13 +152,13 @@ body.logged-in .sella-account-label--member {
 }
 
 @media (max-width: 360px) {
-  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column:not(:has(a.sella-account-link)) img {
+  .elementor-inner-section > .elementor-container:has(> .elementor-inner-column a.sella-account-link) > .elementor-inner-column:not(:has(a.sella-account-link)) img {
     max-width: 78px;
   }
 }
 
 @media (max-width: 340px) {
-  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column:not(:has(a.sella-account-link)) img {
+  .elementor-inner-section > .elementor-container:has(> .elementor-inner-column a.sella-account-link) > .elementor-inner-column:not(:has(a.sella-account-link)) img {
     max-width: 62px;
   }
 
