@@ -14,9 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.20' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.21' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
+require_once get_stylesheet_directory() . '/inc/sella-performance.php';
 
 /**
  * WooCommerce product modules.
@@ -36,6 +37,9 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-customer-fields.php';
 	require_once get_stylesheet_directory() . '/inc/sella-checkout-offers.php';
 	require_once get_stylesheet_directory() . '/inc/sella-free-shipping.php';
+	require_once get_stylesheet_directory() . '/inc/sella-add-to-cart-links.php';
+	require_once get_stylesheet_directory() . '/inc/sella-cart-drawer.php';
+	require_once get_stylesheet_directory() . '/inc/sella-header-account.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 

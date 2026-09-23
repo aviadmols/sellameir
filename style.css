@@ -61,6 +61,119 @@ html[dir="rtl"] .sc-header-icons .sc-trigger.sc-open-cart .sc-trigger-count {
   display: none !important;
 }
 
+/* Header — "כניסה למנויים" text button in place of the person icon
+   (inc/sella-header-account.php). Desktop: Smart Cart shortcode; mobile:
+   Elementor icon list. */
+.sc-header-icons .sc-trigger.sc-account-trigger,
+.elementor-icon-list-item > a.sella-account-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 34px;
+  margin-inline-end: 6px;
+  padding: 0 16px !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.sc-header-icons .sc-trigger.sc-account-trigger:hover,
+.elementor-icon-list-item > a.sella-account-link:hover {
+  opacity: 1;
+  color: #fff !important;
+  border-color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.sella-account-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  color: inherit;
+}
+
+.sella-account-label--member,
+body.logged-in .sella-account-label--guest {
+  display: none;
+}
+
+body.logged-in .sella-account-label--member {
+  display: inline;
+}
+
+@media (max-width: 767px) {
+  .sc-header-icons .sc-trigger.sc-account-trigger,
+  .elementor-icon-list-item > a.sella-account-link {
+    height: 28px;
+    margin-inline-end: 0;
+    padding: 0 10px !important;
+  }
+
+  .sella-account-label {
+    font-size: 12px;
+  }
+
+  /* The mobile header's icon column was sized for icons: keep the logo, the
+     icons, the button and the burger on one line and let that column take the
+     room the logo column does not use. */
+  .elementor-container:has(> .elementor-column a.sella-account-link) {
+    flex-wrap: nowrap;
+  }
+
+  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column {
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+
+  .elementor-container > .elementor-column:has(a.sella-account-link) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .elementor-column:has(a.sella-account-link) > .elementor-widget-wrap {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .elementor-widget-icon-list:has(a.sella-account-link) {
+    flex-shrink: 0;
+  }
+
+  .elementor-widget-icon-list:has(a.sella-account-link) .elementor-icon-list-items {
+    flex-wrap: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column:not(:has(a.sella-account-link)) img {
+    max-width: 78px;
+  }
+}
+
+@media (max-width: 340px) {
+  .elementor-container:has(> .elementor-column a.sella-account-link) > .elementor-column:not(:has(a.sella-account-link)) img {
+    max-width: 62px;
+  }
+
+  .elementor-icon-list-item > a.sella-account-link {
+    padding: 0 8px !important;
+  }
+
+  .sella-account-label {
+    font-size: 11px;
+  }
+
+  .elementor-widget-icon-list:has(a.sella-account-link) .elementor-icon-list-item {
+    margin-inline: 1px !important;
+  }
+}
+
 /* Homepage books slider — add-to-cart button in static cards */
 .static-book-card .book-action-area {
   display: flex !important;
@@ -1256,4 +1369,18 @@ body.sella-search-docked-open.sc-search-open {
     flex: 0 0 auto;
     white-space: nowrap;
   }
+}
+
+/* Article page — "more articles" sidebar (Unlimited Elements post grid in the
+   single-post template): every excerpt takes exactly three lines, cut with an
+   ellipsis when longer, so the cards line up. */
+.elementor-element-df417ca .uc_post_text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  line-height: 1.5;
+  min-height: 4.5em;
+  max-height: 4.5em;
 }

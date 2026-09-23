@@ -142,6 +142,56 @@
     }
   }
 
+  /**
+   * Field errors: keep only the message under the field. WooCommerce prints each
+   * one twice, as an inline message and again in a list at the top of the form,
+   * then scrolls to that list. Drop the list items that already show inline,
+   * drop the list when nothing is left, and scroll to the first invalid field.
+   * Errors that belong to no field (payment, stock) stay in the list.
+   *
+   * checkout_error fires before WooCommerce adds the inline messages, so an item
+   * is dropped when its field exists (WooCommerce's own test for writing one),
+   * and the scroll waits a tick for the messages to be in place.
+   */
+  function fieldErrorsInline() {
+    var groups = document.querySelectorAll('form.checkout .woocommerce-NoticeGroup-checkout');
+    var first = null;
+
+    for (var i = 0; i < groups.length; i++) {
+      var items = groups[i].querySelectorAll('li[data-id]');
+
+      for (var j = 0; j < items.length; j++) {
+        var field = document.getElementById(items[j].getAttribute('data-id'));
+        if (field) {
+          first = first || field;
+          items[j].parentNode.removeChild(items[j]);
+        }
+      }
+
+      if (!groups[i].querySelector('li')) {
+        groups[i].parentNode.removeChild(groups[i]);
+      }
+    }
+
+    // Something is still listed at the top: WooCommerce's scroll to it stands.
+    if (!first || document.querySelector('form.checkout .woocommerce-NoticeGroup-checkout')) {
+      return;
+    }
+
+    window.jQuery('html, body').stop(true);
+    window.setTimeout(function () {
+      var row = (first.closest && first.closest('.form-row')) || first;
+      var top = row.getBoundingClientRect().top + window.pageYOffset - 120;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+
+      try {
+        first.focus({ preventScroll: true });
+      } catch (error) {
+        first.focus();
+      }
+    }, 0);
+  }
+
   function boot() {
     enhance();
     orderSummary();
@@ -166,6 +216,7 @@
         orderSummary();
         shippingBlock();
       });
+      window.jQuery(document.body).on('checkout_error', fieldErrorsInline);
     }
   }
 

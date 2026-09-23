@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'SELLA_MARKETING_CONSENT_META', 'sella_marketing_consent' );
-define( 'SELLA_MARKETING_CONSENT_LABEL', 'אני מאשר/ת לקבל תוכן שיווקי, עדכונים ומבצעים' );
+define( 'SELLA_MARKETING_CONSENT_LABEL', 'אני רוצה להישאר מעודכן על מבצעים, אירועים וספרים חדשים' );
 
 /**
  * The phone number is needed for delivery updates, so it is not optional.
