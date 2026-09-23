@@ -113,9 +113,39 @@
     return toggle;
   }
 
+  /**
+   * Shipping row: the heading on its own line, the methods stacked under it.
+   * WooCommerce prints the heading in a <th> beside a narrow <td>, and the
+   * method labels overflowed that cell. The review table is re-rendered on
+   * every checkout refresh, so this runs again from the updated_checkout hook.
+   */
+  function shippingBlock() {
+    var rows = document.querySelectorAll('.woocommerce-checkout-review-order-table tr.woocommerce-shipping-totals');
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var th = row.querySelector('th');
+      var td = row.querySelector('td');
+
+      if (!th || !td || row.classList.contains('sella-shipping-row')) {
+        continue;
+      }
+
+      var heading = document.createElement('span');
+      heading.className = 'sella-shipping-heading';
+      heading.textContent = th.textContent.trim();
+
+      td.colSpan = 2;
+      td.insertBefore(heading, td.firstChild);
+      row.removeChild(th);
+      row.classList.add('sella-shipping-row');
+    }
+  }
+
   function boot() {
     enhance();
     orderSummary();
+    shippingBlock();
 
     document.addEventListener('input', onFieldEvent);
     document.addEventListener('change', onFieldEvent);
@@ -134,6 +164,7 @@
         enhance();
         syncAll();
         orderSummary();
+        shippingBlock();
       });
     }
   }

@@ -607,6 +607,65 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   font-weight: 800;
 }
 
+/* Shipping: the heading sits on its own line with the methods stacked under it.
+   assets/js/sella-checkout-fields.js rebuilds the row into one cell spanning both
+   columns on every refresh of the review table; until it runs, the cell wraps
+   instead of overflowing. The ids in these selectors outrank Elementor's widget CSS,
+   which also caps this cell at 70px: harmless in the table, but not once the cell is
+   a block on mobile. */
+.woocommerce-checkout #order_review tr.woocommerce-shipping-totals td {
+  text-align: start;
+  white-space: normal;
+  max-width: none; /* Elementor caps this cell at 70px */
+}
+
+.woocommerce-checkout #order_review .sella-shipping-heading {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.woocommerce-checkout #order_review #shipping_method {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.woocommerce-checkout #order_review #shipping_method li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  white-space: normal;
+}
+
+.woocommerce-checkout #order_review #shipping_method .shipping_method[type="radio"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #746fed;
+  cursor: pointer;
+}
+
+.woocommerce-checkout #order_review #shipping_method li label {
+  display: block;
+  margin: 0;
+  color: #171717;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.woocommerce-checkout #order_review #shipping_method li input:checked + label {
+  font-weight: 600;
+}
+
 /* Mobile order summary toggle — built by assets/js/sella-checkout-fields.js. */
 .sella-order-toggle {
   display: none;
@@ -801,6 +860,11 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
 
   .woocommerce-checkout #payment {
     padding: 14px;
+  }
+
+  /* The rebuilt shipping row has a single cell: let it take the whole row. */
+  .woocommerce-checkout #order_review tr.sella-shipping-row td {
+    flex: 1 1 100%;
   }
 }
 
