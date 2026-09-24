@@ -23,3 +23,14 @@ function sella_disable_emoji() {
 	add_filter( 'emoji_svg_url', '__return_false' );
 }
 add_action( 'init', 'sella_disable_emoji' );
+
+/**
+ * Show text in a fallback font while the custom fonts (polin) download,
+ * instead of leaving it invisible. Elementor Pro prints 'auto' by default.
+ *
+ * @return string
+ */
+function sella_custom_fonts_display() {
+	return 'swap';
+}
+add_filter( 'elementor_pro/custom_fonts/font_display', 'sella_custom_fonts_display' );
