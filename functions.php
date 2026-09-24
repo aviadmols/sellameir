@@ -14,10 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.23' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.24' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';
+require_once get_stylesheet_directory() . '/inc/sella-page-cache.php';
 
 /**
  * WooCommerce product modules.

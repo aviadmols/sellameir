@@ -72,6 +72,10 @@
               '<span class="sella-upsell__price-now"></span>' +
               '<del class="sella-upsell__price-was"></del>' +
             '</p>' +
+            '<p class="sella-upsell__timer" hidden>' +
+              '<span class="sella-upsell__timer-label"></span>' +
+              '<span class="sella-upsell__timer-clock" dir="ltr"></span>' +
+            '</p>' +
             '<button type="button" class="sella-upsell__btn" data-upsell-add></button>' +
           '</div>' +
           '<a class="sella-upsell__cover" href="#" tabindex="-1" aria-hidden="true">' +
@@ -96,7 +100,10 @@
       cover: root.querySelector('.sella-upsell__cover'),
       coverImg: root.querySelector('.sella-upsell__cover-img'),
       nav: root.querySelector('.sella-upsell__nav'),
-      counter: root.querySelector('.sella-upsell__counter')
+      counter: root.querySelector('.sella-upsell__counter'),
+      timer: root.querySelector('.sella-upsell__timer'),
+      timerLabel: root.querySelector('.sella-upsell__timer-label'),
+      timerClock: root.querySelector('.sella-upsell__timer-clock')
     };
 
     root.addEventListener('click', function (event) {
@@ -215,6 +222,65 @@
     pruneAdded();
   }
 
+  /**
+   * Display-only countdown. The end time is kept for the visit, so moving
+   * between pages does not restart it; at zero it quietly starts over.
+   */
+  var timerInterval = null;
+
+  function timerEnd(popup) {
+    var key = 'sella-upsell-timer-' + popup.id;
+    var length = popup.timer.minutes * 60000;
+    var end = 0;
+    try {
+      end = parseInt(window.sessionStorage.getItem(key), 10) || 0;
+    } catch (e) {
+      /* Private browsing: count from now. */
+    }
+    if (end <= Date.now() || end > Date.now() + length) {
+      end = Date.now() + length;
+      try {
+        window.sessionStorage.setItem(key, String(end));
+      } catch (e) {
+        /* Nothing to do; the in-memory end time still works for this page. */
+      }
+    }
+    return end;
+  }
+
+  function pad(number) {
+    return number < 10 ? '0' + number : String(number);
+  }
+
+  function tickTimer() {
+    if (!activePopup || !activePopup.timer) {
+      stopTimer();
+      return;
+    }
+    var left = Math.max(0, Math.round((timerEnd(activePopup) - Date.now()) / 1000));
+    var hours = Math.floor(left / 3600);
+    var minutes = Math.floor((left % 3600) / 60);
+    var seconds = left % 60;
+    nodes.timerClock.textContent = (hours ? hours + ':' + pad(minutes) : pad(minutes)) + ':' + pad(seconds);
+  }
+
+  function startTimer() {
+    stopTimer();
+    var timer = activePopup && activePopup.timer;
+    nodes.timer.hidden = !timer;
+    if (!timer) {
+      return;
+    }
+    nodes.timerLabel.textContent = timer.label || '';
+    tickTimer();
+    timerInterval = window.setInterval(tickTimer, 1000);
+  }
+
+  function stopTimer() {
+    window.clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
   function openPopup(popup) {
     if (!popup || !popup.items.length || (root && root.classList.contains('is-open'))) {
       return;
@@ -227,6 +293,7 @@
     currentIndex = 0;
     markShown(popup);
     render();
+    startTimer();
     root.hidden = false;
     /* Let the browser paint the hidden state before transitioning in. */
     window.requestAnimationFrame(function () {
@@ -241,6 +308,7 @@
       return;
     }
     root.classList.remove('is-open');
+    stopTimer();
     hideTimer = window.setTimeout(function () {
       root.hidden = true;
     }, 400);

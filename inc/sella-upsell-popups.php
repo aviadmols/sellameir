@@ -27,6 +27,14 @@ define( 'SELLA_UPSELL_META_CART_CATEGORIES', '_sella_upsell_cart_categories' );
 define( 'SELLA_UPSELL_META_CART_MIN_TOTAL', '_sella_upsell_cart_min_total' );
 define( 'SELLA_UPSELL_META_CART_MAX_TOTAL', '_sella_upsell_cart_max_total' );
 define( 'SELLA_UPSELL_META_CART_CROSS_SELLS', '_sella_upsell_cart_cross_sells' );
+define( 'SELLA_UPSELL_META_TIMER', '_sella_upsell_timer' );
+define( 'SELLA_UPSELL_META_TIMER_MINUTES', '_sella_upsell_timer_minutes' );
+define( 'SELLA_UPSELL_META_TIMER_LABEL', '_sella_upsell_timer_label' );
+
+/**
+ * Default text shown before the countdown.
+ */
+define( 'SELLA_UPSELL_TIMER_DEFAULT_LABEL', 'ההצעה מסתיימת בעוד' );
 
 /**
  * Cap on books sent to the browser per popup, so a whole category does not
@@ -220,6 +228,11 @@ function sella_upsell_save_meta( $post_id, $source ) {
 	update_post_meta( $post_id, SELLA_UPSELL_META_CART_MIN_TOTAL, max( 0, (float) ( $source['sella_upsell_cart_min_total'] ?? 0 ) ) );
 	update_post_meta( $post_id, SELLA_UPSELL_META_CART_MAX_TOTAL, max( 0, (float) ( $source['sella_upsell_cart_max_total'] ?? 0 ) ) );
 	update_post_meta( $post_id, SELLA_UPSELL_META_CART_CROSS_SELLS, ! empty( $source['sella_upsell_cart_cross_sells'] ) ? '1' : '0' );
+
+	$timer_label = isset( $source['sella_upsell_timer_label'] ) ? sanitize_text_field( wp_unslash( $source['sella_upsell_timer_label'] ) ) : '';
+	update_post_meta( $post_id, SELLA_UPSELL_META_TIMER, ! empty( $source['sella_upsell_timer'] ) ? '1' : '0' );
+	update_post_meta( $post_id, SELLA_UPSELL_META_TIMER_MINUTES, max( 1, min( 1440, absint( $source['sella_upsell_timer_minutes'] ?? 15 ) ) ) );
+	update_post_meta( $post_id, SELLA_UPSELL_META_TIMER_LABEL, '' !== $timer_label ? $timer_label : SELLA_UPSELL_TIMER_DEFAULT_LABEL );
 }
 
 /**
@@ -306,6 +319,11 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 	$cart_min       = $upsell_id ? (float) get_post_meta( $upsell_id, SELLA_UPSELL_META_CART_MIN_TOTAL, true ) : 0;
 	$cart_max       = $upsell_id ? (float) get_post_meta( $upsell_id, SELLA_UPSELL_META_CART_MAX_TOTAL, true ) : 0;
 	$cross_sells    = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_CART_CROSS_SELLS, true ) : '0';
+	$timer          = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_TIMER, true ) : '0';
+	$timer_minutes  = $upsell_id ? absint( get_post_meta( $upsell_id, SELLA_UPSELL_META_TIMER_MINUTES, true ) ) : 15;
+	$timer_minutes  = $timer_minutes ? $timer_minutes : 15;
+	$timer_label    = $upsell_id ? get_post_meta( $upsell_id, SELLA_UPSELL_META_TIMER_LABEL, true ) : '';
+	$timer_label    = '' !== $timer_label ? $timer_label : SELLA_UPSELL_TIMER_DEFAULT_LABEL;
 	$products       = is_array( $products ) ? array_map( 'absint', $products ) : array();
 	$scope_products = is_array( $scope_products ) ? array_map( 'absint', $scope_products ) : array();
 	$scope_pages    = is_array( $scope_pages ) ? array_map( 'absint', $scope_pages ) : array();
@@ -406,6 +424,17 @@ function sella_upsell_render_form( $upsell_id = 0 ) {
 			<tr>
 				<th><label for="sella_upsell_frequency">תדירות</label></th>
 				<td><select id="sella_upsell_frequency" name="sella_upsell_frequency"><?php foreach ( $options['frequencies'] as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $frequency, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></td>
+			</tr>
+			<tr>
+				<th>טיימר</th>
+				<td>
+					<label><input type="checkbox" id="sella_upsell_timer" name="sella_upsell_timer" value="1" <?php checked( $timer, '1' ); ?> /> להציג טיימר רץ בפופאפ</label>
+					<div class="sella-upsell-timer-settings" <?php echo '1' === $timer ? '' : 'hidden'; ?> style="margin-top:10px;">
+						<label>אורך הטיימר בדקות <input type="number" min="1" max="1440" name="sella_upsell_timer_minutes" value="<?php echo esc_attr( (string) $timer_minutes ); ?>" style="width:90px;" /></label>
+						<label style="margin-inline-start:14px;">טקסט לפני הטיימר <input class="regular-text" type="text" name="sella_upsell_timer_label" value="<?php echo esc_attr( $timer_label ); ?>" /></label>
+						<p class="description">לתצוגה בלבד: הטיימר לא משנה מחיר ולא סוגר את ההצעה. הוא נספר מהפעם הראשונה שהגולש רואה את הפופאפ, ממשיך בין עמודים באותו ביקור, ומתחיל מחדש כשהוא מגיע לאפס.</p>
+					</div>
+				</td>
 			</tr>
 			<tr>
 				<th><label for="sella_upsell_scope">איפה להציג</label></th>
@@ -826,6 +855,12 @@ function sella_upsell_get_active( $context = null ) {
 			'trigger'   => get_post_meta( $post->ID, SELLA_UPSELL_META_TRIGGER, true ) ?: 'delay',
 			'delay'     => absint( get_post_meta( $post->ID, SELLA_UPSELL_META_DELAY, true ) ?: 5 ),
 			'frequency' => get_post_meta( $post->ID, SELLA_UPSELL_META_FREQUENCY, true ) ?: 'session',
+			'timer'     => '1' === get_post_meta( $post->ID, SELLA_UPSELL_META_TIMER, true )
+				? array(
+					'minutes' => absint( get_post_meta( $post->ID, SELLA_UPSELL_META_TIMER_MINUTES, true ) ?: 15 ),
+					'label'   => get_post_meta( $post->ID, SELLA_UPSELL_META_TIMER_LABEL, true ) ?: SELLA_UPSELL_TIMER_DEFAULT_LABEL,
+				)
+				: null,
 		);
 	}
 	return $active;

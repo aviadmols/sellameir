@@ -56,5 +56,9 @@
 
     $('#sella_upsell_cart_rule').on('change', toggleCartRule);
     toggleCartRule();
+
+    $('#sella_upsell_timer').on('change', function () {
+      $('.sella-upsell-timer-settings').prop('hidden', !this.checked);
+    });
   });
 })(jQuery);
