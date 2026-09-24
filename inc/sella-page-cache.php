@@ -141,13 +141,17 @@ function sella_pc_page_cacheable() {
 
 /**
  * Start buffering the page once WordPress knows which page it is.
+ *
+ * One step before PHP_INT_MAX: buffers that rewrite the page (such as
+ * sella_delay_tracking_start) start after this one, sit inside it, and so
+ * run before the page is stored.
  */
 function sella_pc_start_buffer() {
 	if ( sella_pc_page_cacheable() ) {
 		ob_start( 'sella_pc_store' );
 	}
 }
-add_action( 'template_redirect', 'sella_pc_start_buffer', PHP_INT_MAX );
+add_action( 'template_redirect', 'sella_pc_start_buffer', PHP_INT_MAX - 1 );
 
 /**
  * Output-buffer callback: save the finished page, then send it unchanged.
