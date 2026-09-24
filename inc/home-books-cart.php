@@ -46,7 +46,8 @@ function sella_random_books_shortcode() {
 			$product_id      = $product->get_id();
 			$product_title   = get_the_title();
 			$product_price   = $product->get_price_html();
-			$product_image   = get_the_post_thumbnail_url( get_the_ID(), 'large' );
+			// Covers show at about 112px wide; 'medium' (300px, uncropped) stays sharp on 2x screens.
+			$product_image   = get_the_post_thumbnail_url( get_the_ID(), 'medium' );
 			$product_url     = get_permalink();
 			$add_to_cart_url = $product->add_to_cart_url();
 
@@ -59,7 +60,7 @@ function sella_random_books_shortcode() {
 				<a href="' . esc_url( $product_url ) . '" class="book-link-wrapper">
 					<div class="book-3d-container">
 						<div class="book-3d"' . $bg_img_style . '>
-							<img src="' . esc_url( $product_image ) . '" alt="' . esc_attr( $product_title ) . '" class="book-cover-img">
+							<img src="' . esc_url( $product_image ) . '" alt="' . esc_attr( $product_title ) . '" class="book-cover-img" loading="lazy" decoding="async">
 						</div>
 					</div>
 					<h3 class="book-title">' . esc_html( $product_title ) . '</h3>
