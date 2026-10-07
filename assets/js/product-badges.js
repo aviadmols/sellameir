@@ -50,9 +50,9 @@
       return;
     }
 
-    // Mount on the card itself — never inside .book-3d / perspective,
-    // otherwise the badge sits behind the cover and only shows on hover.
-    var target = card;
+    // Inside the book itself, so the label turns with the cover when the book
+    // opens; the CSS lifts it to the cover's depth. The card is the fallback.
+    var target = card.querySelector('.book-3d') || card;
     var style = window.getComputedStyle(target);
     if (style.position === 'static') {
       target.style.position = 'relative';
@@ -90,11 +90,8 @@
       return;
     }
 
-    // Prefer a non-3D wrapper if available.
-    var mount = host;
-    if (host.classList.contains('book-3d') || host.classList.contains('single-book-3d')) {
-      mount = host.parentElement || host;
-    }
+    // Inside the book, so the label turns with the cover.
+    var mount = host.querySelector('.book-3d') || host;
 
     var style = window.getComputedStyle(mount);
     if (style.position === 'static') {

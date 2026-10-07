@@ -65,9 +65,9 @@ function sella_random_books_shortcode() {
 					</div>
 					<h3 class="book-title">' . esc_html( $product_title ) . '</h3>
 					<span class="book-author">' . esc_html( $author_name ) . '</span>
-					<div class="book-price">' . $product_price . '</div>
 				</a>
 				<div class="book-action-area">
+					<div class="book-price">' . $product_price . '</div>
 					<a href="' . esc_url( $add_to_cart_url ) . '" class="book-add-to-cart-btn" data-product_id="' . absint( $product_id ) . '">הוספה לסל</a>
 				</div>
 			</div>';

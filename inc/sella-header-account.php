@@ -1,11 +1,14 @@
 <?php
 /**
- * Header: a "כניסה למנויים" text button in place of the person icon.
+ * Header: a "כניסה למנויים" text button in place of the person icon on
+ * desktop, and a "לחנות" button in its place on mobile, where the menu that
+ * opens carries the subscriber links instead.
  *
  * Desktop draws the icon from a Smart Cart shortcode, mobile from an Elementor
  * icon-list widget linking to My Account; both are rewritten on output. The
- * markup carries both labels and CSS picks one from body.logged-in, so cached
- * HTML (Elementor's element cache, a page cache) never shows the wrong one.
+ * account labels carry both texts and CSS picks one from body.logged-in, so
+ * cached HTML (Elementor's element cache, a page cache) never shows the wrong
+ * one.
  *
  * @package HelloElementorChild
  */
@@ -49,7 +52,7 @@ add_filter( 'do_shortcode_tag', 'sella_header_account_button', 20 );
 
 /**
  * Elementor icon lists (the mobile header): an icon-only My Account link
- * becomes the same button.
+ * becomes a button to the shop.
  *
  * @param string                 $content Widget HTML.
  * @param \Elementor\Widget_Base $widget  Widget.
@@ -67,12 +70,40 @@ function sella_header_account_icon_list( $content, $widget ) {
 			if ( '' !== trim( wp_strip_all_tags( $match[2] ) ) ) {
 				return $match[0];
 			}
-			$attrs = false !== strpos( $match[1], 'class="' )
-				? str_replace( 'class="', 'class="sella-account-link ', $match[1] )
-				: $match[1] . ' class="sella-account-link"';
-			return '<a' . $attrs . '>' . sella_header_account_labels() . '</a>';
+			$attrs = preg_replace( '#\bhref="[^"]*"#', 'href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '"', $match[1] );
+			$attrs = false !== strpos( $attrs, 'class="' )
+				? str_replace( 'class="', 'class="sella-account-link sella-shop-link ', $attrs )
+				: $attrs . ' class="sella-account-link sella-shop-link"';
+			return '<a' . $attrs . '><span class="sella-account-label">לחנות</span></a>';
 		},
 		$content
 	);
 }
 add_filter( 'elementor/widget/render_content', 'sella_header_account_icon_list', 20, 2 );
+
+/**
+ * The menu that opens from the mobile header (Elementor popup 1641): the
+ * subscriber links, which the header button no longer offers there. Only this
+ * widget, since the same WordPress menu is the desktop header's navigation.
+ *
+ * @param string                 $content Widget HTML.
+ * @param \Elementor\Widget_Base $widget  Widget.
+ * @return string
+ */
+function sella_header_mobile_menu_links( $content, $widget ) {
+	if ( 'nav-menu' !== $widget->get_name() || '647d9de' !== $widget->get_id() ) {
+		return $content;
+	}
+
+	$items = sprintf(
+		'<li class="menu-item sella-menu-account"><a href="%1$s" class="elementor-item">%2$s</a></li>'
+		. '<li class="menu-item sella-menu-join"><a href="%3$s" class="elementor-item">הצטרפות למנויים</a></li>',
+		esc_url( wc_get_page_permalink( 'myaccount' ) ),
+		sella_header_account_labels(),
+		esc_url( home_url( '/subscription/' ) )
+	);
+
+	// Both lists: the visible one and Elementor's dropdown copy.
+	return preg_replace( '#(<ul\b[^>]*\belementor-nav-menu\b[^>]*>.*?)(</ul>)#s', '$1' . $items . '$2', $content );
+}
+add_filter( 'elementor/widget/render_content', 'sella_header_mobile_menu_links', 20, 2 );

@@ -62,3 +62,43 @@
 .woocommerce-checkout .sella-product-image-with-badges {
   display: none !important;
 }
+
+/*
+ * On a book: a small label on the cover, flush with its edge a little below
+ * the top. It sits inside .book-3d at the cover's depth, so it turns with the
+ * cover when the book opens. The book is right to left, so the label hangs
+ * off the right edge and its free side, the left, is rounded.
+ */
+.book-card-item .book-3d > .sella-product-badges,
+.book-3d > .sella-product-badges {
+  top: 7%;
+  inset-inline-start: 0;
+  z-index: 4;
+  gap: 4px;
+  transform: translateZ(calc(var(--book-size, 250) / 10 * 1px + 1px)) !important;
+}
+
+.book-3d > .sella-product-badges .sella-product-badge {
+  width: auto;
+  height: auto;
+  min-height: 22px;
+  padding: 4px 10px;
+  border-radius: 0;
+  border-start-end-radius: 6px;
+  border-end-end-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+@media (max-width: 767px) {
+  .book-3d > .sella-product-badges .sella-product-badge {
+    min-height: 18px;
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+}

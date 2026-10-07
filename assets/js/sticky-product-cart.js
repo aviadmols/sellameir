@@ -2,9 +2,13 @@
   'use strict';
 
   function boot() {
-    var originalButton = document.querySelector(
-      '.single_add_to_cart_button, button[name="add-to-cart"], a.add_to_cart_button'
-    );
+    // This book's own button. A bare a.add_to_cart_button would match the
+    // first related book further down the page and add that one instead.
+    var postId = (document.body.className.match(/\bpostid-(\d+)\b/) || [])[1];
+    var originalButton =
+      document.querySelector('.single-page-custom-btn') ||
+      document.querySelector('.single_add_to_cart_button, button[name="add-to-cart"]') ||
+      (postId && document.querySelector('a.add_to_cart_button[data-product_id="' + postId + '"]'));
 
     if (!originalButton || document.querySelector('.sella-sticky-product-cart')) {
       return;
@@ -84,15 +88,32 @@
       }
     });
 
+    // The same colours as the page's own button, whatever Elementor sets them to.
+    var look = window.getComputedStyle(originalButton);
+    stickyButton.style.setProperty('--sella-sticky-bg', look.backgroundColor);
+    stickyButton.style.setProperty('--sella-sticky-color', look.color);
+
     document.body.appendChild(bar);
     document.body.classList.add('sella-has-sticky-product-cart');
     syncButton();
 
+    // Only once the page's own button has scrolled away above, and while no
+    // other copy of it (the page has one further down too) is on screen.
+    var pageButtons = document.querySelectorAll('.single-page-custom-btn');
+
+    function inView(el) {
+      var r = el.getBoundingClientRect();
+      return r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
+    }
+
     function syncVisibility() {
-      bar.classList.toggle('is-visible', window.scrollY > 80);
+      var rect = originalButton.getBoundingClientRect();
+      var passed = rect.height ? rect.bottom < 0 : window.scrollY > 80;
+      bar.classList.toggle('is-visible', passed && !Array.prototype.some.call(pageButtons, inView));
     }
 
     window.addEventListener('scroll', syncVisibility, { passive: true });
+    window.addEventListener('resize', syncVisibility, { passive: true });
     syncVisibility();
 
     if (window.MutationObserver) {
