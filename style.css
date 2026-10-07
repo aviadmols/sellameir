@@ -234,23 +234,8 @@ body.logged-in .sella-account-label--member {
   color: #fff;
 }
 
-/* Price and button on one row. */
-.static-book-card .book-action-area {
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 14px;
-  height: auto;
-}
-
-.static-book-card .book-action-area .book-price {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  margin: 0;
-  white-space: nowrap;
-}
-
-/* Mobile: lighter, smaller titles and buttons on every book card. */
+/* Mobile: lighter, smaller titles, prices and buttons on every book card
+   (home page, shop, categories). */
 @media (max-width: 767px) {
   .elementor-2 .elementor-element.elementor-element-58cdf7d .static-book-card .book-title,
   .book-card-item .book-title {
@@ -277,19 +262,29 @@ body.logged-in .sella-account-label--member {
     font-size: 12px !important;
     font-weight: 500 !important;
     line-height: 16px !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
 
-  .static-book-card .book-action-area {
-    gap: 8px;
+  .book-card-item .book-action-area {
+    align-items: center;
+    height: auto;
+    min-height: 0;
     margin-top: 6px;
   }
 
-  .static-book-card .book-action-area .book-price {
+  .book-card-item .book-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0 6px;
+    margin-bottom: 6px;
     font-size: 14px !important;
   }
 
-  .static-book-card .book-action-area .book-price del,
-  .static-book-card .book-action-area .book-price del * {
+  .book-card-item .book-price del,
+  .book-card-item .book-price del * {
     font-size: 11px !important;
   }
 }
