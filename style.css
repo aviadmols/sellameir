@@ -1580,6 +1580,12 @@ body.sella-search-docked-open.sc-search-open {
     line-height: 1.45 !important;
   }
 
+  .elementor-location-footer .elementor-element-c8af07b {
+    width: 100%;
+    max-width: 300px;
+    margin-inline: auto !important;
+  }
+
   .elementor-location-footer .elementor-element-d36dd5d {
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) !important;
   }

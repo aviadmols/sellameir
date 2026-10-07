@@ -82,6 +82,31 @@ function sella_header_account_icon_list( $content, $widget ) {
 add_filter( 'elementor/widget/render_content', 'sella_header_account_icon_list', 20, 2 );
 
 /**
+ * The same, on the header as it is printed. Elementor's element cache keeps
+ * a widget's HTML from before this change, the account button, until its
+ * cache is cleared; this filter runs on every page and turns that one too.
+ *
+ * @param string $content Document HTML.
+ * @return string
+ */
+function sella_header_shop_button( $content ) {
+	if ( false === strpos( $content, 'sella-account-link' ) ) {
+		return $content;
+	}
+
+	return preg_replace_callback(
+		'#<a([^>]*\bclass="sella-account-link"[^>]*)>.*?</a>#s',
+		function ( $match ) {
+			$attrs = preg_replace( '#\bhref="[^"]*"#', 'href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '"', $match[1] );
+			$attrs = str_replace( 'class="sella-account-link"', 'class="sella-account-link sella-shop-link"', $attrs );
+			return '<a' . $attrs . '><span class="sella-account-label">לחנות</span></a>';
+		},
+		$content
+	);
+}
+add_filter( 'elementor/frontend/the_content', 'sella_header_shop_button' );
+
+/**
  * The menu that opens from the mobile header (Elementor popup 1641): the
  * subscriber links, which the header button no longer offers there. Only this
  * widget, since the same WordPress menu is the desktop header's navigation.
