@@ -1660,3 +1660,10 @@ body.sella-search-docked-open.sc-search-open {
   font: inherit;
   line-height: inherit;
 }
+
+@media (max-width: 768px) {
+  .sibolet-hero-blur-container {
+    height: 250px !important;
+    z-index: -1;
+  }
+}
