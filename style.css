@@ -1654,3 +1654,9 @@ body.sella-search-docked-open.sc-search-open {
     justify-content: center;
   }
 }
+
+/* The mobile menu's account item: the menu's own type, not the header button's. */
+.sella-menu-account .sella-account-label {
+  font: inherit;
+  line-height: inherit;
+}
