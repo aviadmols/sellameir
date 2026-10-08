@@ -46,8 +46,13 @@ function sella_random_books_shortcode() {
 			$product_id      = $product->get_id();
 			$product_title   = get_the_title();
 			$product_price   = $product->get_price_html();
-			// Covers show at about 112px wide; 'medium' (300px, uncropped) stays sharp on 2x screens.
+			// The back of the book (--bg-img) is barely seen; 'medium' is plenty for it.
 			$product_image   = get_the_post_thumbnail_url( get_the_ID(), 'medium' );
+			// The front shows up to 265px wide on desktop and 110px on mobile, so the
+			// browser picks from every size of the cover: 'medium' alone (about 200px
+			// wide) was stretched on desktop and looked pixelated.
+			$thumb_id        = (int) get_post_thumbnail_id();
+			$cover_srcset    = $thumb_id ? wp_get_attachment_image_srcset( $thumb_id, 'medium' ) : '';
 			$product_url     = get_permalink();
 			$add_to_cart_url = $product->add_to_cart_url();
 
@@ -60,7 +65,7 @@ function sella_random_books_shortcode() {
 				<a href="' . esc_url( $product_url ) . '" class="book-link-wrapper">
 					<div class="book-3d-container">
 						<div class="book-3d"' . $bg_img_style . '>
-							<img src="' . esc_url( $product_image ) . '" alt="' . esc_attr( $product_title ) . '" class="book-cover-img" loading="lazy" decoding="async">
+							<img src="' . esc_url( $product_image ) . '"' . ( $cover_srcset ? ' srcset="' . esc_attr( $cover_srcset ) . '" sizes="(max-width: 767px) 120px, 270px"' : '' ) . ' alt="' . esc_attr( $product_title ) . '" class="book-cover-img" loading="lazy" decoding="async">
 						</div>
 					</div>
 					<h3 class="book-title">' . esc_html( $product_title ) . '</h3>
