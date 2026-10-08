@@ -1803,3 +1803,10 @@ body.sella-search-docked-open.sc-search-open {
     row-gap: 28px !important;
   }
 }
+
+/* Cart drawer quantity: the − and + centred in their buttons. */
+.sc-root .sc-qty__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
