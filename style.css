@@ -1631,9 +1631,10 @@ body.sella-search-docked-open.sc-search-open {
 }
 
 .sella-ai__label {
-  color: #171717;
-  font-size: 14px;
-  font-weight: 500;
+  color: #000;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
 .sella-ai__row {
@@ -1669,6 +1670,11 @@ body.sella-search-docked-open.sc-search-open {
 @media (max-width: 767px) {
   .sella-ai {
     justify-content: center;
+  }
+
+  /* The same size as "רוצים לשתף?" beside it. */
+  .sella-ai__label {
+    font-size: 16px;
   }
 }
 
