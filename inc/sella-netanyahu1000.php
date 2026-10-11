@@ -40,7 +40,7 @@ define( 'SELLA_N1000_GALLERY_SLOTS', 8 );
 
 /**
  * The theme's photos, shipped in assets/images/netanyahu1000/, for the
- * portrait, background and gallery fields while they are empty.
+ * portrait, background, gallery and quote-logo fields while they are empty.
  *
  * @return array
  */
@@ -49,6 +49,7 @@ function sella_n1000_default_images() {
 		'portrait'   => 'bibi-1000-book.png',
 		'background' => 'map-bg.jpg',
 		'gallery'    => array( 'book-1000-1.jpg', 'book-1000-2.jpg', 'book-1000-3.jpg', 'book-1000-5.jpg', 'book-1000-6.jpg' ),
+		'quote_logo' => 'wsj-wide.png',
 	);
 }
 
@@ -246,6 +247,43 @@ function sella_n1000_register_fields() {
 add_action( 'acf/init', 'sella_n1000_register_fields' );
 
 /**
+ * Fill a never-saved field with the original content, so the edit screen
+ * shows the real texts and the media-library photos instead of empty
+ * fields. Once the page is saved the stored values take over.
+ *
+ * @param mixed $value   Stored value.
+ * @param mixed $post_id ACF post ID.
+ * @param array $field   Field.
+ * @return mixed
+ */
+function sella_n1000_prefill_field( $value, $post_id, $field ) {
+	$name = isset( $field['name'] ) ? (string) $field['name'] : '';
+	if ( 0 !== strpos( $name, 'n1000_' ) || ! is_numeric( $post_id ) || metadata_exists( 'post', (int) $post_id, $name ) ) {
+		return $value;
+	}
+
+	$defaults = sella_n1000_defaults();
+	if ( isset( $defaults[ $name ] ) ) {
+		return $defaults[ $name ];
+	}
+
+	$images = sella_n1000_default_images();
+	$files  = array(
+		'n1000_portrait'   => $images['portrait'],
+		'n1000_background' => $images['background'],
+		'n1000_quote_logo' => $images['quote_logo'],
+	);
+	foreach ( $images['gallery'] as $i => $file ) {
+		$files[ 'n1000_gallery_' . ( $i + 1 ) ] = $file;
+	}
+
+	$id = isset( $files[ $name ] ) ? sella_n1000_media_id( $files[ $name ] ) : 0;
+
+	return $id ? $id : $value;
+}
+add_filter( 'acf/load_value', 'sella_n1000_prefill_field', 10, 3 );
+
+/**
  * A field's value, or its default while it is empty or ACF is missing.
  * A switched-off toggle is a value, not an empty field.
  *
@@ -364,14 +402,15 @@ function sella_n1000_price_text( $product, $page_id ) {
 
 /**
  * The template's photos that are copied into the media library. The WSJ
- * logo is an SVG, which the media library refuses, so it stays a theme file.
+ * logo goes in as a PNG (wsj-wide.png), since the media library refuses SVG;
+ * the SVG stays the theme fallback.
  *
  * @return string[]
  */
 function sella_n1000_media_files() {
 	$images = sella_n1000_default_images();
 
-	return array_merge( array( $images['portrait'], $images['background'] ), $images['gallery'] );
+	return array_merge( array( $images['portrait'], $images['background'], $images['quote_logo'] ), $images['gallery'] );
 }
 
 /**
@@ -500,7 +539,8 @@ function sella_n1000_body_class( $classes ) {
 add_filter( 'body_class', 'sella_n1000_body_class' );
 
 /**
- * Load the template's stylesheet and script on pages that use it.
+ * Load the template's stylesheet and script on pages that use it. They are versioned
+ * by modification time, so a deploy reaches browsers that cached the old files.
  */
 function sella_n1000_assets() {
 	if ( ! is_page_template( SELLA_N1000_TEMPLATE ) ) {
@@ -511,14 +551,14 @@ function sella_n1000_assets() {
 		'sella-netanyahu1000',
 		get_stylesheet_directory_uri() . '/assets/css/sella-netanyahu1000.css',
 		array( 'hello-elementor-child-style' ),
-		HELLO_ELEMENTOR_CHILD_VERSION
+		(string) filemtime( get_stylesheet_directory() . '/assets/css/sella-netanyahu1000.css' )
 	);
 
 	wp_enqueue_script(
 		'sella-netanyahu1000',
 		get_stylesheet_directory_uri() . '/assets/js/sella-netanyahu1000.js',
 		array(),
-		HELLO_ELEMENTOR_CHILD_VERSION,
+		(string) filemtime( get_stylesheet_directory() . '/assets/js/sella-netanyahu1000.js' ),
 		true
 	);
 }
