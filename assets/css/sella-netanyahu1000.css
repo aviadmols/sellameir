@@ -20,6 +20,30 @@
 	margin: 0;
 }
 
+/*
+ * "ה-header מעל ה-hero": the site header floats over the hero, so the map
+ * shows behind it as on the source page. sella-netanyahu1000.js keeps
+ * --n1000-header-h at the header's real height; the numbers are its
+ * height before the script runs. The body is positioned so the header sits
+ * under the admin bar, not behind it.
+ */
+body.sella-n1000-header-over {
+	position: relative;
+	--n1000-header-h: 157px;
+}
+
+body.sella-n1000-header-over .elementor-location-header {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	z-index: 50;
+}
+
+body.sella-n1000-header-over .sella-n1000__hero-grid {
+	padding-top: calc(var(--n1000-header-h) + 16px);
+}
+
 /* Hero: portrait beside the text, over a faded map. */
 .sella-n1000__hero {
 	position: relative;
@@ -180,6 +204,8 @@
 	display: block;
 	width: 100%;
 	height: auto;
+	aspect-ratio: 800 / 602;
+	object-fit: cover;
 }
 
 /* Wall Street Journal quote. */
@@ -271,6 +297,10 @@ html.sella-n1000-locked {
 }
 
 @media screen and (max-width: 910px) {
+	body.sella-n1000-header-over {
+		--n1000-header-h: 137px;
+	}
+
 	.sella-n1000__hero-grid {
 		grid-template-columns: 1fr;
 		padding: 24px 4px 0;

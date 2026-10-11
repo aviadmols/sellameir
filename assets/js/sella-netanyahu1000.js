@@ -1,8 +1,22 @@
 /**
- * מהדורת האלף page: open a gallery photo in a lightbox.
+ * מהדורת האלף page: keep the hero clear of a floating header, and open a
+ * gallery photo in a lightbox.
  */
 (function () {
 	'use strict';
+
+	var header = document.querySelector('.sella-n1000-header-over .elementor-location-header');
+	if (header) {
+		var fit = function () {
+			document.body.style.setProperty('--n1000-header-h', header.offsetHeight + 'px');
+		};
+		fit();
+		if ('ResizeObserver' in window) {
+			new ResizeObserver(fit).observe(header);
+		} else {
+			window.addEventListener('resize', fit);
+		}
+	}
 
 	var box = document.querySelector('.sella-n1000__lightbox');
 	if (!box) {
