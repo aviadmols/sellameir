@@ -27,7 +27,7 @@ get_header();
 <main id="content" class="sella-n1000">
 	<section class="sella-n1000__hero">
 		<div class="sella-n1000__hero-grid">
-			<img class="sella-n1000__portrait" src="<?php echo esc_url( $sella_n1000_img . 'bibi-1000-book.png' ); ?>" alt="Benjamin Netanyahu" width="1066" height="1600" fetchpriority="high">
+			<img class="sella-n1000__portrait" <?php echo sella_n1000_img_attrs( 'bibi-1000-book.png', '(max-width: 910px) 300px, 577px' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> alt="Benjamin Netanyahu" width="1066" height="1600" fetchpriority="high">
 			<div class="sella-n1000__intro">
 				<h1 class="sella-n1000__title">ביבי: סיפור חיי</h1>
 				<div class="sella-n1000__rule"></div>
@@ -47,14 +47,14 @@ get_header();
 				<p class="sella-n1000__price"><?php echo esc_html( number_format( $sella_n1000_price, floor( $sella_n1000_price ) === $sella_n1000_price ? 0 : 2 ) ); ?> ש"ח</p>
 			</div>
 		</div>
-		<img class="sella-n1000__map" src="<?php echo esc_url( $sella_n1000_img . 'map-bg.jpg' ); ?>" alt="" aria-hidden="true">
+		<img class="sella-n1000__map" <?php echo sella_n1000_img_attrs( 'map-bg.jpg', '100vw' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> alt="" aria-hidden="true">
 		<div class="sella-n1000__fade"></div>
 	</section>
 
 	<div class="sella-n1000__gallery">
 		<?php foreach ( $sella_n1000_gallery as $sella_n1000_file ) : ?>
-			<button type="button" class="sella-n1000__thumb" data-full="<?php echo esc_url( $sella_n1000_img . $sella_n1000_file ); ?>" aria-label="הגדלת התמונה">
-				<img src="<?php echo esc_url( $sella_n1000_img . $sella_n1000_file ); ?>" alt="book" width="800" height="602" loading="lazy">
+			<button type="button" class="sella-n1000__thumb" data-full="<?php echo esc_url( sella_n1000_img_url( $sella_n1000_file ) ); ?>" aria-label="הגדלת התמונה">
+				<img <?php echo sella_n1000_img_attrs( $sella_n1000_file, '(max-width: 910px) 100vw, 217px' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> alt="book" width="800" height="602" loading="lazy">
 			</button>
 		<?php endforeach; ?>
 	</div>
