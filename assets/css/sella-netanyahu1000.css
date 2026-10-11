@@ -1,0 +1,334 @@
+/**
+ * מהדורת האלף page (templates/netanyahu1000.php), a copy of
+ * selameir.com/netanyahu1000. Mobile below 910px, like the source.
+ */
+
+.sella-n1000 {
+	--n1000-black: #080d16;
+	--n1000-primary: #7670f0;
+	position: relative;
+	padding-bottom: 80px;
+	background: var(--n1000-black);
+	color: #fff;
+	font-family: polin, sans-serif;
+	font-size: 16px;
+	line-height: 1.65;
+	overflow: hidden;
+}
+
+.sella-n1000 p {
+	margin: 0;
+}
+
+/* Hero: portrait beside the text, over a faded map. */
+.sella-n1000__hero {
+	position: relative;
+	overflow: hidden;
+}
+
+.sella-n1000__hero-grid {
+	position: relative;
+	z-index: 4;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+	align-items: center;
+	max-width: 1170px;
+	margin: 0 auto;
+	padding-top: 40px;
+}
+
+.sella-n1000__portrait {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	height: auto;
+}
+
+.sella-n1000__intro {
+	margin-top: -48px;
+	padding: 0 12px;
+	text-align: center;
+}
+
+.sella-n1000 .sella-n1000__title {
+	margin: 0;
+	padding: 0 0 16px;
+	color: #fff;
+	font-family: inherit;
+	font-size: 60px;
+	font-weight: 300;
+	line-height: 1;
+}
+
+.sella-n1000__rule {
+	width: 100%;
+	max-width: 400px;
+	height: 1px;
+	margin: 0 auto;
+	background: var(--n1000-primary);
+}
+
+.sella-n1000 .sella-n1000__subtitle {
+	margin: 0;
+	padding: 16px 0 32px;
+	color: #fff;
+	font-family: inherit;
+	font-size: 30px;
+	font-weight: 600;
+	line-height: 1.65;
+}
+
+.sella-n1000__text p {
+	padding-bottom: 16px;
+	text-wrap: pretty;
+}
+
+.sella-n1000__buy {
+	margin: 0;
+}
+
+.sella-n1000 .sella-n1000__button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 60px;
+	margin-top: 32px;
+	padding: 0 64px;
+	border: 0;
+	border-radius: 1000px;
+	background: var(--n1000-primary);
+	color: #fff;
+	font-family: inherit;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 60px;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition: filter 0.3s;
+}
+
+.sella-n1000 .sella-n1000__button:hover,
+.sella-n1000 .sella-n1000__button:focus-visible {
+	background: var(--n1000-primary);
+	color: #fff;
+	filter: brightness(110%);
+}
+
+.sella-n1000 .sella-n1000__price {
+	padding-top: 16px;
+	font-size: 24px;
+	font-weight: 700;
+}
+
+.sella-n1000__map {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	width: 100%;
+	max-width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.2;
+}
+
+.sella-n1000__fade {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 2;
+	height: 500px;
+	background: linear-gradient(0deg, var(--n1000-black) 30%, rgba(8, 13, 22, 0));
+}
+
+/* Gallery strip, overlapping the bottom of the hero. */
+.sella-n1000__gallery {
+	position: relative;
+	z-index: 4;
+	display: flex;
+	gap: 16px;
+	max-width: 1170px;
+	margin: -48px auto 0;
+	padding: 0 12px;
+	background: var(--n1000-black);
+}
+
+.sella-n1000 .sella-n1000__thumb {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 20px;
+	background: none;
+	overflow: hidden;
+	cursor: pointer;
+	transition: 0.4s;
+}
+
+.sella-n1000 .sella-n1000__thumb:hover {
+	background: none;
+	filter: brightness(90%);
+}
+
+.sella-n1000 .sella-n1000__thumb:active {
+	filter: brightness(80%);
+}
+
+.sella-n1000__thumb img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+/* Wall Street Journal quote. */
+.sella-n1000__quote {
+	max-width: 600px;
+	margin: 0 auto;
+	padding: 112px 0 32px;
+	text-align: center;
+}
+
+.sella-n1000__quote-mark {
+	display: inline-block;
+	width: 150px;
+	height: auto;
+	margin-bottom: -32px;
+	vertical-align: middle;
+}
+
+.sella-n1000__rule--short {
+	max-width: 300px;
+	margin: 24px auto;
+}
+
+.sella-n1000__wsj {
+	display: inline-block;
+	width: 200px;
+	height: auto;
+}
+
+/* Lightbox. */
+.sella-n1000__lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: grid;
+	align-items: center;
+	overflow-y: auto;
+	background: rgba(0, 0, 0, 0.7);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.3s ease-in-out;
+}
+
+.sella-n1000__lightbox.is-open {
+	opacity: 1;
+	pointer-events: all;
+}
+
+.sella-n1000__lightbox-card {
+	position: relative;
+	width: 96%;
+	max-width: 720px;
+	margin: 16px auto;
+	padding: 76px 32px 32px;
+	border-radius: 20px;
+	background: #fff;
+	box-shadow: rgba(0, 0, 0, 0.11) 6px 6px 20px 20px;
+}
+
+.sella-n1000 .sella-n1000__lightbox-close {
+	position: absolute;
+	top: 26px;
+	left: 28px;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: none;
+	color: #000;
+	font-size: 28px;
+	line-height: 36px;
+	cursor: pointer;
+}
+
+.sella-n1000 .sella-n1000__lightbox-close:hover {
+	background: rgba(0, 0, 0, 0.06);
+	color: #000;
+}
+
+.sella-n1000__lightbox-card img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+html.sella-n1000-locked {
+	overflow: hidden;
+}
+
+@media screen and (max-width: 910px) {
+	.sella-n1000__hero-grid {
+		grid-template-columns: 1fr;
+		padding: 24px 4px 0;
+	}
+
+	.sella-n1000__portrait {
+		width: 300px;
+		margin: 0 auto;
+	}
+
+	.sella-n1000__intro {
+		width: 100%;
+		max-width: 500px;
+		margin: -128px auto 0;
+	}
+
+	.sella-n1000 .sella-n1000__title {
+		font-size: 40px;
+	}
+
+	.sella-n1000__rule {
+		max-width: 250px;
+	}
+
+	.sella-n1000 .sella-n1000__subtitle {
+		font-size: 20px;
+	}
+
+	.sella-n1000 .sella-n1000__button {
+		width: 100%;
+		max-width: 280px;
+		padding: 0 24px;
+	}
+
+	.sella-n1000__fade {
+		height: 1000px;
+	}
+
+	.sella-n1000__gallery {
+		flex-wrap: wrap;
+		justify-content: center;
+		margin-top: 64px;
+		padding: 0 32px;
+	}
+
+	.sella-n1000 .sella-n1000__thumb {
+		flex: 1 1 calc(50% - 8px);
+	}
+
+	.sella-n1000__quote {
+		padding: 64px 16px 32px;
+	}
+
+	.sella-n1000__quote-mark {
+		width: 100px;
+	}
+
+	.sella-n1000__rule--short {
+		max-width: 250px;
+	}
+}
