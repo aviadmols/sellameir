@@ -10,6 +10,7 @@
   var offers = (data.offers || []).slice();
   var labels = data.labels || {};
   var SEEN_KEY = 'sella-checkout-offers-seen';
+  var TIMER_KEY = 'sella-checkout-offers-timer-';
 
   var root = null;
   var nodes = {};
@@ -17,6 +18,7 @@
   var busy = false;
   var returnFocus = null;
   var hideTimer = null;
+  var timerInterval = null;
   var touchX = null;
   var rtl = true;
 
@@ -62,6 +64,10 @@
               '</p>' +
             '</div>' +
           '</div>' +
+          '<p class="sella-offers__timer" hidden>' +
+            '<span class="sella-offers__timer-label"></span>' +
+            '<span class="sella-offers__timer-clock" dir="ltr"></span>' +
+          '</p>' +
           '<button type="button" class="sella-offers__add" data-offers-add></button>' +
           '<button type="button" class="sella-offers__dismiss" data-offers-close></button>' +
         '</div>' +
@@ -83,6 +89,9 @@
       text: root.querySelector('.sella-offers__text'),
       now: root.querySelector('.sella-offers__price-now'),
       was: root.querySelector('.sella-offers__price-was'),
+      timer: root.querySelector('.sella-offers__timer'),
+      timerLabel: root.querySelector('.sella-offers__timer-label'),
+      timerClock: root.querySelector('.sella-offers__timer-clock'),
       add: root.querySelector('.sella-offers__add'),
       dismiss: root.querySelector('.sella-offers__dismiss'),
       nav: root.querySelector('.sella-offers__nav'),
@@ -153,6 +162,7 @@
     nodes.was.textContent = offer.regular || '';
     nodes.was.hidden = !offer.regular;
 
+    startTimer();
     resetButton();
     renderNav();
 
@@ -185,6 +195,65 @@
     if (focusDot && nodes.dots.children[index]) {
       nodes.dots.children[index].focus();
     }
+  }
+
+  /**
+   * Display-only countdown, per offer. The end time is kept for the visit, so
+   * a reload does not restart it; at zero it quietly starts over.
+   */
+  function timerEnd(offer) {
+    var key = TIMER_KEY + offer.id;
+    var length = offer.timer.minutes * 60000;
+    var end = 0;
+    try {
+      end = parseInt(window.sessionStorage.getItem(key), 10) || 0;
+    } catch (e) {
+      /* Private browsing: count from now. */
+    }
+    if (end <= Date.now() || end > Date.now() + length) {
+      end = Date.now() + length;
+      try {
+        window.sessionStorage.setItem(key, String(end));
+      } catch (e) {
+        /* Nothing to do; the in-memory end time still works for this page. */
+      }
+    }
+    return end;
+  }
+
+  function pad(number) {
+    return number < 10 ? '0' + number : String(number);
+  }
+
+  function tickTimer() {
+    var offer = offers[index];
+    if (!offer || !offer.timer) {
+      stopTimer();
+      return;
+    }
+    var left = Math.max(0, Math.round((timerEnd(offer) - Date.now()) / 1000));
+    var hours = Math.floor(left / 3600);
+    var minutes = Math.floor((left % 3600) / 60);
+    var seconds = left % 60;
+    nodes.timerClock.textContent = (hours ? hours + ':' + pad(minutes) : pad(minutes)) + ':' + pad(seconds);
+  }
+
+  function startTimer() {
+    stopTimer();
+    var offer = offers[index];
+    var timer = offer && offer.timer;
+    nodes.timer.hidden = !timer;
+    if (!timer) {
+      return;
+    }
+    nodes.timerLabel.textContent = timer.label || '';
+    tickTimer();
+    timerInterval = window.setInterval(tickTimer, 1000);
+  }
+
+  function stopTimer() {
+    window.clearInterval(timerInterval);
+    timerInterval = null;
   }
 
   function resetButton() {
@@ -247,6 +316,7 @@
 
     root.classList.remove('is-open');
     document.documentElement.classList.remove('sella-offers-lock');
+    stopTimer();
     hideTimer = window.setTimeout(function () {
       root.hidden = true;
     }, 300);

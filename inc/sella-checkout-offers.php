@@ -28,6 +28,7 @@ define( 'SELLA_OFFER_ADMIN_SLUG', 'sella-checkout-offers' );
 define( 'SELLA_OFFER_CART_KEY', 'sella_checkout_offer' );
 define( 'SELLA_OFFER_ITEM_META', '_sella_checkout_offer_id' );
 define( 'SELLA_OFFER_DEFAULT_BUTTON', 'הוספה להזמנה' );
+define( 'SELLA_OFFER_DEFAULT_TIMER', 'ההצעה מסתיימת בעוד' );
 
 /**
  * Private storage for offers; edited only through the screen below.
@@ -98,6 +99,9 @@ function sella_offer_defaults() {
 		'headline'        => '',
 		'text'            => '',
 		'button'          => '',
+		'timer'           => false,
+		'timer_minutes'   => 15,
+		'timer_label'     => '',
 		'rule'            => 'any',
 		'rule_products'   => array(),
 		'rule_categories' => array(),
@@ -197,6 +201,9 @@ function sella_offer_sanitize( $source ) {
 		'headline'        => sanitize_text_field( wp_unslash( $source['sella_offer_headline'] ?? '' ) ),
 		'text'            => sanitize_textarea_field( wp_unslash( $source['sella_offer_text'] ?? '' ) ),
 		'button'          => sanitize_text_field( wp_unslash( $source['sella_offer_button'] ?? '' ) ),
+		'timer'           => ! empty( $source['sella_offer_timer'] ),
+		'timer_minutes'   => max( 1, min( 1440, absint( $source['sella_offer_timer_minutes'] ?? 15 ) ) ),
+		'timer_label'     => sanitize_text_field( wp_unslash( $source['sella_offer_timer_label'] ?? '' ) ),
 		'rule'            => isset( $rules[ $rule ] ) ? $rule : 'any',
 		'rule_products'   => sella_offer_id_list( $source['sella_offer_rule_products'] ?? array() ),
 		'rule_categories' => sella_offer_id_list( $source['sella_offer_rule_categories'] ?? array() ),
@@ -545,6 +552,7 @@ function sella_offer_admin_assets( $hook ) {
 			'decimals'      => wc_get_price_decimals(),
 			'placeholder'   => wc_placeholder_img_src( 'medium' ),
 			'defaultButton' => SELLA_OFFER_DEFAULT_BUTTON,
+			'defaultTimer'  => SELLA_OFFER_DEFAULT_TIMER,
 			'noProduct'     => 'שם הספר',
 			'chooseProduct' => 'בחרו את הספר שמוצע.',
 			'notSimple'     => 'אפשר להציע רק ספר רגיל, לא מוצר עם וריאציות.',
@@ -643,6 +651,7 @@ function sella_offer_render_list() {
 								<strong><?php echo esc_html( sella_offer_format_price( $offer['price'] ) ); ?></strong>
 								<?php if ( $regular > (float) $offer['price'] ) : ?><del><?php echo esc_html( sella_offer_format_price( $regular ) ); ?></del><?php endif; ?>
 							<?php endif; ?>
+							<?php if ( $offer['timer'] ) : ?><span class="sella-offer-table__timer">טיימר של <?php echo esc_html( (string) $offer['timer_minutes'] ); ?> דקות</span><?php endif; ?>
 						</td>
 						<td class="sella-offer-table__rule"><?php echo esc_html( sella_offer_rule_summary( $offer ) ); ?></td>
 						<td>
@@ -769,6 +778,16 @@ function sella_offer_render_form( $offer_id ) {
 							<input type="text" id="sella_offer_button" name="sella_offer_button" value="<?php echo esc_attr( $offer['button'] ); ?>" placeholder="<?php echo esc_attr( SELLA_OFFER_DEFAULT_BUTTON ); ?>" />
 							<p class="description">ריק = "<?php echo esc_html( SELLA_OFFER_DEFAULT_BUTTON ); ?>".</p>
 						</div>
+						<div class="sella-offer-field">
+							<label class="sella-offer-check"><input type="checkbox" id="sella_offer_timer" name="sella_offer_timer" value="1" <?php checked( $offer['timer'] ); ?> /> להציג טיימר רץ בהצעה</label>
+							<div class="sella-offer-timer-settings" <?php echo $offer['timer'] ? '' : 'hidden'; ?>>
+								<label for="sella_offer_timer_minutes">אורך הטיימר</label>
+								<input type="number" id="sella_offer_timer_minutes" name="sella_offer_timer_minutes" min="1" max="1440" step="1" class="small-text" value="<?php echo esc_attr( (string) $offer['timer_minutes'] ); ?>" /> דקות
+								<label for="sella_offer_timer_label">טקסט לפני הטיימר</label>
+								<input type="text" id="sella_offer_timer_label" name="sella_offer_timer_label" value="<?php echo esc_attr( $offer['timer_label'] ); ?>" placeholder="<?php echo esc_attr( SELLA_OFFER_DEFAULT_TIMER ); ?>" />
+								<p class="description">ריק = "<?php echo esc_html( SELLA_OFFER_DEFAULT_TIMER ); ?>". לתצוגה בלבד: הטיימר לא משנה את המחיר ולא סוגר את ההצעה. הוא נספר מהפעם הראשונה שהלקוח רואה את ההצעה, לא מתאפס כשעוברים בין עמודים באותו ביקור, ומתחיל מחדש כשהוא מגיע לאפס.</p>
+							</div>
+						</div>
 					</section>
 
 					<section class="sella-offer-section">
@@ -850,6 +869,10 @@ function sella_offer_render_form( $offer_id ) {
 											</p>
 										</div>
 									</div>
+									<p class="sella-offers__timer" data-preview="timer" hidden>
+										<span class="sella-offers__timer-label" data-preview="timerLabel"></span>
+										<span class="sella-offers__timer-clock" data-preview="timerClock" dir="ltr"></span>
+									</p>
 									<span class="sella-offers__add" data-preview="button"></span>
 									<span class="sella-offers__dismiss">לא תודה, להמשיך לתשלום</span>
 								</div>
@@ -910,6 +933,12 @@ function sella_offer_active_slides() {
 			'headline' => $offer['headline'],
 			'text'     => $offer['text'],
 			'button'   => '' !== $offer['button'] ? $offer['button'] : SELLA_OFFER_DEFAULT_BUTTON,
+			'timer'    => $offer['timer']
+				? array(
+					'minutes' => (int) $offer['timer_minutes'],
+					'label'   => '' !== $offer['timer_label'] ? $offer['timer_label'] : SELLA_OFFER_DEFAULT_TIMER,
+				)
+				: null,
 			'price'    => sella_offer_format_price( $now ),
 			'regular'  => $was > $now ? sella_offer_format_price( $was ) : '',
 		);

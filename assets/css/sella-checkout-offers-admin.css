@@ -65,6 +65,13 @@
   color: #8c8f94;
 }
 
+.sella-offer-table__timer {
+  display: block;
+  margin-top: 3px;
+  color: #646970;
+  font-size: 12px;
+}
+
 .sella-offer-status {
   padding: 3px 12px;
   border: 0;
@@ -168,13 +175,15 @@
 
 .sella-offer-field > label,
 .sella-offer-field__label,
-.sella-offer-rule-match > label {
+.sella-offer-rule-match > label,
+.sella-offer-timer-settings > label {
   display: block;
   margin-bottom: 6px;
   font-weight: 600;
 }
 
-.sella-offer-rule-match > label:not(:first-child) {
+.sella-offer-rule-match > label:not(:first-child),
+.sella-offer-timer-settings > label:not(:first-child) {
   margin-top: 14px;
 }
 
@@ -206,7 +215,8 @@
   font-weight: 600;
 }
 
-.sella-offer-rule-match {
+.sella-offer-rule-match,
+.sella-offer-timer-settings {
   margin-top: 14px;
   padding: 14px 16px;
   border-radius: 4px;

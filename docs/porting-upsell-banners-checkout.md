@@ -229,7 +229,7 @@ sella_checkout_hide_inline_quantity() // woocommerce_checkout_cart_item_quantity
 
 ## 4א. הצעות בדף התשלום
 
-- **אחסון:** CPT פרטי `sella_checkout_offer`, כל ההגדרות במערך אחד ב-meta `_sella_checkout_offer` (ספר, מחיר, כותרת, טקסט, טקסט כפתור, תנאי, סכום מינימום/מקסימום, פעיל). הסדר בסליידר = `menu_order`. הגדרות הפופאפ (השהיה, תדירות) ב-option `sella_checkout_offers_settings`.
+- **אחסון:** CPT פרטי `sella_checkout_offer`, כל ההגדרות במערך אחד ב-meta `_sella_checkout_offer` (ספר, מחיר, כותרת, טקסט, טקסט כפתור, טיימר (פעיל, דקות, טקסט), תנאי, סכום מינימום/מקסימום, פעיל). הסדר בסליידר = `menu_order`. הגדרות הפופאפ (השהיה, תדירות) ב-option `sella_checkout_offers_settings`.
 - **מסך ניהול:** תת-תפריט `sella-checkout-offers` תחת `sella-upsell-popups`.
 - **המחיר המיוחד נאכף בשרת:** השורה שנוספה מהפופאפ נושאת cart item data בשם `sella_checkout_offer`. ב-`woocommerce_before_calculate_totals` (וגם ב-`woocommerce_cart_loaded_from_session`, בשביל המיני-סל) המחיר מוחל רק אם ההצעה עדיין פעילה והתנאי עדיין מתקיים; אחרת חוזר המחיר הרגיל. כמות קבועה 1.
 - **שורות מהצעה לא נספרות בתנאים** — אחרת הצעה יכולה לפתוח את עצמה או הצעה אחרת.
