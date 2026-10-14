@@ -20,6 +20,7 @@ require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';
 require_once get_stylesheet_directory() . '/inc/sella-page-cache.php';
 require_once get_stylesheet_directory() . '/inc/sella-delay-tracking.php';
+require_once get_stylesheet_directory() . '/inc/sella-typography.php';
 
 /**
  * WooCommerce product modules.

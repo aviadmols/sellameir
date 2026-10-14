@@ -1,0 +1,35 @@
+/**
+ * One font for the whole site: Google Sans (Google Fonts, Hebrew and Latin),
+ * in place of the polin / leon / Roboto / Heebo mix that Elementor, the
+ * smart-cart plugin and the page CSS each set on their own.
+ *
+ * The rule sits in a cascade layer: an !important declaration in a layer
+ * beats every !important declaration outside one, whatever its selector, so
+ * it also wins over the plugins' own `font-family: polin !important`.
+ * Icon fonts are left out, or their glyphs would turn into letters.
+ * Pseudo-elements (::before / ::after) keep their own font-family, which is
+ * where WooCommerce, Swiper and Elementor draw their icons.
+ */
+
+:root {
+	--sella-font-family: 'Google Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+}
+
+@layer sella-typography {
+	body,
+	body *:not(
+		.fa, .fas, .far, .fab, .fal, .fad, .fat,
+		[class^="fa-"], [class*=" fa-"],
+		[class^="eicon"], [class*=" eicon-"],
+		[class^="feather-"], [class*=" feather-"],
+		.dashicons, [class^="dashicons-"], [class*=" dashicons-"],
+		.material-icons,
+		.star-rating, .star-rating *,
+		[class*="rating__stars"], [class*="rating__stars"] *,
+		.elementor-custom-embed-play i,
+		#wpadminbar, #wpadminbar *,
+		code, pre, kbd, samp
+	) {
+		font-family: var(--sella-font-family) !important;
+	}
+}
