@@ -1,11 +1,11 @@
 /**
- * "הקטנה גורפת ב-1px": every font-size the site's stylesheets declare, at
- * every breakpoint, comes out 1px smaller. Printed inline at the end of
+ * "הקטנה גורפת", 2px: every font-size the site's stylesheets declare, at
+ * every breakpoint, comes out 2px smaller. Printed inline at the end of
  * <head> (inc/sella-typography.php), so the head stylesheets are already
  * loaded and rewritten before the first paint; sheets and inline styles
  * added later (footer, popups, AJAX fragments) are rewritten as they come.
  *
- * px values lose 1px, rem/vw/calc/clamp/var() values become calc(x - 1px),
+ * px values lose 2px, rem/vw/calc/clamp/var() values become calc(x - 2px),
  * em and % values are left alone, as they follow the parent's smaller size.
  * Rules that style form fields keep them at 16px or more, since iOS zooms
  * into a field under 16px when it is tapped. Sheets from other domains
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	var STEP = 1;
+	var STEP = 2;
 	var FIELD_MIN = 16;
 	var seenSheets = new WeakSet();
 	// An attribute rather than a WeakSet, so that copies of an element

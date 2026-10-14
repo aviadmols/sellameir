@@ -1,11 +1,11 @@
 <?php
 /**
- * The site's typography: Google Sans everywhere, every font size 1px smaller.
+ * The site's typography: Google Sans everywhere, every font size 2px smaller.
  *
  * - assets/css/sella-typography.css puts Google Sans on every element, over
  *   whatever font Elementor, the plugins or the page CSS set.
  * - assets/js/sella-font-scale.js, printed inline at the end of <head>,
- *   takes 1px off every font-size the stylesheets declare, on desktop and
+ *   takes 2px off every font-size the stylesheets declare, on desktop and
  *   mobile alike. Google Sans runs larger than polin did.
  *
  * @package HelloElementorChild
@@ -73,7 +73,7 @@ add_filter( 'wp_resource_hints', 'sella_typography_resource_hints', 10, 2 );
 add_filter( 'elementor/frontend/print_google_fonts', '__return_false' );
 
 /**
- * Print the 1px font-size script last in <head>, after every stylesheet in
+ * Print the font-size script last in <head>, after every stylesheet in
  * it, so it runs once they have loaded and before the page is first drawn.
  */
 function sella_typography_print_font_scale() {
