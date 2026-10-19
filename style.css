@@ -1908,6 +1908,16 @@ body.search.post-type-archive-product #sibolet-archive-grid:not(.sella-search-fi
   }
 }
 
+/* The newsletter form's reply sits on the black footer: Elementor gives the
+   success message no colour, so it took the dark grey body text. */
+.elementor-location-footer .elementor-element-c8af07b .elementor-message {
+  color: #fff;
+}
+
+.elementor-location-footer .elementor-element-c8af07b .elementor-message.elementor-message-danger {
+  color: #ff8a80;
+}
+
 /* Footer on mobile: compact and centred, one short block per topic. */
 @media (max-width: 767px) {
   .elementor-location-footer .elementor-element-8e7ea74 {
