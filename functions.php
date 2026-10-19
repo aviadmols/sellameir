@@ -39,6 +39,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-unlimited-stock.php';
 	require_once get_stylesheet_directory() . '/inc/sella-customer-fields.php';
 	require_once get_stylesheet_directory() . '/inc/sella-checkout-offers.php';
+	require_once get_stylesheet_directory() . '/inc/sella-thankyou.php';
 	require_once get_stylesheet_directory() . '/inc/sella-free-shipping.php';
 	require_once get_stylesheet_directory() . '/inc/sella-add-to-cart-links.php';
 	require_once get_stylesheet_directory() . '/inc/sella-cart-drawer.php';
