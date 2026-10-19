@@ -1727,6 +1727,69 @@ body.sella-search-docked-open.sc-search-open {
   }
 }
 
+/* Larger text in the Smart Cart search panel. assets/js/sella-font-scale.js
+   takes 2px off every size here too, so each shows 2px under what it says. */
+#sc-search .sc-search__input {
+  font-size: 19px !important;
+}
+
+#sc-search .sc-search__side-title,
+#sc-search .sc-search__heading {
+  font-size: 16px;
+}
+
+#sc-search .sc-search__side-list a,
+#sc-search .sc-search__suggest,
+#sc-search .sc-search__view-all {
+  font-size: 17px;
+}
+
+#sc-search .sc-search__count,
+#sc-search .sc-search__path {
+  font-size: 14px;
+}
+
+#sc-search .sc-search-row__name {
+  font-size: 18px;
+}
+
+#sc-search .sc-search-row__price {
+  font-size: 17px;
+}
+
+#sc-search .sc-search-row__badge {
+  font-size: 12px;
+}
+
+#sc-search .sc-search__empty-title {
+  font-size: 20px;
+}
+
+#sc-search .sc-search__empty-text {
+  font-size: 17px;
+}
+
+/* The shop search page (?s=…&post_type=product): sella-shop-search.js filters
+   the archive grid down to the term, so the full list waits rather than
+   flashing first. Should the script not run, the grid shows after a moment. */
+body.search.post-type-archive-product #sibolet-archive-grid:not(.sella-search-filtered) {
+  visibility: hidden;
+  animation: sella-search-reveal 0s 2.5s forwards;
+}
+
+@keyframes sella-search-reveal {
+  to {
+    visibility: visible;
+  }
+}
+
+#sibolet-archive-grid .sella-search-empty {
+  grid-column: 1 / -1;
+  margin: 24px 0;
+  font-size: 18px;
+  text-align: center;
+}
+
 /* Sticky product bar — price under the title, sale price included. */
 .sella-sticky-product-cart__price {
   display: flex;
