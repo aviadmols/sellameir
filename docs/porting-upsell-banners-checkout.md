@@ -46,7 +46,7 @@ add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 | נתיב | תוכן |
 |---|---|
 | `inc/sella-checkout-offers.php` | CPT, מסך ניהול עם תצוגה מקדימה, חוקיות סל, endpoint הוספה, אכיפת המחיר בסל, תיוג שורת הזמנה (ראו 4א) |
-| `assets/js/sella-checkout-offers.js` | הפופאפ: סליידר, חיצים/נקודות/החלקה, הוספה ורענון הצ'קאאוט |
+| `assets/js/sella-checkout-offers.js` | הפופאפ: סליידר (חיצים/נקודות/החלקה), רשימה או רשת, טיימר, הוספה ורענון הצ'קאאוט |
 | `assets/css/sella-checkout-offers.css` | עיצוב הפופאפ — נטען גם באדמין לתצוגה המקדימה |
 | `assets/js/sella-checkout-offers-admin.js` | תצוגה מקדימה חיה, שליפת מחיר רגיל, הצגה מותנית של שדות התנאי |
 | `assets/css/sella-checkout-offers-admin.css` | פריסת מסך הניהול |
@@ -229,11 +229,12 @@ sella_checkout_hide_inline_quantity() // woocommerce_checkout_cart_item_quantity
 
 ## 4א. הצעות בדף התשלום
 
-- **אחסון:** CPT פרטי `sella_checkout_offer`, כל ההגדרות במערך אחד ב-meta `_sella_checkout_offer` (ספר, מחיר, כותרת, טקסט, טקסט כפתור, טיימר (פעיל, דקות, טקסט), תנאי, סכום מינימום/מקסימום, פעיל). הסדר בסליידר = `menu_order`. הגדרות הפופאפ (השהיה, תדירות) ב-option `sella_checkout_offers_settings`.
+- **אחסון:** CPT פרטי `sella_checkout_offer`, כל ההגדרות במערך אחד ב-meta `_sella_checkout_offer` (ספר, מחיר, כותרת, טקסט, טקסט כפתור, תנאי, סכום מינימום/מקסימום, פעיל). הסדר בסליידר = `menu_order`. הגדרות הפופאפ (השהיה, תדירות, תצוגה: `slider`/`stack`/`grid`, טיימר: פעיל, דקות, טקסט) ב-option `sella_checkout_offers_settings`.
 - **מסך ניהול:** תת-תפריט `sella-checkout-offers` תחת `sella-upsell-popups`.
 - **המחיר המיוחד נאכף בשרת:** השורה שנוספה מהפופאפ נושאת cart item data בשם `sella_checkout_offer`. ב-`woocommerce_before_calculate_totals` (וגם ב-`woocommerce_cart_loaded_from_session`, בשביל המיני-סל) המחיר מוחל רק אם ההצעה עדיין פעילה והתנאי עדיין מתקיים; אחרת חוזר המחיר הרגיל. כמות קבועה 1.
 - **שורות מהצעה לא נספרות בתנאים** — אחרת הצעה יכולה לפתוח את עצמה או הצעה אחרת.
 - **ההוספה** עוברת דרך `wc_ajax_sella_offer_add`, שבודק מחדש תנאי, מלאי ושהספר לא כבר בסל.
+- **טיימר לכל הפופאפ:** מתחיל בפעם הראשונה שהפופאפ נפתח (`wc_ajax_sella_offer_timer_start` שומר את הזמן ב-WooCommerce session, `sella_offer_timer_started`), ולכן רענון או ביקור חוזר לא מאפסים אותו. כשהזמן נגמר הפופאפ לא נטען יותר לאותו לקוח, וההוספה נדחית (עם 10 שניות חסד ללחיצה בשנייה האחרונה). ספר שכבר נוסף נשאר במחיר ההצעה.
 - **בהזמנה:** meta מוסתר `_sella_checkout_offer_id` על השורה + תגית במסך ההזמנה באדמין.
 
 ---

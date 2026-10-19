@@ -4,8 +4,13 @@
  * checkout page.
  *
  * Each offer is one book with its own price, its own slide text and its own
- * cart rule. Every offer whose rule matches the cart becomes a slide in the
- * same popup, in the order set in the admin.
+ * cart rule. Every offer whose rule matches the cart shows in the same popup,
+ * in the order set in the admin: one at a time in a slider, or all together,
+ * stacked or two to a row.
+ *
+ * The popup may carry a countdown. It starts the first time the popup opens
+ * for a shopper and is kept in their WooCommerce session; when it runs out
+ * the offers are gone for them and cannot be added any more.
  *
  * The special price belongs to the cart line added from the popup (marked with
  * cart item data), is limited to one copy, and holds only while the offer's
@@ -29,6 +34,7 @@ define( 'SELLA_OFFER_CART_KEY', 'sella_checkout_offer' );
 define( 'SELLA_OFFER_ITEM_META', '_sella_checkout_offer_id' );
 define( 'SELLA_OFFER_DEFAULT_BUTTON', 'הוספה להזמנה' );
 define( 'SELLA_OFFER_DEFAULT_TIMER', 'ההצעה מסתיימת בעוד' );
+define( 'SELLA_OFFER_TIMER_SESSION', 'sella_offer_timer_started' );
 
 /**
  * Private storage for offers; edited only through the screen below.
@@ -99,9 +105,6 @@ function sella_offer_defaults() {
 		'headline'        => '',
 		'text'            => '',
 		'button'          => '',
-		'timer'           => false,
-		'timer_minutes'   => 15,
-		'timer_label'     => '',
 		'rule'            => 'any',
 		'rule_products'   => array(),
 		'rule_categories' => array(),
@@ -159,18 +162,75 @@ function sella_offer_ids() {
 }
 
 /**
+ * Ways the popup can lay out its offers.
+ *
+ * @return array<string, string>
+ */
+function sella_offer_layouts() {
+	return array(
+		'slider' => 'סליידר: הצעה אחת בכל פעם, עם חיצים',
+		'stack'  => 'רשימה: ההצעות אחת מתחת לשנייה',
+		'grid'   => 'רשת: שתיים בשורה במחשב, אחת מתחת לשנייה בנייד',
+	);
+}
+
+/**
  * Popup settings shared by all offers.
  *
- * @return array{delay: int, frequency: string}
+ * @return array{delay: int, frequency: string, layout: string, timer: bool, timer_minutes: int, timer_label: string}
  */
 function sella_offer_settings() {
 	$settings = get_option( SELLA_OFFER_SETTINGS, array() );
 	$settings = is_array( $settings ) ? $settings : array();
+	$layouts  = sella_offer_layouts();
 
 	return array(
-		'delay'     => isset( $settings['delay'] ) ? max( 0, min( 60, absint( $settings['delay'] ) ) ) : 2,
-		'frequency' => isset( $settings['frequency'] ) && 'always' === $settings['frequency'] ? 'always' : 'session',
+		'delay'         => isset( $settings['delay'] ) ? max( 0, min( 60, absint( $settings['delay'] ) ) ) : 2,
+		'frequency'     => isset( $settings['frequency'] ) && 'always' === $settings['frequency'] ? 'always' : 'session',
+		'layout'        => isset( $settings['layout'], $layouts[ $settings['layout'] ] ) ? $settings['layout'] : 'slider',
+		'timer'         => ! empty( $settings['timer'] ),
+		'timer_minutes' => isset( $settings['timer_minutes'] ) ? max( 1, min( 1440, absint( $settings['timer_minutes'] ) ) ) : 15,
+		'timer_label'   => isset( $settings['timer_label'] ) && '' !== $settings['timer_label'] ? (string) $settings['timer_label'] : SELLA_OFFER_DEFAULT_TIMER,
 	);
+}
+
+/**
+ * When the popup first opened for this shopper, from the WooCommerce
+ * session; 0 if it has not opened yet.
+ *
+ * @return int
+ */
+function sella_offer_timer_started() {
+	return function_exists( 'WC' ) && WC()->session ? absint( WC()->session->get( SELLA_OFFER_TIMER_SESSION ) ) : 0;
+}
+
+/**
+ * Seconds left on the popup's timer for this shopper: the full length until
+ * the popup first opens, below zero once it ran out. Null without a timer.
+ *
+ * @return int|null
+ */
+function sella_offer_timer_left() {
+	$settings = sella_offer_settings();
+	if ( ! $settings['timer'] ) {
+		return null;
+	}
+
+	$length  = $settings['timer_minutes'] * MINUTE_IN_SECONDS;
+	$started = sella_offer_timer_started();
+
+	return $started ? $started + $length - time() : $length;
+}
+
+/**
+ * The popup's clock as it first shows, e.g. "15:00" or "1:30:00".
+ *
+ * @param int $minutes Timer length.
+ * @return string
+ */
+function sella_offer_timer_clock( $minutes ) {
+	$hours = intdiv( $minutes, 60 );
+	return $hours ? sprintf( '%d:%02d:00', $hours, $minutes % 60 ) : sprintf( '%02d:00', $minutes );
 }
 
 /**
@@ -201,9 +261,6 @@ function sella_offer_sanitize( $source ) {
 		'headline'        => sanitize_text_field( wp_unslash( $source['sella_offer_headline'] ?? '' ) ),
 		'text'            => sanitize_textarea_field( wp_unslash( $source['sella_offer_text'] ?? '' ) ),
 		'button'          => sanitize_text_field( wp_unslash( $source['sella_offer_button'] ?? '' ) ),
-		'timer'           => ! empty( $source['sella_offer_timer'] ),
-		'timer_minutes'   => max( 1, min( 1440, absint( $source['sella_offer_timer_minutes'] ?? 15 ) ) ),
-		'timer_label'     => sanitize_text_field( wp_unslash( $source['sella_offer_timer_label'] ?? '' ) ),
 		'rule'            => isset( $rules[ $rule ] ) ? $rule : 'any',
 		'rule_products'   => sella_offer_id_list( $source['sella_offer_rule_products'] ?? array() ),
 		'rule_categories' => sella_offer_id_list( $source['sella_offer_rule_categories'] ?? array() ),
@@ -426,8 +483,12 @@ function sella_offer_handle_admin_actions() {
 		update_option(
 			SELLA_OFFER_SETTINGS,
 			array(
-				'delay'     => isset( $_POST['sella_offer_delay'] ) ? absint( $_POST['sella_offer_delay'] ) : 2,
-				'frequency' => isset( $_POST['sella_offer_frequency'] ) ? sanitize_key( wp_unslash( $_POST['sella_offer_frequency'] ) ) : 'session',
+				'delay'         => isset( $_POST['sella_offer_delay'] ) ? absint( $_POST['sella_offer_delay'] ) : 2,
+				'frequency'     => isset( $_POST['sella_offer_frequency'] ) ? sanitize_key( wp_unslash( $_POST['sella_offer_frequency'] ) ) : 'session',
+				'layout'        => isset( $_POST['sella_offer_layout'] ) ? sanitize_key( wp_unslash( $_POST['sella_offer_layout'] ) ) : 'slider',
+				'timer'         => ! empty( $_POST['sella_offer_timer'] ),
+				'timer_minutes' => isset( $_POST['sella_offer_timer_minutes'] ) ? absint( $_POST['sella_offer_timer_minutes'] ) : 15,
+				'timer_label'   => isset( $_POST['sella_offer_timer_label'] ) ? sanitize_text_field( wp_unslash( $_POST['sella_offer_timer_label'] ) ) : '',
 			),
 			false
 		);
@@ -552,7 +613,6 @@ function sella_offer_admin_assets( $hook ) {
 			'decimals'      => wc_get_price_decimals(),
 			'placeholder'   => wc_placeholder_img_src( 'medium' ),
 			'defaultButton' => SELLA_OFFER_DEFAULT_BUTTON,
-			'defaultTimer'  => SELLA_OFFER_DEFAULT_TIMER,
 			'noProduct'     => 'שם הספר',
 			'chooseProduct' => 'בחרו את הספר שמוצע.',
 			'notSimple'     => 'אפשר להציע רק ספר רגיל, לא מוצר עם וריאציות.',
@@ -608,7 +668,7 @@ function sella_offer_render_list() {
 
 		<p class="sella-offer-lead">
 			ספרים שמוצעים ללקוח במחיר מיוחד, בפופאפ שנפתח במרכז דף התשלום.
-			לכל הצעה יש ספר אחד, מחיר, טקסט ותנאי משלה. כשכמה הצעות מתאימות לסל של הלקוח, הן מוצגות יחד בסליידר — לפי הסדר שבטבלה.
+			לכל הצעה יש ספר אחד, מחיר, טקסט ותנאי משלה. כשכמה הצעות מתאימות לסל של הלקוח, הן מוצגות יחד באותו פופאפ, לפי הסדר שבטבלה ובתצוגה שנבחרה בהגדרות למטה.
 		</p>
 
 		<?php if ( empty( $ids ) ) : ?>
@@ -651,7 +711,6 @@ function sella_offer_render_list() {
 								<strong><?php echo esc_html( sella_offer_format_price( $offer['price'] ) ); ?></strong>
 								<?php if ( $regular > (float) $offer['price'] ) : ?><del><?php echo esc_html( sella_offer_format_price( $regular ) ); ?></del><?php endif; ?>
 							<?php endif; ?>
-							<?php if ( $offer['timer'] ) : ?><span class="sella-offer-table__timer">טיימר של <?php echo esc_html( (string) $offer['timer_minutes'] ); ?> דקות</span><?php endif; ?>
 						</td>
 						<td class="sella-offer-table__rule"><?php echo esc_html( sella_offer_rule_summary( $offer ) ); ?></td>
 						<td>
@@ -700,6 +759,29 @@ function sella_offer_render_list() {
 				</label>
 			</p>
 			<p class="description">אם הלקוח כבר התחיל למלא פרטים כשהזמן עבר, הפופאפ לא קופץ לו באמצע ההקלדה.</p>
+			<p>
+				<label>
+					תצוגת ההצעות
+					<select name="sella_offer_layout">
+						<?php foreach ( sella_offer_layouts() as $key => $label ) : ?>
+							<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $settings['layout'], $key ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+			</p>
+			<p>
+				<label class="sella-offer-check"><input type="checkbox" id="sella_offer_timer" name="sella_offer_timer" value="1" <?php checked( $settings['timer'] ); ?> /> להציג טיימר רץ בפופאפ</label>
+			</p>
+			<div class="sella-offer-timer-settings" <?php echo $settings['timer'] ? '' : 'hidden'; ?>>
+				<label for="sella_offer_timer_minutes">אורך הטיימר</label>
+				<input type="number" id="sella_offer_timer_minutes" name="sella_offer_timer_minutes" min="1" max="1440" step="1" class="small-text" value="<?php echo esc_attr( (string) $settings['timer_minutes'] ); ?>" /> דקות
+				<label for="sella_offer_timer_label">טקסט לפני הטיימר</label>
+				<input type="text" id="sella_offer_timer_label" name="sella_offer_timer_label" class="regular-text" value="<?php echo esc_attr( $settings['timer_label'] ); ?>" />
+				<p class="description">
+					הטיימר מופיע בראש הפופאפ ונספר מהפעם הראשונה שהפופאפ נפתח ללקוח. רענון הדף או ביקור חוזר לא מאפסים אותו.
+					כשהוא מגיע לאפס, כל ההצעות יורדות: הפופאפ נסגר, לא מוצג לאותו לקוח שוב, ואי אפשר להוסיף ספר במחיר ההצעה. ספר שכבר נוסף לפני כן נשאר במחיר ההצעה.
+				</p>
+			</div>
 			<?php submit_button( 'שמירת הגדרות', 'secondary', 'submit', false ); ?>
 		</form>
 	</div>
@@ -716,6 +798,7 @@ function sella_offer_render_form( $offer_id ) {
 	$offer      = $offer_id ? sella_offer_get( $offer_id ) : array_merge( sella_offer_defaults(), array( 'order' => count( sella_offer_ids() ) + 1 ) );
 	$product    = $offer['product_id'] ? wc_get_product( $offer['product_id'] ) : null;
 	$rules      = sella_offer_rules();
+	$settings   = sella_offer_settings();
 	$categories = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
 	$categories = is_wp_error( $categories ) ? array() : $categories;
 	$error      = isset( $_GET['error'] ) ? sanitize_key( wp_unslash( $_GET['error'] ) ) : '';
@@ -777,16 +860,6 @@ function sella_offer_render_form( $offer_id ) {
 							<label for="sella_offer_button">טקסט הכפתור</label>
 							<input type="text" id="sella_offer_button" name="sella_offer_button" value="<?php echo esc_attr( $offer['button'] ); ?>" placeholder="<?php echo esc_attr( SELLA_OFFER_DEFAULT_BUTTON ); ?>" />
 							<p class="description">ריק = "<?php echo esc_html( SELLA_OFFER_DEFAULT_BUTTON ); ?>".</p>
-						</div>
-						<div class="sella-offer-field">
-							<label class="sella-offer-check"><input type="checkbox" id="sella_offer_timer" name="sella_offer_timer" value="1" <?php checked( $offer['timer'] ); ?> /> להציג טיימר רץ בהצעה</label>
-							<div class="sella-offer-timer-settings" <?php echo $offer['timer'] ? '' : 'hidden'; ?>>
-								<label for="sella_offer_timer_minutes">אורך הטיימר</label>
-								<input type="number" id="sella_offer_timer_minutes" name="sella_offer_timer_minutes" min="1" max="1440" step="1" class="small-text" value="<?php echo esc_attr( (string) $offer['timer_minutes'] ); ?>" /> דקות
-								<label for="sella_offer_timer_label">טקסט לפני הטיימר</label>
-								<input type="text" id="sella_offer_timer_label" name="sella_offer_timer_label" value="<?php echo esc_attr( $offer['timer_label'] ); ?>" placeholder="<?php echo esc_attr( SELLA_OFFER_DEFAULT_TIMER ); ?>" />
-								<p class="description">ריק = "<?php echo esc_html( SELLA_OFFER_DEFAULT_TIMER ); ?>". לתצוגה בלבד: הטיימר לא משנה את המחיר ולא סוגר את ההצעה. הוא נספר מהפעם הראשונה שהלקוח רואה את ההצעה, לא מתאפס כשעוברים בין עמודים באותו ביקור, ומתחיל מחדש כשהוא מגיע לאפס.</p>
-							</div>
 						</div>
 					</section>
 
@@ -856,6 +929,12 @@ function sella_offer_render_form( $offer_id ) {
 						<div class="sella-offers sella-offers--preview is-open">
 							<div class="sella-offers__dialog">
 								<span class="sella-offers__close" aria-hidden="true">&times;</span>
+								<?php if ( $settings['timer'] ) : ?>
+									<p class="sella-offers__timer">
+										<span class="sella-offers__timer-label"><?php echo esc_html( $settings['timer_label'] ); ?></span>
+										<span class="sella-offers__timer-clock" dir="ltr"><?php echo esc_html( sella_offer_timer_clock( $settings['timer_minutes'] ) ); ?></span>
+									</p>
+								<?php endif; ?>
 								<div class="sella-offers__slide">
 									<p class="sella-offers__headline" data-preview="headline"></p>
 									<div class="sella-offers__body">
@@ -869,10 +948,6 @@ function sella_offer_render_form( $offer_id ) {
 											</p>
 										</div>
 									</div>
-									<p class="sella-offers__timer" data-preview="timer" hidden>
-										<span class="sella-offers__timer-label" data-preview="timerLabel"></span>
-										<span class="sella-offers__timer-clock" data-preview="timerClock" dir="ltr"></span>
-									</p>
 									<span class="sella-offers__add" data-preview="button"></span>
 									<span class="sella-offers__dismiss">לא תודה, להמשיך לתשלום</span>
 								</div>
@@ -933,12 +1008,6 @@ function sella_offer_active_slides() {
 			'headline' => $offer['headline'],
 			'text'     => $offer['text'],
 			'button'   => '' !== $offer['button'] ? $offer['button'] : SELLA_OFFER_DEFAULT_BUTTON,
-			'timer'    => $offer['timer']
-				? array(
-					'minutes' => (int) $offer['timer_minutes'],
-					'label'   => '' !== $offer['timer_label'] ? $offer['timer_label'] : SELLA_OFFER_DEFAULT_TIMER,
-				)
-				: null,
 			'price'    => sella_offer_format_price( $now ),
 			'regular'  => $was > $now ? sella_offer_format_price( $was ) : '',
 		);
@@ -952,6 +1021,12 @@ function sella_offer_active_slides() {
  */
 function sella_offer_frontend_assets() {
 	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || is_checkout_pay_page() ) {
+		return;
+	}
+
+	// The popup's timer ran out for this shopper: the offers are gone.
+	$left = sella_offer_timer_left();
+	if ( null !== $left && $left <= 0 ) {
 		return;
 	}
 
@@ -972,7 +1047,16 @@ function sella_offer_frontend_assets() {
 			'offers'    => $slides,
 			'delay'     => $settings['delay'],
 			'frequency' => $settings['frequency'],
+			'layout'    => $settings['layout'],
+			'timer'     => null === $left
+				? null
+				: array(
+					'label'   => $settings['timer_label'],
+					'left'    => $left,
+					'started' => (bool) sella_offer_timer_started(),
+				),
 			'addUrl'    => WC_AJAX::get_endpoint( 'sella_offer_add' ),
+			'timerUrl'  => WC_AJAX::get_endpoint( 'sella_offer_timer_start' ),
 			'nonce'     => wp_create_nonce( 'sella_offer_add' ),
 			'labels'    => array(
 				'dialog'   => 'הצעה מיוחדת להזמנה שלך',
@@ -984,11 +1068,26 @@ function sella_offer_frontend_assets() {
 				'adding'   => 'מוסיף להזמנה...',
 				'added'    => 'נוסף להזמנה ✓',
 				'error'    => 'לא הצלחנו להוסיף. נסו שוב.',
+				'expired'  => 'הזמן של ההצעה נגמר',
 			),
 		)
 	);
 }
 add_action( 'wp_enqueue_scripts', 'sella_offer_frontend_assets', 30 );
+
+/**
+ * The popup opened: start this shopper's timer, once.
+ */
+function sella_offer_ajax_timer_start() {
+	check_ajax_referer( 'sella_offer_add', 'nonce' );
+
+	if ( function_exists( 'WC' ) && WC()->session && ! sella_offer_timer_started() ) {
+		WC()->session->set( SELLA_OFFER_TIMER_SESSION, time() );
+	}
+
+	wp_send_json_success();
+}
+add_action( 'wc_ajax_sella_offer_timer_start', 'sella_offer_ajax_timer_start' );
 
 /**
  * Add an offer's book to the cart, after checking again that it still applies.
@@ -1006,6 +1105,11 @@ function sella_offer_ajax_add() {
 
 	if ( ! $offer || ! sella_offer_rule_passes( $offer, $snapshot ) ) {
 		wp_send_json_error( array( 'message' => 'ההצעה כבר לא זמינה.' ) );
+	}
+	// A few seconds' grace for a click on the timer's last second.
+	$left = sella_offer_timer_left();
+	if ( null !== $left && $left < -10 ) {
+		wp_send_json_error( array( 'message' => 'הזמן של ההצעה נגמר.' ) );
 	}
 	if ( in_array( $offer['product_id'], $snapshot['in_cart'], true ) ) {
 		wp_send_json_error( array( 'message' => 'הספר כבר נמצא בהזמנה.' ) );

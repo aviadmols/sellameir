@@ -8,6 +8,10 @@
       return window.confirm(cfg.confirmDelete);
     });
 
+    $('#sella_offer_timer').on('change', function () {
+      $('.sella-offer-timer-settings').prop('hidden', !this.checked);
+    });
+
     var $form = $('.sella-offer-edit');
     if (!$form.length) {
       return;
@@ -18,9 +22,6 @@
     var $headline = $('#sella_offer_headline');
     var $text = $('#sella_offer_text');
     var $button = $('#sella_offer_button');
-    var $timer = $('#sella_offer_timer');
-    var $timerMinutes = $('#sella_offer_timer_minutes');
-    var $timerLabel = $('#sella_offer_timer_label');
     var $rule = $('#sella_offer_rule');
     var $regular = $form.find('.sella-offer-regular');
     var $productError = $form.find('.sella-offer-product-error');
@@ -54,23 +55,6 @@
       preview.image.attr('src', product ? product.image : cfg.placeholder);
       preview.now.text(formatPrice(price) || '—');
       preview.was.text(showWas ? product.price : '').prop('hidden', !showWas);
-      syncTimer();
-    }
-
-    // The timer as it looks when the shopper first sees it.
-    function syncTimer() {
-      var on = $timer.prop('checked');
-      var minutes = Math.max(1, Math.min(1440, parseInt($timerMinutes.val(), 10) || 15));
-      var hours = Math.floor(minutes / 60);
-      var rest = minutes % 60;
-      var pad = function (number) {
-        return number < 10 ? '0' + number : String(number);
-      };
-
-      $form.find('.sella-offer-timer-settings').prop('hidden', !on);
-      preview.timer.prop('hidden', !on);
-      preview.timerLabel.text($.trim($timerLabel.val()) || cfg.defaultTimer);
-      preview.timerClock.text((hours ? hours + ':' + pad(rest) : pad(rest)) + ':00');
     }
 
     function syncProduct() {
@@ -102,7 +86,6 @@
     });
 
     $form.on('input change', '#sella_offer_price, #sella_offer_headline, #sella_offer_text, #sella_offer_button', syncPreview);
-    $form.on('input change', '#sella_offer_timer, #sella_offer_timer_minutes, #sella_offer_timer_label', syncTimer);
     $rule.on('change', syncRule);
 
     // The book picker is a hidden <select>, so the browser cannot flag it itself.
