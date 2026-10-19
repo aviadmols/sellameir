@@ -150,6 +150,22 @@ function sella_checkout_hide_inline_quantity() {
 }
 add_filter( 'woocommerce_checkout_cart_item_quantity', 'sella_checkout_hide_inline_quantity', 20 );
 
+/**
+ * List the credit-card gateway (PayPlus) before PayPal. The first gateway is
+ * also the one checkout selects when the shopper has not picked one yet.
+ *
+ * @param array $gateways Available gateways, keyed by ID.
+ * @return array
+ */
+function sella_credit_card_gateway_first( $gateways ) {
+	if ( ! is_array( $gateways ) || ! isset( $gateways['lets_payplus'] ) ) {
+		return $gateways;
+	}
+
+	return array( 'lets_payplus' => $gateways['lets_payplus'] ) + $gateways;
+}
+add_filter( 'woocommerce_available_payment_gateways', 'sella_credit_card_gateway_first', 100 );
+
 
 add_filter('upload_mimes', function ($mimes) {
     $mimes['json'] = 'application/json';
