@@ -1682,6 +1682,12 @@ body.sella-has-sticky-product-cart {
   cursor: pointer;
 }
 
+/* No "ספרים" filter: every book is in that category, so it shows the same
+   list as "כל הספרים". */
+.sibolet-categories-wrapper .cat-filter-btn[data-cat-id="15"] {
+  display: none;
+}
+
 #sibolet-book-search.sella-shop-search-trigger:focus,
 #sibolet-book-search.sella-shop-search-trigger:focus-visible {
   outline: 2px solid rgba(116, 111, 237, 0.35);
