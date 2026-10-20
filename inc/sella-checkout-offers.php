@@ -778,7 +778,7 @@ function sella_offer_render_list() {
 				<label for="sella_offer_timer_label">טקסט לפני הטיימר</label>
 				<input type="text" id="sella_offer_timer_label" name="sella_offer_timer_label" class="regular-text" value="<?php echo esc_attr( $settings['timer_label'] ); ?>" />
 				<p class="description">
-					הטיימר מופיע בראש הפופאפ ונספר מהפעם הראשונה שהפופאפ נפתח ללקוח. רענון הדף או ביקור חוזר לא מאפסים אותו.
+					הטיימר מופיע בראש הפופאפ (בתצוגת רשימה: בראש כל הצעה) ונספר מהפעם הראשונה שהפופאפ נפתח ללקוח. רענון הדף או ביקור חוזר לא מאפסים אותו.
 					כשהוא מגיע לאפס, כל ההצעות יורדות: הפופאפ נסגר, לא מוצג לאותו לקוח שוב, ואי אפשר להוסיף ספר במחיר ההצעה. ספר שכבר נוסף לפני כן נשאר במחיר ההצעה.
 				</p>
 			</div>

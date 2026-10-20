@@ -16,6 +16,8 @@
   var timer = data.timer || null;
   var layout = data.layout === 'stack' || data.layout === 'grid' ? data.layout : 'slider';
   var slider = layout === 'slider';
+  // Stacked, each offer carries the countdown at its own top, as a slide does.
+  var timerOnCards = layout === 'stack';
   var SEEN_KEY = 'sella-checkout-offers-seen';
 
   var root = null;
@@ -82,8 +84,6 @@
       dialog: root.querySelector('.sella-offers__dialog'),
       close: root.querySelector('.sella-offers__close'),
       timer: root.querySelector('.sella-offers__timer'),
-      timerLabel: root.querySelector('.sella-offers__timer-label'),
-      timerClock: root.querySelector('.sella-offers__timer-clock'),
       title: root.querySelector('.sella-offers__title'),
       cards: root.querySelector('.sella-offers__cards'),
       dismiss: root.querySelector('.sella-offers__dismiss'),
@@ -156,6 +156,12 @@
     el.className = 'sella-offers__slide';
     el.setAttribute('data-offer-id', String(offer.id));
     el.innerHTML =
+      (timer && timerOnCards
+        ? '<p class="sella-offers__timer sella-offers__timer--card" role="timer">' +
+            '<span class="sella-offers__timer-label"></span>' +
+            '<span class="sella-offers__timer-clock" dir="ltr"></span>' +
+          '</p>'
+        : '') +
       '<p class="sella-offers__headline"></p>' +
       '<div class="sella-offers__body">' +
         '<img class="sella-offers__cover" src="" alt="" />' +
@@ -260,13 +266,22 @@
     return !!timerEnd && timerEnd <= Date.now();
   }
 
+  /** Every countdown on show: the band over the dialog, or one per card. */
+  function eachTimer(callback) {
+    Array.prototype.forEach.call(root.querySelectorAll('.sella-offers__timer'), function (el) {
+      callback(el, el.querySelector('.sella-offers__timer-label'), el.querySelector('.sella-offers__timer-clock'));
+    });
+  }
+
   function startTimer() {
-    nodes.timer.hidden = !timer;
+    nodes.timer.hidden = !timer || timerOnCards;
     if (!timer || expired) {
       return;
     }
 
-    nodes.timerLabel.textContent = timer.label || '';
+    eachTimer(function (el, label) {
+      label.textContent = timer.label || '';
+    });
     if (!timerEnd) {
       timerEnd = Date.now() + timer.left * 1000;
       startTimerOnServer();
@@ -283,7 +298,9 @@
 
   function tick() {
     var left = Math.max(0, Math.round((timerEnd - Date.now()) / 1000));
-    nodes.timerClock.textContent = formatTime(left);
+    eachTimer(function (el, label, clock) {
+      clock.textContent = formatTime(left);
+    });
     if (!left) {
       timeUp();
     }
@@ -305,8 +322,10 @@
   function timeUp() {
     stopTimer();
     expired = true;
-    nodes.timer.classList.add('is-over');
-    nodes.timerLabel.textContent = labels.expired || '';
+    eachTimer(function (el, label) {
+      el.classList.add('is-over');
+      label.textContent = labels.expired || '';
+    });
 
     // A book already on its way to the cart may finish; the server allows it.
     offers.forEach(function (offer) {

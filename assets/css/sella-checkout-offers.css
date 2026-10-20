@@ -368,6 +368,13 @@ html.sella-offers-lock {
   border-top: 1px solid #f0f0f3;
 }
 
+/* Stacked, the countdown heads each offer instead of the dialog. */
+.sella-offers .sella-offers__timer--card {
+  margin: 0 0 14px;
+  padding: 10px 16px;
+  border-radius: 12px;
+}
+
 .sella-offers--stack .sella-offers__headline,
 .sella-offers--grid .sella-offers__headline {
   margin-bottom: 12px;
