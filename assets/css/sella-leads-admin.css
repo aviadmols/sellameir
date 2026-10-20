@@ -1,0 +1,172 @@
+/* Inquiries and leads screen (inc/sella-leads.php). */
+.sella-leads-lead {
+  max-width: 860px;
+  color: #50575e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sella-leads-admin .subsubsub {
+  float: none;
+  margin: 12px 0 8px;
+}
+
+.sella-leads-fresh {
+  display: inline-block;
+  margin-inline-start: 4px;
+  padding: 0 7px;
+  border-radius: 9px;
+  background: #d63638;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.sella-leads-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+.sella-leads-search input[type="search"] {
+  min-width: 280px;
+}
+
+.sella-leads-admin .tablenav .displaying-num {
+  margin-inline-start: 12px;
+}
+
+.sella-leads-table td,
+.sella-leads-table th {
+  vertical-align: top;
+}
+
+.sella-leads-table tr.is-new td {
+  font-weight: 600;
+}
+
+.sella-leads-table tr.is-new td .sella-leads-text,
+.sella-leads-table tr.is-new td details {
+  font-weight: 400;
+}
+
+.sella-leads-table__date {
+  white-space: nowrap;
+}
+
+.sella-leads-table__date span {
+  display: block;
+  color: #646970;
+  font-weight: 400;
+}
+
+.sella-leads-table .sella-leads-table__message {
+  width: 30%;
+}
+
+.sella-leads-text {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.sella-leads-table details summary {
+  cursor: pointer;
+  color: #2271b1;
+}
+
+.sella-leads-table details[open] summary {
+  margin-bottom: 6px;
+}
+
+.sella-leads-extra {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+
+.sella-leads-extra dt {
+  color: #646970;
+}
+
+.sella-leads-extra dd {
+  margin: 0;
+}
+
+.sella-leads-table__source a {
+  display: block;
+  font-weight: 400;
+}
+
+.sella-leads-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f0f0f1;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sella-leads-type--contact {
+  background: #efeefe;
+  color: #4b46c9;
+}
+
+.sella-leads-type--newsletter {
+  background: #e7f6ec;
+  color: #1a7a3c;
+}
+
+.sella-leads-type--checkout_email {
+  background: #fcf3e6;
+  color: #8a5300;
+}
+
+.sella-leads-type--back_in_stock {
+  background: #e8f1fb;
+  color: #135e96;
+}
+
+.sella-leads-status {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sella-leads-status.is-new {
+  border-color: #d63638;
+  background: #fcf0f1;
+  color: #b32d2e;
+}
+
+.sella-leads-status.is-handled {
+  border-color: #c3c4c7;
+  background: #f6f7f7;
+  color: #50575e;
+}
+
+.sella-leads-empty {
+  padding: 24px !important;
+  color: #646970;
+  text-align: center !important;
+}
+
+.sella-leads-settings {
+  max-width: 640px;
+  margin-top: 28px;
+  padding: 16px 20px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sella-leads-settings h2 {
+  margin-top: 0;
+  font-size: 15px;
+}

@@ -1,0 +1,236 @@
+/* Contact form, [sella_contact_form] (inc/sella-leads.php). Fields as at the
+   checkout: grey fill, the label inside the field, the brand purple on focus.
+   assets/js/sella-font-scale.js takes 2px off the sizes here, form fields
+   aside, so each label shows 2px under what it says.
+   "body .sella-contact" outranks the Elementor kit's own field and button rules. */
+.sella-contact {
+  --sella-contact-accent: #746fed;
+  --sella-contact-accent-dark: #5d57d8;
+  --sella-contact-ink: #171717;
+  --sella-contact-muted: #7b7f8a;
+  --sella-contact-line: #e7e7ee;
+  --sella-contact-fill: #f7f7f9;
+  --sella-contact-error: #d7263d;
+
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  color: var(--sella-contact-ink);
+  direction: rtl;
+  text-align: start;
+}
+
+.sella-contact [hidden] {
+  display: none !important;
+}
+
+.sella-contact__form,
+.sella-contact__done {
+  margin: 0;
+  padding: 32px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(23, 23, 23, 0.06);
+  box-sizing: border-box;
+}
+
+.sella-contact__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sella-contact__field--name,
+.sella-contact__field--order_ref,
+.sella-contact__field--message {
+  grid-column: 1 / -1;
+}
+
+.sella-contact__box {
+  position: relative;
+}
+
+.sella-contact__label {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline: 17px;
+  z-index: 1;
+  overflow: hidden;
+  color: var(--sella-contact-muted);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.sella-contact__req {
+  color: var(--sella-contact-accent);
+}
+
+.sella-contact__optional {
+  font-weight: 400;
+}
+
+body .sella-contact .sella-contact__box .sella-contact__input {
+  display: block;
+  width: 100%;
+  height: 60px;
+  margin: 0;
+  padding: 27px 16px 8px;
+  border: 1px solid var(--sella-contact-line);
+  border-radius: 14px;
+  background: var(--sella-contact-fill);
+  box-shadow: none;
+  box-sizing: border-box;
+  color: var(--sella-contact-ink);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  outline: none;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+/* Email and phone are typed left to right but sit on the right, like the rest. */
+body .sella-contact .sella-contact__box .sella-contact__input[dir="ltr"] {
+  text-align: right;
+}
+
+body .sella-contact .sella-contact__box .sella-contact__textarea {
+  height: auto;
+  min-height: 170px;
+  padding-top: 34px;
+  resize: vertical;
+}
+
+body .sella-contact .sella-contact__box .sella-contact__input:hover {
+  border-color: #d4d4e2;
+}
+
+body .sella-contact .sella-contact__box .sella-contact__input:focus {
+  border-color: var(--sella-contact-accent);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(116, 111, 237, 0.16);
+}
+
+body .sella-contact .sella-contact__field.is-invalid .sella-contact__input {
+  border-color: var(--sella-contact-error);
+  background: #fff8f9;
+}
+
+.sella-contact__field.is-invalid .sella-contact__label {
+  color: var(--sella-contact-error);
+}
+
+.sella-contact__error,
+.sella-contact__hint {
+  margin: 6px 4px 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.sella-contact__error {
+  color: var(--sella-contact-error);
+  font-weight: 500;
+}
+
+.sella-contact__hint {
+  color: var(--sella-contact-muted);
+}
+
+/* For bots only. */
+.sella-contact__trap {
+  position: absolute;
+  inset-inline-start: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.sella-contact__status {
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fdecee;
+  color: var(--sella-contact-error);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+body .sella-contact .sella-contact__form .sella-contact__submit {
+  display: block;
+  width: 100%;
+  margin: 22px 0 0;
+  padding: 16px 24px;
+  border: 0;
+  border-radius: 100px;
+  background: var(--sella-contact-accent);
+  box-shadow: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+body .sella-contact .sella-contact__form .sella-contact__submit:hover,
+body .sella-contact .sella-contact__form .sella-contact__submit:focus-visible {
+  background: var(--sella-contact-accent-dark);
+  color: #fff;
+}
+
+body .sella-contact .sella-contact__form .sella-contact__submit:active {
+  transform: scale(0.99);
+}
+
+body .sella-contact .sella-contact__form .sella-contact__submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* After sending. */
+.sella-contact__done {
+  padding: 52px 32px;
+  text-align: center;
+  outline: none;
+}
+
+.sella-contact__done-icon {
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: #f0effd url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23746fed' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 32px no-repeat;
+}
+
+.sella-contact__done-text {
+  max-width: 440px;
+  margin: 0 auto;
+  color: var(--sella-contact-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .sella-contact__form,
+  .sella-contact__done {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .sella-contact__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .sella-contact__done {
+    padding: 40px 22px;
+  }
+}

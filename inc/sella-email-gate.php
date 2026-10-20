@@ -316,6 +316,17 @@ function sella_eg_ajax_continue() {
 		}
 
 		sella_eg_pending_order( $email );
+
+		// In the leads list too (sella-leads.php).
+		if ( function_exists( 'sella_leads_add' ) ) {
+			sella_leads_add(
+				[
+					'type'   => 'checkout_email',
+					'email'  => $email,
+					'source' => 'פופאפ לפני תשלום',
+				]
+			);
+		}
 	}
 
 	/*

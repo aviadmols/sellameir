@@ -466,6 +466,18 @@ function sella_bis_ajax_subscribe() {
 		wp_send_json_error( array( 'message' => $labels['error'] ), 500 );
 	}
 
+	// In the leads list too (sella-leads.php), one row per book and address.
+	if ( function_exists( 'sella_leads_add' ) ) {
+		sella_leads_add(
+			array(
+				'type'     => 'back_in_stock',
+				'email'    => $email,
+				'source'   => $product->get_name(),
+				'page_url' => get_permalink( $product->get_parent_id() ? $product->get_parent_id() : $product->get_id() ),
+			)
+		);
+	}
+
 	// Same answer for new and existing subscriptions, so the form never reveals who subscribed.
 	wp_send_json_success( array( 'message' => $labels['success'] ) );
 }

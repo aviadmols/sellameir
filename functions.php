@@ -50,6 +50,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-product-page.php';
 	require_once get_stylesheet_directory() . '/inc/sella-netanyahu1000.php';
 	require_once get_stylesheet_directory() . '/inc/sella-subscription-plans.php';
+	require_once get_stylesheet_directory() . '/inc/sella-leads.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
