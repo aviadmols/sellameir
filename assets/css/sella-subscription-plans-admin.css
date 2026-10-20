@@ -1,0 +1,182 @@
+/* Subscription plans screen (inc/sella-subscription-plans.php). */
+.sella-plans-admin {
+  max-width: 1280px;
+}
+
+.sella-plans-lead {
+  max-width: 820px;
+  color: #50575e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sella-plans-section {
+  margin: 20px 0;
+  padding: 18px 20px 20px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sella-plans-section h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.sella-plans-field {
+  display: block;
+  margin: 0 0 12px;
+}
+
+.sella-plans-field > span,
+.sella-plans-field legend,
+.sella-plans-feature label > span,
+.sella-plans-field--price label > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #1d2327;
+  font-weight: 600;
+}
+
+.sella-plans-field input[type="text"],
+.sella-plans-field input[type="url"] {
+  width: 100%;
+}
+
+/* Benefit rows */
+.sella-plans-features {
+  margin: 14px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.sella-plans-feature {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 3fr) minmax(0, 2fr) 28px;
+  align-items: end;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid #f0f0f1;
+}
+
+.sella-plans-feature:first-child {
+  border-top: 0;
+}
+
+.sella-plans-feature input[type="text"] {
+  width: 100%;
+}
+
+.sella-plans-handle {
+  align-self: center;
+  color: #8c8f94;
+  cursor: move;
+}
+
+.sella-plans-remove {
+  align-self: center;
+  color: #b32d2e;
+  font-size: 22px;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sella-plans-card .sella-plans-remove {
+  margin-inline-start: auto;
+  font-size: 13px;
+}
+
+.sella-plans-remove:hover,
+.sella-plans-remove:focus {
+  color: #8a2424;
+}
+
+/* Plan cards */
+.sella-plans-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 14px 0 12px;
+}
+
+.sella-plans-card {
+  padding: 0 16px 6px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #f6f7f7;
+}
+
+.sella-plans-card--placeholder {
+  min-height: 200px;
+  border: 2px dashed #a7aaad;
+  background: transparent;
+}
+
+.sella-plans-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -16px 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #dcdcde;
+  border-radius: 8px 8px 0 0;
+  background: #fff;
+  cursor: move;
+}
+
+.sella-plans-card__head .dashicons {
+  color: #8c8f94;
+}
+
+.sella-plans-card__title {
+  font-size: 14px;
+}
+
+.sella-plans-field--price {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sella-plans-field--price input {
+  width: 100%;
+}
+
+.sella-plans-card > .description {
+  margin: 0 0 12px;
+}
+
+.sella-plans-style label {
+  display: block;
+  margin: 4px 0;
+}
+
+.sella-plans-includes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sella-plans-include {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.sella-plans-include input {
+  margin-top: 2px;
+}
+
+@media (max-width: 782px) {
+  .sella-plans-feature {
+    grid-template-columns: 24px minmax(0, 1fr) 28px;
+  }
+
+  .sella-plans-feature__short {
+    grid-column: 2;
+  }
+}
