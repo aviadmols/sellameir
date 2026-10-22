@@ -130,6 +130,11 @@
   color: #135e96;
 }
 
+.sella-leads-type--first_chapter {
+  background: #f6eefc;
+  color: #7a2fb3;
+}
+
 .sella-leads-status {
   padding: 3px 10px;
   border: 1px solid transparent;

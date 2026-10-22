@@ -8,8 +8,9 @@
  * - Newsletter signups: the HTML form in the newsletter popup (form.newsletter-form,
  *   caught by assets/js/sella-leads-capture.js) and every Elementor Pro form,
  *   such as the footer's.
- * - An address given in the popup before checkout (sella-email-gate.php) and a
- *   back-in-stock request (sella-back-in-stock.php), which call sella_leads_add().
+ * - An address given in the popup before checkout (sella-email-gate.php), a
+ *   back-in-stock request (sella-back-in-stock.php) and a request for a book's
+ *   first chapter (sella-first-chapter.php), which call sella_leads_add().
  *
  * The pages are cached (sella-page-cache.php), so a form cannot carry a nonce
  * that would still be valid when the cached copy is served. Spam is kept out
@@ -98,6 +99,7 @@ function sella_leads_types() {
 		'newsletter'     => 'ניוזלטר',
 		'checkout_email' => 'מייל לפני תשלום',
 		'back_in_stock'  => 'חזרה למלאי',
+		'first_chapter'  => 'פרק ראשון',
 		'form'           => 'טפסים אחרים',
 	);
 }
@@ -108,7 +110,7 @@ function sella_leads_types() {
  * @return array<int, string>
  */
 function sella_leads_single_types() {
-	return array( 'newsletter', 'checkout_email', 'back_in_stock' );
+	return array( 'newsletter', 'checkout_email', 'back_in_stock', 'first_chapter' );
 }
 
 /**
@@ -528,6 +530,11 @@ function sella_leads_from_elementor_form( $record ) {
 		return;
 	}
 
+	// A form another module records its own way, such as one connected to a first chapter.
+	if ( apply_filters( 'sella_leads_skip_elementor_form', false, $record ) ) {
+		return;
+	}
+
 	$lead   = array( 'fields' => array() );
 	$simple = true;
 
@@ -591,6 +598,8 @@ function sella_leads_register_admin_page() {
 	$title = 'פניות ולידים' . ( $new ? ' <span class="awaiting-mod">' . (int) $new . '</span>' : '' );
 
 	add_menu_page( 'פניות ולידים', $title, 'manage_woocommerce', SELLA_LEADS_SLUG, 'sella_leads_render_admin_page', 'dashicons-email-alt', 58.3 );
+	// Its own first item, so the first-chapter screens under it come after the list.
+	add_submenu_page( SELLA_LEADS_SLUG, 'פניות ולידים', 'פניות ולידים', 'manage_woocommerce', SELLA_LEADS_SLUG );
 }
 add_action( 'admin_menu', 'sella_leads_register_admin_page' );
 
@@ -829,7 +838,7 @@ function sella_leads_render_admin_page() {
 
 		<p class="sella-leads-lead">
 			כל מה שגולשים משאירים באתר: פניות מטופס צור קשר (<code>[sella_contact_form]</code>), הרשמות לניוזלטר מהפופאפ ומטופס הפוטר,
-			כתובות מייל שהושארו לפני התשלום ובקשות לעדכון על ספר שחזר למלאי. הייצוא כולל את הסינון והחיפוש שבחרתם.
+			כתובות מייל שהושארו לפני התשלום, בקשות לעדכון על ספר שחזר למלאי ובקשות לפרק ראשון. הייצוא כולל את הסינון והחיפוש שבחרתם.
 		</p>
 
 		<ul class="subsubsub">

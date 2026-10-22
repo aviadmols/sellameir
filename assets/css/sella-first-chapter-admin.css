@@ -1,0 +1,265 @@
+/* First-chapter admin screens (inc/sella-first-chapter.php). The sent log
+   also loads sella-leads-admin.css for its table. */
+.sella-fc-admin {
+  max-width: 1280px;
+}
+
+.sella-fc-lead {
+  max-width: 860px;
+  color: #50575e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sella-fc-section {
+  max-width: 980px;
+  margin: 20px 0;
+  padding: 18px 20px 20px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sella-fc-section h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.sella-fc-section > .description {
+  max-width: 820px;
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+
+.sella-fc-field {
+  display: block;
+  margin: 0 0 12px;
+}
+
+.sella-fc-field > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #1d2327;
+  font-weight: 600;
+}
+
+.sella-fc-field > small {
+  display: block;
+  margin-top: 4px;
+}
+
+.sella-fc-field select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.sella-fc-help {
+  margin: 14px 0 0;
+}
+
+.sella-fc-help summary {
+  color: #2271b1;
+  cursor: pointer;
+}
+
+.sella-fc-help pre {
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: #f6f7f7;
+  font-size: 12px;
+  text-align: left;
+}
+
+.sella-fc-section .button[name="sella_fc_test"] {
+  margin-top: 6px;
+}
+
+/* Product → chapter rows */
+.sella-fc-map__row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 24px minmax(0, 2fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #f0f0f1;
+}
+
+.sella-fc-map__row:first-child {
+  border-top: 0;
+}
+
+.sella-fc-map__row select {
+  width: 100%;
+  max-width: none;
+}
+
+.sella-fc-map__arrow {
+  color: #8c8f94;
+  font-size: 18px;
+  text-align: center;
+}
+
+.sella-fc-map {
+  margin-bottom: 12px;
+}
+
+.sella-fc-remove {
+  color: #b32d2e;
+  font-size: 20px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.sella-fc-remove:hover,
+.sella-fc-remove:focus {
+  color: #8a2424;
+}
+
+/* Elementor form cards */
+.sella-fc-conn {
+  margin: 0 0 14px;
+  padding: 14px 16px 6px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #f9f9fb;
+}
+
+.sella-fc-conn__head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.sella-fc-conn__head .sella-fc-field {
+  flex: 1;
+}
+
+.sella-fc-conn__head .sella-fc-remove {
+  margin-bottom: 18px;
+  font-size: 13px;
+}
+
+.sella-fc-conn__body:not(:empty) {
+  padding-top: 12px;
+  border-top: 1px solid #e6e6ea;
+}
+
+.sella-fc-conn__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.sella-fc-conn__choices {
+  margin: -4px 0 14px;
+}
+
+.sella-fc-choices {
+  width: 100%;
+  max-width: 640px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.sella-fc-choices th,
+.sella-fc-choices td {
+  padding: 7px 10px;
+  border: 1px solid #e6e6ea;
+  text-align: start;
+  vertical-align: middle;
+}
+
+.sella-fc-choices th {
+  background: #f6f7f7;
+  font-weight: 600;
+}
+
+.sella-fc-choices code {
+  margin-inline-start: 6px;
+  font-size: 11px;
+}
+
+.sella-fc-choices select {
+  width: 100%;
+}
+
+.sella-fc-warn {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-inline-start: 4px solid #dba617;
+  background: #fcf9e8;
+}
+
+/* Chapter screen */
+.sella-fc-file__current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  background: #f6f7f7;
+}
+
+.sella-fc-file__current a[data-fc-file-name] {
+  direction: ltr;
+  font-weight: 600;
+}
+
+/* Sent log */
+.sella-fc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f0f0f1;
+  color: #50575e;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sella-fc-badge--sent,
+.sella-fc-badge--ok {
+  background: #e7f6ec;
+  color: #1a7a3c;
+}
+
+.sella-fc-badge--failed {
+  background: #fcf0f1;
+  color: #b32d2e;
+}
+
+.sella-fc-badge--pending {
+  background: #fcf3e6;
+  color: #8a5300;
+}
+
+.sella-fc-muted {
+  color: #8c8f94;
+}
+
+.sella-fc-actions .button-link {
+  display: block;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 782px) {
+  .sella-fc-map__row {
+    grid-template-columns: minmax(0, 1fr) 28px;
+  }
+
+  .sella-fc-map__arrow {
+    display: none;
+  }
+
+  .sella-fc-map__row > select:not(.wc-product-search) {
+    grid-column: 1;
+  }
+
+  .sella-fc-conn__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

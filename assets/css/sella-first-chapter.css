@@ -1,0 +1,274 @@
+/* First-chapter form, [sella_first_chapter] (inc/sella-first-chapter.php).
+   The look of the "קבלו פרק ראשון" section (the lavender card, the black
+   envelope, pill fields, the purple button) without its topic chips and books.
+   "body .sella-fc" outranks the Elementor kit's own heading, field and
+   button rules. */
+.sella-fc {
+  --sella-fc-accent: #6560e0;
+  --sella-fc-accent-dark: #5650d2;
+  --sella-fc-ink: #0b0b0f;
+  --sella-fc-muted: #55546a;
+  --sella-fc-line: rgba(23, 22, 48, 0.1);
+  --sella-fc-error: #d7263d;
+
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 44px 48px 48px;
+  border-radius: 28px;
+  background:
+    radial-gradient(60% 75% at 48% 52%, rgba(200, 186, 220, 0.7) 0%, rgba(200, 186, 220, 0) 72%),
+    linear-gradient(160deg, #e6e4fc 0%, #dddbf8 55%, #e3e1fb 100%);
+  box-sizing: border-box;
+  color: var(--sella-fc-ink);
+  direction: rtl;
+  text-align: start;
+}
+
+.sella-fc [hidden] {
+  display: none !important;
+}
+
+.sella-fc__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: #000;
+  color: #fff;
+}
+
+.sella-fc__icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+body .sella-fc .sella-fc__title {
+  margin: 22px 0 0;
+  padding: 0;
+  color: var(--sella-fc-ink);
+  font-family: inherit;
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.sella-fc__form {
+  margin: 0;
+}
+
+body .sella-fc .sella-fc__text {
+  margin: 26px 0 0;
+  color: var(--sella-fc-ink);
+  font-size: clamp(19px, 1.8vw, 26px);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sella-fc__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+body .sella-fc .sella-fc__label {
+  display: block;
+  margin: 0 6px 9px;
+  padding: 0;
+  color: var(--sella-fc-ink);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+body .sella-fc .sella-fc__field .sella-fc__input {
+  display: block;
+  width: 100%;
+  height: 62px;
+  margin: 0;
+  padding: 0 24px;
+  border: 1px solid var(--sella-fc-line);
+  border-radius: 100px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(23, 22, 48, 0.04);
+  box-sizing: border-box;
+  color: var(--sella-fc-ink);
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1.4;
+  outline: none;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* The email is typed left to right but sits on the right, like the name. */
+body .sella-fc .sella-fc__field .sella-fc__input[dir="ltr"] {
+  text-align: right;
+}
+
+body .sella-fc .sella-fc__field .sella-fc__input:hover {
+  border-color: rgba(23, 22, 48, 0.2);
+}
+
+body .sella-fc .sella-fc__field .sella-fc__input:focus {
+  border-color: var(--sella-fc-accent);
+  box-shadow: 0 0 0 3px rgba(101, 96, 224, 0.2);
+}
+
+body .sella-fc .sella-fc__field.is-invalid .sella-fc__input {
+  border-color: var(--sella-fc-error);
+  background: #fff8f9;
+}
+
+.sella-fc__field.is-invalid .sella-fc__label {
+  color: var(--sella-fc-error);
+}
+
+body .sella-fc .sella-fc__error {
+  margin: 7px 10px 0;
+  color: var(--sella-fc-error);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* For bots only. */
+.sella-fc__trap {
+  position: absolute;
+  inset-inline-start: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+body .sella-fc .sella-fc__status {
+  margin: 18px 0 0;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--sella-fc-error);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+body .sella-fc .sella-fc__form .sella-fc__submit {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin: 16px 0 0;
+  padding: 16px 24px;
+  border: 0;
+  border-radius: 100px;
+  background: var(--sella-fc-accent);
+  box-shadow: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+body .sella-fc .sella-fc__form .sella-fc__submit:hover,
+body .sella-fc .sella-fc__form .sella-fc__submit:focus-visible {
+  background: var(--sella-fc-accent-dark);
+  color: #fff;
+}
+
+body .sella-fc .sella-fc__form .sella-fc__submit:focus-visible {
+  outline: 3px solid rgba(101, 96, 224, 0.35);
+  outline-offset: 3px;
+}
+
+body .sella-fc .sella-fc__form .sella-fc__submit:active {
+  transform: scale(0.99);
+}
+
+body .sella-fc .sella-fc__form .sella-fc__submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* After sending: the note takes the form's place under the title. */
+.sella-fc__done {
+  margin-top: 26px;
+  padding: 22px 26px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.8);
+  outline: none;
+}
+
+body .sella-fc .sella-fc__done-title {
+  margin: 0;
+  padding-inline-start: 36px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%236560e0'/%3E%3Cpath d='M7 12.4l3.3 3.3L17 9' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right center / 26px no-repeat;
+  color: var(--sella-fc-ink);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+body .sella-fc .sella-fc__done-text {
+  margin: 8px 0 0;
+  color: var(--sella-fc-muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.sella-fc__done-email {
+  color: var(--sella-fc-ink);
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .sella-fc {
+    padding: 28px 20px 24px;
+    border-radius: 22px;
+  }
+
+  .sella-fc__icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .sella-fc__icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  body .sella-fc .sella-fc__title {
+    margin-top: 18px;
+  }
+
+  body .sella-fc .sella-fc__text {
+    margin-top: 14px;
+  }
+
+  .sella-fc__fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  body .sella-fc .sella-fc__field .sella-fc__input {
+    height: 56px;
+  }
+
+  body .sella-fc .sella-fc__form .sella-fc__submit {
+    min-height: 58px;
+    font-size: 19px;
+  }
+
+  .sella-fc__done {
+    margin-top: 18px;
+    padding: 18px 18px;
+  }
+}
