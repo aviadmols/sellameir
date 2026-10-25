@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.35' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.36' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';
@@ -22,6 +22,7 @@ require_once get_stylesheet_directory() . '/inc/sella-page-cache.php';
 require_once get_stylesheet_directory() . '/inc/sella-delay-tracking.php';
 require_once get_stylesheet_directory() . '/inc/sella-typography.php';
 require_once get_stylesheet_directory() . '/inc/sella-legacy-redirects.php';
+require_once get_stylesheet_directory() . '/inc/sella-footer-links.php';
 
 /**
  * WooCommerce product modules.
