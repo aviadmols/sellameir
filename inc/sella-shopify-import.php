@@ -39,6 +39,8 @@ define( 'SELLA_SI_DEFAULT_SHOP', 'sellameir-com.myshopify.com' );
 define( 'SELLA_SI_ORDER_KEY', '_sella_shopify_order' );
 define( 'SELLA_SI_ARTICLE_KEY', '_sella_shopify_article' );
 define( 'SELLA_SI_LOG_LIMIT', 200 );
+define( 'SELLA_SI_AUTHOR_SLUG', 'bmeskin' ); // "מערכת סלע מאיר".
+define( 'SELLA_SI_AUTHOR_FROM', 'tomeronen' );
 
 /*
  * ------------------------------------------------------------------
@@ -447,6 +449,56 @@ function sella_si_localize_images( $html, $post_id, &$errors ) {
 }
 
 /**
+ * The author imported articles are published under: the "מערכת סלע מאיר"
+ * user (user name bmeskin), else whoever runs the import.
+ *
+ * @return int
+ */
+function sella_si_author_id() {
+	$user = get_user_by( 'slug', SELLA_SI_AUTHOR_SLUG );
+	return $user ? (int) $user->ID : get_current_user_id();
+}
+
+/**
+ * Articles imported before the author was set came in under the person who
+ * ran the import (tomeronen). Move every post of theirs to "מערכת סלע מאיר",
+ * 40 per admin page load, through wp_update_post so Yoast's author data
+ * follows.
+ */
+function sella_si_move_post_authors() {
+	if ( get_option( 'sella_si_authors_moved' ) || ! current_user_can( 'manage_options' ) || wp_doing_ajax() ) {
+		return;
+	}
+	$from = get_user_by( 'slug', SELLA_SI_AUTHOR_FROM );
+	$to   = get_user_by( 'slug', SELLA_SI_AUTHOR_SLUG );
+	if ( ! $from || ! $to ) {
+		return;
+	}
+
+	$ids = get_posts(
+		array(
+			'post_type'      => 'post',
+			'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+			'author'         => $from->ID,
+			'fields'         => 'ids',
+			'posts_per_page' => 40,
+		)
+	);
+	foreach ( $ids as $id ) {
+		wp_update_post(
+			array(
+				'ID'          => $id,
+				'post_author' => $to->ID,
+			)
+		);
+	}
+	if ( count( $ids ) < 40 ) {
+		update_option( 'sella_si_authors_moved', gmdate( 'c' ), false );
+	}
+}
+add_action( 'admin_init', 'sella_si_move_post_authors' );
+
+/**
  * Category for a Shopify blog, made when missing.
  *
  * @param array $blog handle and title.
@@ -488,7 +540,7 @@ function sella_si_import_article( $node, &$job ) {
 			'post_excerpt'  => wp_strip_all_tags( (string) $node['summary'] ),
 			'post_date'     => get_date_from_gmt( $date_gmt ),
 			'post_date_gmt' => $date_gmt,
-			'post_author'   => get_current_user_id(),
+			'post_author'   => sella_si_author_id(),
 			'post_category' => array( sella_si_blog_category( $node['blog'] ) ),
 			'tags_input'    => $node['tags'],
 			'meta_input'    => array(
