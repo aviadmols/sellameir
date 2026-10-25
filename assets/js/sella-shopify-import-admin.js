@@ -66,6 +66,21 @@
             $status.text(text.stopped);
             return;
           }
+          if (data.wait) {
+            // The old store asked to slow down: the same step runs again after the pause.
+            $status.text(text.waiting);
+            setTimeout(function () {
+              if (stopping) {
+                setRunning(false);
+                $status.text(text.stopped);
+                return;
+              }
+              $status.text(text.running);
+              step(false);
+            }, data.wait * 1000);
+            return;
+          }
+          $status.text(data.total ? text.running + ' ' + (data.imported + data.skipped + data.failed) + ' / ' + data.total : text.running);
           step(false);
         })
         .fail(function () {

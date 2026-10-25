@@ -94,6 +94,10 @@ function sella_si_job( $job ) {
 			'log'      => array(),
 			'file'     => '',
 			'header'   => array(),
+			'urls'     => array(),
+			'dates'    => array(),
+			'blogs'    => array(),
+			'wait'     => 0,
 		)
 	);
 }
@@ -333,6 +337,27 @@ function sella_si_existing_post( $shopify_id ) {
 }
 
 /**
+ * Post already made from the article at /blogs/<blog>/<handle>, by either
+ * import (the API or the public site).
+ *
+ * @param string $path "<blog>/<handle>", decoded.
+ * @return int Post ID or 0.
+ */
+function sella_si_post_by_handle( $path ) {
+	$ids = get_posts(
+		array(
+			'post_type'      => 'post',
+			'post_status'    => 'any',
+			'meta_key'       => '_sella_shopify_handle', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			'meta_value'     => $path, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			'fields'         => 'ids',
+			'posts_per_page' => 1,
+		)
+	);
+	return $ids ? (int) $ids[0] : 0;
+}
+
+/**
  * Download an image into the media library, attached to a post.
  *
  * @param string $url     Image URL (may start with //).
@@ -437,7 +462,7 @@ function sella_si_blog_category( $blog ) {
 function sella_si_import_article( $node, &$job ) {
 	$label = '«' . $node['title'] . '»';
 
-	if ( sella_si_existing_post( $node['id'] ) ) {
+	if ( sella_si_existing_post( $node['id'] ) || sella_si_post_by_handle( $node['blog']['handle'] . '/' . $node['handle'] ) ) {
 		++$job['skipped'];
 		sella_si_log( $job, 'skip', $label . ' כבר יובא.' );
 		return;
@@ -530,6 +555,332 @@ function sella_si_step_articles( &$job ) {
 	$page          = $data['articles']['pageInfo'];
 	$job['cursor'] = $page['endCursor'] ? $page['endCursor'] : $job['cursor'];
 	$job['done']   = ! $page['hasNextPage'];
+	return true;
+}
+
+/*
+ * ------------------------------------------------------------------
+ * Articles from the public site, without an app
+ * ------------------------------------------------------------------
+ *
+ * The article list comes from the store's sitemap, and each article is read
+ * from its page in the old theme: og:title, the body in div.post-des, the
+ * full-size image in og:image, tags in div.tags. The page shows the date
+ * without a year ("12 מאי 17:16"); the year comes from the image's upload
+ * time (?v=<timestamp>), else from the sitemap's last change. The blog's
+ * Atom feed has exact dates for its latest 30 articles, and they win.
+ *
+ * Shopify answers fast crawling with 429 or a "Verifying your connection"
+ * page; the step then stops and the screen waits a minute before going on.
+ */
+
+define( 'SELLA_SI_SITE', 'https://sellameir.com' );
+define( 'SELLA_SI_SITE_PER_STEP', 3 );
+define( 'SELLA_SI_SITE_WAIT', 60 );
+
+/**
+ * Fetch a page of the old store.
+ *
+ * @param string $url Full URL or a path.
+ * @return array{code: int, body: string, blocked: bool}|WP_Error
+ */
+function sella_si_site_get( $url ) {
+	if ( 0 === strpos( $url, '/' ) ) {
+		$url = SELLA_SI_SITE . $url;
+	}
+	$response = wp_remote_get(
+		$url,
+		array(
+			'timeout' => 30,
+			'headers' => array(
+				'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+				'Accept-Language' => 'he-IL,he;q=0.9',
+			),
+		)
+	);
+	if ( is_wp_error( $response ) ) {
+		return $response;
+	}
+	$code = (int) wp_remote_retrieve_response_code( $response );
+	$body = (string) wp_remote_retrieve_body( $response );
+	return array(
+		'code'    => $code,
+		'body'    => $body,
+		'blocked' => 429 === $code || 503 === $code || false !== strpos( $body, 'Verifying your connection' ),
+	);
+}
+
+/**
+ * First step: the article URLs from the sitemap, and exact dates and blog
+ * names from each blog's Atom feed.
+ *
+ * @param array $job Progress, changed in place.
+ * @return true|WP_Error
+ */
+function sella_si_site_prepare( &$job ) {
+	$index = sella_si_site_get( '/sitemap.xml' );
+	if ( is_wp_error( $index ) ) {
+		return $index;
+	}
+	if ( $index['blocked'] ) {
+		$job['wait'] = SELLA_SI_SITE_WAIT;
+		return true;
+	}
+
+	$urls = array();
+	preg_match_all( '#<loc>\s*([^<]*sitemap_articles[^<]*)\s*</loc>#', $index['body'], $maps );
+	foreach ( $maps[1] as $map_url ) {
+		$map = sella_si_site_get( html_entity_decode( $map_url ) );
+		if ( is_wp_error( $map ) ) {
+			return $map;
+		}
+		if ( $map['blocked'] ) {
+			$job['wait'] = SELLA_SI_SITE_WAIT;
+			return true;
+		}
+		preg_match_all( '#<url>(.*?)</url>#s', $map['body'], $entries );
+		foreach ( $entries[1] as $entry ) {
+			if ( preg_match( '#<loc>\s*([^<]+?)\s*</loc>#', $entry, $loc ) && preg_match( '#/blogs/[^/]+/[^/?]+#', $loc[1] ) ) {
+				$lastmod = preg_match( '#<lastmod>([^<]+)</lastmod>#', $entry, $lm ) ? (int) strtotime( $lm[1] ) : 0;
+				$urls[]  = array( html_entity_decode( $loc[1] ), $lastmod );
+			}
+		}
+	}
+	if ( ! $urls ) {
+		return new WP_Error( 'sella_si_site', 'לא נמצאו מאמרים ב-sitemap של האתר הישן.' );
+	}
+
+	$dates = array();
+	$blogs = array();
+	foreach ( array_unique( array_map( 'sella_si_site_blog', wp_list_pluck( $urls, 0 ) ) ) as $blog ) {
+		$feed = sella_si_site_get( '/blogs/' . rawurlencode( $blog ) . '.atom' );
+		if ( is_wp_error( $feed ) || $feed['blocked'] || 200 !== $feed['code'] ) {
+			continue;
+		}
+		if ( preg_match( '#<title>([^<]+)</title>#', $feed['body'], $t ) ) {
+			$name           = trim( preg_replace( '/^.*?[-–:]\s*/u', '', html_entity_decode( $t[1], ENT_QUOTES, 'UTF-8' ) ) );
+			$blogs[ $blog ] = '' !== $name ? $name : $blog;
+		}
+		preg_match_all( '#<entry>(.*?)</entry>#s', $feed['body'], $items );
+		foreach ( $items[1] as $item ) {
+			if ( preg_match( '#<link[^>]+href="([^"]+)"#', $item, $l ) && preg_match( '#<published>([^<]+)</published>#', $item, $p ) ) {
+				$dates[ sella_si_site_key( $l[1] ) ] = (int) strtotime( $p[1] );
+			}
+		}
+	}
+
+	$job['urls']   = $urls;
+	$job['dates']  = $dates;
+	$job['blogs']  = $blogs;
+	$job['total']  = count( $urls );
+	$job['cursor'] = 0;
+	sella_si_log( $job, 'ok', 'נמצאו ' . count( $urls ) . ' מאמרים באתר הישן.' );
+	return true;
+}
+
+/**
+ * "<blog>/<handle>", decoded, for an article URL.
+ *
+ * @param string $url Article URL.
+ * @return string
+ */
+function sella_si_site_key( $url ) {
+	$path = rawurldecode( (string) wp_parse_url( $url, PHP_URL_PATH ) );
+	return preg_match( '#/blogs/([^/]+)/([^/]+)#', $path, $m ) ? $m[1] . '/' . $m[2] : '';
+}
+
+/**
+ * The blog handle of an article URL.
+ *
+ * @param string $url Article URL.
+ * @return string
+ */
+function sella_si_site_blog( $url ) {
+	return strtok( sella_si_site_key( $url ), '/' );
+}
+
+/**
+ * Inner HTML of the first <div class="$class">, nested divs included.
+ *
+ * @param string $html  Page.
+ * @param string $class Exact class attribute.
+ * @return string
+ */
+function sella_si_inner_div( $html, $class ) {
+	$start = strpos( $html, '<div class="' . $class . '"' );
+	if ( false === $start ) {
+		return '';
+	}
+	$from  = strpos( $html, '>', $start ) + 1;
+	$pos   = $from;
+	$depth = 1;
+	while ( preg_match( '#<(/?)div\b[^>]*>#i', $html, $m, PREG_OFFSET_CAPTURE, $pos ) ) {
+		$depth += '/' === $m[1][0] ? -1 : 1;
+		$pos    = $m[0][1] + strlen( $m[0][0] );
+		if ( 0 === $depth ) {
+			return trim( substr( $html, $from, $m[0][1] - $from ) );
+		}
+	}
+	return '';
+}
+
+/**
+ * Publication time from the page's "12 מאי 17:16", with the year taken from
+ * the image's upload time when it falls near that day, else the latest year
+ * that is not after the sitemap's last change.
+ *
+ * @param string $text     Date text from the page.
+ * @param int    $image_ts Image upload time, or 0.
+ * @param int    $lastmod  Sitemap last change, or 0.
+ * @return int Timestamp, 0 when the text cannot be read.
+ */
+function sella_si_site_date( $text, $image_ts, $lastmod ) {
+	$months = array( 'ינו' => 1, 'פבר' => 2, 'מרץ' => 3, 'מרס' => 3, 'אפר' => 4, 'מאי' => 5, 'יונ' => 6, 'יול' => 7, 'אוג' => 8, 'ספט' => 9, 'אוק' => 10, 'נוב' => 11, 'דצמ' => 12 );
+	if ( ! preg_match( '/(\d{1,2})\s+(\S+?)[׳\'.]?\s+(\d{1,2}):(\d{2})/u', $text, $m ) ) {
+		return 0;
+	}
+	$month = 0;
+	foreach ( $months as $prefix => $number ) {
+		if ( 0 === strpos( $m[2], $prefix ) ) {
+			$month = $number;
+		}
+	}
+	if ( ! $month ) {
+		return 0;
+	}
+
+	$tz = new DateTimeZone( 'Asia/Jerusalem' );
+	$at = function ( $year ) use ( $m, $month, $tz ) {
+		return ( new DateTime( sprintf( '%04d-%02d-%02d %02d:%02d', $year, $month, (int) $m[1], (int) $m[3], (int) $m[4] ), $tz ) )->getTimestamp();
+	};
+
+	if ( $image_ts ) {
+		$year = (int) gmdate( 'Y', $image_ts );
+		foreach ( array( $year, $year - 1, $year + 1 ) as $candidate ) {
+			if ( abs( $at( $candidate ) - $image_ts ) < 45 * DAY_IN_SECONDS ) {
+				return $at( $candidate );
+			}
+		}
+	}
+
+	$year = (int) gmdate( 'Y', $lastmod ? $lastmod : time() );
+	$ts   = $at( $year );
+	return $ts > ( $lastmod ? $lastmod : time() ) + DAY_IN_SECONDS ? $at( $year - 1 ) : $ts;
+}
+
+/**
+ * Read one article page into the shape the API import uses.
+ *
+ * @param string $url     Article URL.
+ * @param string $html    Page.
+ * @param int    $lastmod Sitemap last change.
+ * @param array  $job     Progress (dates and blog names from the feeds).
+ * @return array|WP_Error
+ */
+function sella_si_site_article( $url, $html, $lastmod, $job ) {
+	$meta = function ( $attr, $name ) use ( $html ) {
+		return preg_match( '#<meta\s+' . $attr . '="' . preg_quote( $name, '#' ) . '"\s+content="([^"]*)"#', $html, $m ) ? html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ) : '';
+	};
+
+	$key   = sella_si_site_key( $url );
+	$blog  = strtok( $key, '/' );
+	$title = $meta( 'property', 'og:title' );
+	$body  = sella_si_inner_div( $html, 'post-des' );
+	if ( '' === $title || '' === $body ) {
+		return new WP_Error( 'sella_si_page', 'לא נמצאו כותרת או תוכן בעמוד.' );
+	}
+
+	$image    = preg_replace( '#^http://#', 'https://', $meta( 'property', 'og:image:secure_url' ) ? $meta( 'property', 'og:image:secure_url' ) : $meta( 'property', 'og:image' ) );
+	$image_ts = preg_match( '/[?&]v=(\d{9,11})/', $image, $v ) ? (int) $v[1] : 0;
+
+	if ( isset( $job['dates'][ $key ] ) ) {
+		$published = $job['dates'][ $key ];
+	} else {
+		$text      = preg_match( '#בתאריך(?:&nbsp;|\s)*<span>([^<]+)</span>#u', $html, $d ) ? html_entity_decode( $d[1], ENT_QUOTES, 'UTF-8' ) : '';
+		$published = sella_si_site_date( $text, $image_ts, $lastmod );
+		if ( ! $published ) {
+			$published = $lastmod ? $lastmod : time();
+		}
+	}
+
+	$tags = array();
+	if ( preg_match_all( '#<a[^>]*>([^<]+)</a>#', sella_si_inner_div( $html, 'tags' ), $t ) ) {
+		$tags = array_values( array_filter( array_map( 'trim', array_map( 'html_entity_decode', $t[1] ) ) ) );
+	}
+
+	$page_title = preg_match( '#<title>\s*([^<]+?)\s*</title>#', $html, $pt ) ? html_entity_decode( $pt[1], ENT_QUOTES, 'UTF-8' ) : '';
+	$page_title = trim( preg_replace( '/\s*[–|-]\s*סלע מאיר\s*$/u', '', $page_title ) );
+
+	return array(
+		'id'             => 'site:' . $key,
+		'handle'         => substr( $key, strlen( $blog ) + 1 ),
+		'title'          => $title,
+		'body'           => $body,
+		'summary'        => '',
+		'tags'           => $tags,
+		'isPublished'    => true,
+		'publishedAt'    => gmdate( 'c', $published ),
+		'createdAt'      => gmdate( 'c', $published ),
+		'author'         => null,
+		'image'          => '' !== $image ? array( 'url' => $image, 'altText' => $meta( 'property', 'og:image:alt' ) ) : null,
+		'blog'           => array(
+			'handle' => $blog,
+			'title'  => isset( $job['blogs'][ $blog ] ) ? $job['blogs'][ $blog ] : $blog,
+		),
+		'seoTitle'       => '' !== $page_title && $page_title !== $title ? array( 'value' => $page_title ) : null,
+		'seoDescription' => array( 'value' => $meta( 'name', 'description' ) ),
+	);
+}
+
+/**
+ * One step of the import from the public site.
+ *
+ * @param array $job Progress, changed in place.
+ * @return true|WP_Error
+ */
+function sella_si_step_articles_site( &$job ) {
+	if ( empty( $job['urls'] ) ) {
+		return sella_si_site_prepare( $job );
+	}
+
+	$i    = (int) $job['cursor'];
+	$done = 0;
+	while ( $i < count( $job['urls'] ) && $done < SELLA_SI_SITE_PER_STEP ) {
+		list( $url, $lastmod ) = $job['urls'][ $i ];
+		$key                   = sella_si_site_key( $url );
+
+		if ( sella_si_post_by_handle( $key ) ) {
+			++$job['skipped'];
+			++$i;
+			continue; // No need to fetch it.
+		}
+
+		$page = sella_si_site_get( $url );
+		if ( ! is_wp_error( $page ) && $page['blocked'] ) {
+			$job['wait'] = SELLA_SI_SITE_WAIT;
+			break; // Same article again after the pause.
+		}
+
+		if ( is_wp_error( $page ) || 200 !== $page['code'] ) {
+			++$job['failed'];
+			sella_si_log( $job, 'error', $key . ': ' . ( is_wp_error( $page ) ? $page->get_error_message() : 'HTTP ' . $page['code'] ) );
+		} else {
+			$node = sella_si_site_article( $url, $page['body'], $lastmod, $job );
+			if ( is_wp_error( $node ) ) {
+				++$job['failed'];
+				sella_si_log( $job, 'error', $key . ': ' . $node->get_error_message() );
+			} else {
+				sella_si_import_article( $node, $job );
+			}
+		}
+
+		++$i;
+		++$done;
+		sleep( 1 );
+	}
+
+	$job['cursor'] = $i;
+	$job['done']   = $i >= count( $job['urls'] );
 	return true;
 }
 
@@ -1133,7 +1484,7 @@ function sella_si_ajax_step() {
 	}
 
 	$name = isset( $_POST['job'] ) ? sanitize_key( wp_unslash( $_POST['job'] ) ) : '';
-	if ( ! in_array( $name, array( 'articles', 'orders', 'orders_csv' ), true ) ) {
+	if ( ! in_array( $name, array( 'articles_site', 'articles', 'orders', 'orders_csv' ), true ) ) {
 		wp_send_json_error( array( 'message' => 'משימה לא מוכרת.' ) );
 	}
 
@@ -1152,7 +1503,8 @@ function sella_si_ajax_step() {
 		);
 	}
 
-	$seen = count( $job['log'] );
+	$seen        = count( $job['log'] );
+	$job['wait'] = 0;
 	if ( ! $job['done'] ) {
 		sella_si_quiet();
 		$fn     = 'sella_si_step_' . $name;
@@ -1184,6 +1536,7 @@ function sella_si_progress( $job, $seen = 0 ) {
 		'skipped'  => (int) $job['skipped'],
 		'failed'   => (int) $job['failed'],
 		'total'    => (int) $job['total'],
+		'wait'     => (int) $job['wait'],
 		'log'      => array_slice( $job['log'], max( 0, min( $seen, count( $job['log'] ) ) ) ),
 	);
 }
@@ -1216,7 +1569,7 @@ function sella_si_admin_assets( $hook ) {
 	wp_enqueue_script( 'sella-shopify-import-admin', $base . '/assets/js/sella-shopify-import-admin.js', array( 'jquery' ), HELLO_ELEMENTOR_CHILD_VERSION, true );
 
 	$jobs = array();
-	foreach ( array( 'articles', 'orders', 'orders_csv' ) as $name ) {
+	foreach ( array( 'articles_site', 'articles', 'orders', 'orders_csv' ) as $name ) {
 		$jobs[ $name ] = sella_si_progress( sella_si_job( $name ) );
 	}
 	wp_localize_script(
@@ -1233,6 +1586,7 @@ function sella_si_admin_assets( $hook ) {
 				'finished' => 'הייבוא הסתיים.',
 				'error'    => 'הייבוא נעצר בגלל שגיאה. אפשר לתקן ולהמשיך.',
 				'retrying' => 'אין תשובה מהשרת, מנסה שוב…',
+				'waiting'  => 'שופיפיי ביקש להאט. ממשיך לבד בעוד דקה…',
 			),
 		)
 	);
@@ -1382,7 +1736,7 @@ function sella_si_render_page() {
 	?>
 	<div class="wrap sella-si-admin">
 		<h1>ייבוא משופיפיי</h1>
-		<p class="sella-si-lead">מעביר את מאמרי הבלוג ואת היסטוריית ההזמנות מחנות השופיפיי הישנה. כל ייבוא רץ בצעדים קטנים, אפשר לעצור ולהמשיך בכל רגע, ומה שכבר יובא מדולג, כך שבטוח להריץ שוב. לא נשלחים מיילים ללקוחות והמלאי לא משתנה.</p>
+		<p class="sella-si-lead">מעביר את מאמרי הבלוג ואת היסטוריית ההזמנות מחנות השופיפיי הישנה, בלי אפליקציה: המאמרים נקראים ישירות מהאתר, וההזמנות מקובץ הייצוא של שופיפיי. כל ייבוא רץ בצעדים קטנים, אפשר לעצור ולהמשיך בכל רגע, ומה שכבר יובא מדולג, כך שבטוח להריץ שוב. לא נשלחים מיילים ללקוחות והמלאי לא משתנה.</p>
 
 		<?php if ( 'saved' === $notice ) : ?>
 			<div class="notice notice-success is-dismissible"><p>פרטי החיבור נשמרו.</p></div>
@@ -1410,8 +1764,48 @@ function sella_si_render_page() {
 		<div class="notice notice-warning inline"><p><strong>לייבא לפני העברת הדומיין.</strong> שופיפיי מגיש את תמונות המאמרים מהכתובת sellameir.com/cdn/shop, והיא מפסיקה לעבוד ברגע שהדומיין עובר לאתר הזה. הייבוא מוריד כל תמונה לספריית המדיה.</p></div>
 
 		<section class="sella-si-section">
-			<h2>1. חיבור לשופיפיי</h2>
-			<details class="sella-si-help" <?php echo $connected ? '' : 'open'; ?>>
+			<h2>1. מאמרי הבלוג</h2>
+			<p class="description">כל מאמר הופך לפוסט עם התאריך המקורי, התגיות, התמונה הראשית, הכותרת והתיאור לגוגל. הכתובת הישנה של המאמר מפנה מעכשיו לפוסט החדש.</p>
+			<h3>מהאתר הישן, בלי אפליקציה</h3>
+			<p class="description">קורא כל מאמר ישירות מ-sellameir.com, לפי רשימת המאמרים ב-sitemap. לא צריך שום פרטי חיבור. הקצב איטי בכוונה (כ-10 דקות לכל המאמרים), כי שופיפיי חוסם קריאה מהירה. אם שופיפיי מבקש להאט, הייבוא ממתין דקה וממשיך לבד.</p>
+			<?php sella_si_render_job( 'articles_site', 'ייבוא כל המאמרים', true ); ?>
+			<?php if ( $connected ) : ?>
+				<h3>או דרך ה-API</h3>
+				<p class="description">מאמר שכבר יובא מהאתר מדולג, ולהפך.</p>
+				<?php sella_si_render_job( 'articles', 'ייבוא דרך ה-API', true ); ?>
+			<?php endif; ?>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>2. היסטוריית ההזמנות</h2>
+			<p class="description">כל הזמנה נוצרת ב-WooCommerce בסטטוס הסופי שלה (שולמה → הושלמה, בוטלה, הוחזרה), עם מספר ההזמנה משופיפיי (למשל S-1001), התאריך, הסכומים ששולמו בפועל ופרטי הלקוח. שורות ההזמנה מקושרות לספרים באתר כשיש התאמה. אם יש באתר לקוח עם אותו אימייל, ההזמנה מופיעה בחשבון שלו. לקוחות שיירשמו בהמשך יקבלו את ההזמנות שלהם לחשבון אוטומטית.</p>
+			<h3>מקובץ CSV, בלי אפליקציה</h3>
+			<p class="description">בניהול של שופיפיי: <b>Orders</b> ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b> ← <b>Export orders</b>. כשיש הרבה הזמנות, שופיפיי שולח את הקובץ למייל. מעלים אותו כאן ולוחצים "ייבוא מהקובץ". הקובץ נמחק מהשרת בסוף הייבוא.</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="sella-si-upload">
+				<?php $form( 'csv' ); ?>
+				<input type="file" name="csv" accept=".csv,text/csv">
+				<button type="submit" class="button">העלאת הקובץ</button>
+			</form>
+			<?php sella_si_render_job( 'orders_csv', 'ייבוא מהקובץ', '' !== $csv_job['file'] ); ?>
+			<?php if ( $connected ) : ?>
+				<h3>או דרך ה-API</h3>
+				<p class="description">הזמנה שכבר יובאה מהקובץ מדולגת, ולהפך.</p>
+				<?php sella_si_render_job( 'orders', 'ייבוא דרך ה-API', true ); ?>
+			<?php endif; ?>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>3. אחרי הייבוא</h2>
+			<ul class="sella-si-after">
+				<li>WooCommerce ← הגדרות ← <b>Analytics</b> ← <b>Import historical data</b>: כדי שההזמנות הישנות ייכנסו לדוחות המכירות.</li>
+				<li>שורות שלא נמצא להן ספר תואם מופיעות ביומן למעלה. ההזמנה עצמה יובאה עם שם הספר והסכום.</li>
+			</ul>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>4. חיבור לאפליקציה בשופיפיי (לא חובה)</h2>
+			<p class="description">צריך את זה רק כדי לייבא דרך ה-API. המאמרים והזמנות מה-CSV עובדים בלעדיו.</p>
+			<details class="sella-si-help">
 				<summary>איך יוצרים את האפליקציה בשופיפיי</summary>
 				<ol>
 					<li>להיכנס ל-<a href="https://dev.shopify.com/dashboard" target="_blank" rel="noopener">Shopify Dev Dashboard</a> עם החשבון שמנהל את החנות, וללחוץ <b>Create app</b>. שם לדוגמה: "ייבוא לוורדפרס".</li>
@@ -1440,35 +1834,6 @@ function sella_si_render_page() {
 					<button type="submit" class="button">בדיקת חיבור</button>
 				</form>
 			<?php endif; ?>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>2. מאמרי הבלוג</h2>
-			<p class="description">כל מאמר הופך לפוסט עם התאריך המקורי, התגיות, התמונה הראשית, הכותרת והתיאור לגוגל. הכתובת הישנה של המאמר מפנה מעכשיו לפוסט החדש.</p>
-			<?php sella_si_render_job( 'articles', 'ייבוא כל המאמרים', $connected ); ?>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>3. היסטוריית ההזמנות</h2>
-			<p class="description">כל הזמנה נוצרת ב-WooCommerce בסטטוס הסופי שלה (שולמה → הושלמה, בוטלה, הוחזרה), עם מספר ההזמנה משופיפיי (למשל S-1001), התאריך, הסכומים ששולמו בפועל ופרטי הלקוח. שורות ההזמנה מקושרות לספרים באתר כשיש התאמה. אם יש באתר לקוח עם אותו אימייל, ההזמנה מופיעה בחשבון שלו. לקוחות שיירשמו בהמשך יקבלו את ההזמנות שלהם לחשבון אוטומטית.</p>
-			<h3>מה-API</h3>
-			<?php sella_si_render_job( 'orders', 'ייבוא כל ההזמנות', $connected ); ?>
-			<h3>או מקובץ CSV</h3>
-			<p class="description">אם לאפליקציה אין <code>read_all_orders</code>: בשופיפיי ← הזמנות ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b>. שופיפיי שולח את הקובץ למייל. הזמנה שכבר יובאה מה-API מדולגת, כך שאפשר להשתמש בשתי הדרכים.</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="sella-si-upload">
-				<?php $form( 'csv' ); ?>
-				<input type="file" name="csv" accept=".csv,text/csv">
-				<button type="submit" class="button">העלאת הקובץ</button>
-			</form>
-			<?php sella_si_render_job( 'orders_csv', 'ייבוא מהקובץ', '' !== $csv_job['file'] ); ?>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>4. אחרי הייבוא</h2>
-			<ul class="sella-si-after">
-				<li>WooCommerce ← הגדרות ← <b>Analytics</b> ← <b>Import historical data</b>: כדי שההזמנות הישנות ייכנסו לדוחות המכירות.</li>
-				<li>שורות שלא נמצא להן ספר תואם מופיעות ביומן למעלה. ההזמנה עצמה יובאה עם שם הספר והסכום.</li>
-			</ul>
 		</section>
 	</div>
 	<?php
