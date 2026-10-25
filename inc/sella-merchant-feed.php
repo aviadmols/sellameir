@@ -205,6 +205,10 @@ function sella_mf_item( $product ) {
 	$brands = wp_get_post_terms( $parent_id, 'product_brand', array( 'fields' => 'names' ) );
 	$brand  = ! is_wp_error( $brands ) && $brands ? $brands[0] : SELLA_MF_DEFAULT_BRAND;
 	$cats   = wp_get_post_terms( $parent_id, 'product_cat' );
+	if ( ! is_wp_error( $cats ) && function_exists( 'sella_hc_ids' ) ) {
+		$hidden = sella_hc_ids();
+		$cats   = array_values( array_filter( $cats, fn( $cat ) => ! in_array( (int) $cat->term_id, $hidden, true ) ) );
+	}
 	$slugs  = is_wp_error( $cats ) ? array() : wp_list_pluck( $cats, 'slug' );
 	$names  = is_wp_error( $cats ) ? array() : wp_list_pluck( $cats, 'name' );
 	$types  = array_values( array_diff( $slugs, array( 'books', SELLA_MF_NEW_CAT, SELLA_MF_BESTSELLER_CAT ) ) );
