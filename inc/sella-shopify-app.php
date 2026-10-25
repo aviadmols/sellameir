@@ -30,7 +30,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'SELLA_SA_AUTH', 'sella_shopify_app_auth' );
-define( 'SELLA_SA_SCOPES', 'read_content,read_orders,read_all_orders,read_products,read_online_store_navigation' );
+// The same scopes as shopify.app.toml. read_all_orders joins both once Shopify
+// approves it; until then the API gives the last 60 days of orders, and the
+// orders CSV brings the rest.
+define( 'SELLA_SA_SCOPES', 'read_content,read_orders,read_products,read_online_store_navigation' );
 define( 'SELLA_SA_SHOP_RE', '/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/' );
 
 /*
