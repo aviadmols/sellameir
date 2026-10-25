@@ -1688,6 +1688,20 @@ body.sella-has-sticky-product-cart {
   display: none;
 }
 
+/* First come "כל הספרים", "רבי מכר" (432) and "החדשים ביותר" (426); the
+   rest keep the plugin's order. The wrapper is a flex row. */
+.sibolet-categories-wrapper .cat-filter-btn[data-cat-id="0"] {
+  order: -3;
+}
+
+.sibolet-categories-wrapper .cat-filter-btn[data-cat-id="432"] {
+  order: -2;
+}
+
+.sibolet-categories-wrapper .cat-filter-btn[data-cat-id="426"] {
+  order: -1;
+}
+
 #sibolet-book-search.sella-shop-search-trigger:focus,
 #sibolet-book-search.sella-shop-search-trigger:focus-visible {
   outline: 2px solid rgba(116, 111, 237, 0.35);
