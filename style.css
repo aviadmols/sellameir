@@ -1676,6 +1676,13 @@ body.sella-has-sticky-product-cart {
   display: none !important;
 }
 
+/* TEMPORARY (from 26.10.2026): the header's "הצטרפו לקהילת המנויים!"
+   button (header template 46, widget b11db5d) is hidden for a week.
+   Delete this rule to bring it back. */
+.elementor-46 .elementor-element.elementor-element-b11db5d {
+  display: none !important;
+}
+
 /* Shop filter bar — the archive search field opens the site search overlay
    (assets/js/sella-shop-search.js), so it behaves like a button. */
 #sibolet-book-search.sella-shop-search-trigger {
