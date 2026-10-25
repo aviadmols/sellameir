@@ -163,7 +163,7 @@
 }
 
 .sella-leads-settings {
-  max-width: 640px;
+  max-width: 980px;
   margin-top: 28px;
   padding: 16px 20px;
   border: 1px solid #dcdcde;
@@ -174,4 +174,51 @@
 .sella-leads-settings h2 {
   margin-top: 0;
   font-size: 15px;
+}
+
+.sella-leads-settings h3 {
+  margin: 22px 0 6px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f1;
+  font-size: 14px;
+}
+
+.sella-leads-settings h3:first-of-type {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sella-leads-settings > p.submit,
+.sella-leads-settings > .button {
+  margin-top: 16px;
+}
+
+.sella-leads-tab--minor a {
+  color: #646970;
+  font-size: 12px;
+}
+
+.sella-leads-forms {
+  margin: 10px 0 0;
+}
+
+.sella-leads-forms td {
+  vertical-align: middle;
+}
+
+.sella-leads-forms__fields {
+  color: #646970;
+  font-size: 12px;
+}
+
+.sella-leads-forms__note {
+  display: block;
+  margin-top: 4px;
+  color: #646970;
+  font-size: 12px;
+}
+
+.sella-leads-forms-empty {
+  color: #646970;
 }

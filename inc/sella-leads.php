@@ -6,8 +6,11 @@
  *   an optional order number and the message. Each inquiry is also emailed to
  *   the address set on the admin screen.
  * - Newsletter signups: the HTML form in the newsletter popup (form.newsletter-form,
- *   caught by assets/js/sella-leads-capture.js) and every Elementor Pro form,
- *   such as the footer's.
+ *   caught by assets/js/sella-leads-capture.js).
+ * - Every Elementor Pro form, such as the footer's. The settings card puts each
+ *   form in one of the three lists (contact, newsletter, first chapter) or
+ *   leaves it out; a form left on "automatic" is a newsletter signup when it
+ *   asks only for an email and a name, otherwise an inquiry.
  * - An address given in the popup before checkout (sella-email-gate.php), a
  *   back-in-stock request (sella-back-in-stock.php) and a request for a book's
  *   first chapter (sella-first-chapter.php), which call sella_leads_add().
@@ -105,6 +108,16 @@ function sella_leads_types() {
 }
 
 /**
+ * The three lists the screen leads with, and an Elementor form can be put in.
+ * The other kinds come from their own modules and are listed after them.
+ *
+ * @return array<int, string>
+ */
+function sella_leads_lists() {
+	return array( 'first_chapter', 'contact', 'newsletter' );
+}
+
+/**
  * Kinds kept once per address (and source): signing up twice is one signup.
  *
  * @return array<int, string>
@@ -116,7 +129,10 @@ function sella_leads_single_types() {
 /**
  * Screen settings.
  *
- * @return array{notify: bool, notify_email: string}
+ * forms: the list an Elementor form goes to, by the form's element ID; a form
+ * that is not there is "auto".
+ *
+ * @return array{notify: bool, notify_email: string, forms: array<string, string>}
  */
 function sella_leads_settings() {
 	$saved = get_option( SELLA_LEADS_SETTINGS, array() );
@@ -125,7 +141,23 @@ function sella_leads_settings() {
 	return array(
 		'notify'       => isset( $saved['notify'] ) ? (bool) $saved['notify'] : true,
 		'notify_email' => ! empty( $saved['notify_email'] ) ? (string) $saved['notify_email'] : (string) get_option( 'admin_email' ),
+		'forms'        => isset( $saved['forms'] ) && is_array( $saved['forms'] ) ? $saved['forms'] : array(),
 	);
+}
+
+/**
+ * What an Elementor form can be set to on the screen.
+ *
+ * @return array<string, string>
+ */
+function sella_leads_form_choices() {
+	$types   = sella_leads_types();
+	$choices = array( 'auto' => 'אוטומטי' );
+	foreach ( sella_leads_lists() as $list ) {
+		$choices[ $list ] = $types[ $list ];
+	}
+	$choices['skip'] = 'לא לשמור';
+	return $choices;
 }
 
 /**
@@ -520,8 +552,9 @@ add_action( 'wp_ajax_sella_leads_subscribe', 'sella_leads_ajax_subscribe' );
 add_action( 'wp_ajax_nopriv_sella_leads_subscribe', 'sella_leads_ajax_subscribe' );
 
 /**
- * Every Elementor Pro form submission, such as the footer newsletter. A form
- * with an email field and nothing longer than a name counts as a signup.
+ * Every Elementor Pro form submission, such as the footer newsletter, into the
+ * list set for it on the screen. On "auto", a form with an email field and
+ * nothing longer than a name counts as a signup, anything else as an inquiry.
  *
  * @param \ElementorPro\Modules\Forms\Classes\Form_Record $record Submission.
  */
@@ -532,6 +565,12 @@ function sella_leads_from_elementor_form( $record ) {
 
 	// A form another module records its own way, such as one connected to a first chapter.
 	if ( apply_filters( 'sella_leads_skip_elementor_form', false, $record ) ) {
+		return;
+	}
+
+	$form_id = method_exists( $record, 'get_form_settings' ) ? (string) $record->get_form_settings( 'id' ) : '';
+	$list    = sella_leads_settings()['forms'][ $form_id ] ?? 'auto';
+	if ( 'skip' === $list ) {
 		return;
 	}
 
@@ -565,7 +604,11 @@ function sella_leads_from_elementor_form( $record ) {
 
 	$meta = (array) $record->get( 'meta' );
 
-	$lead['type']     = $simple && ! empty( $lead['email'] ) ? 'newsletter' : 'form';
+	if ( in_array( $list, sella_leads_lists(), true ) ) {
+		$lead['type'] = $list;
+	} else {
+		$lead['type'] = $simple && ! empty( $lead['email'] ) ? 'newsletter' : 'contact';
+	}
 	$lead['source']   = (string) $record->get_form_settings( 'form_name' );
 	$lead['page_url'] = isset( $meta['page_url']['value'] ) ? sella_leads_page_url( $meta['page_url']['value'] ) : '';
 
@@ -674,12 +717,22 @@ function sella_leads_handle_admin_actions() {
 	$notice = '';
 
 	if ( 'settings' === $_POST['sella_leads_form'] ) {
-		$email = isset( $_POST['notify_email'] ) ? sanitize_email( wp_unslash( $_POST['notify_email'] ) ) : '';
+		$email   = isset( $_POST['notify_email'] ) ? sanitize_email( wp_unslash( $_POST['notify_email'] ) ) : '';
+		$choices = sella_leads_form_choices();
+		$forms   = array();
+		foreach ( isset( $_POST['forms'] ) ? (array) wp_unslash( $_POST['forms'] ) : array() as $form_id => $list ) {
+			$form_id = sanitize_key( $form_id );
+			$list    = sanitize_key( $list );
+			if ( '' !== $form_id && 'auto' !== $list && isset( $choices[ $list ] ) ) {
+				$forms[ $form_id ] = $list;
+			}
+		}
 		update_option(
 			SELLA_LEADS_SETTINGS,
 			array(
 				'notify'       => ! empty( $_POST['notify'] ),
 				'notify_email' => is_email( $email ) ? $email : '',
+				'forms'        => $forms,
 			),
 			false
 		);
@@ -788,6 +841,60 @@ function sella_leads_order_cell( $ref ) {
 }
 
 /**
+ * The Elementor forms on the site, each with the list it goes to. A form
+ * connected on the first-chapter screen is recorded there and shows as fixed.
+ *
+ * @param array<string, string> $saved List by form element ID.
+ */
+function sella_leads_render_form_choices( $saved ) {
+	$forms = function_exists( 'sella_fc_elementor_forms' ) ? sella_fc_elementor_forms() : array();
+	if ( ! $forms ) {
+		echo '<p class="sella-leads-forms-empty">לא נמצאו באתר טפסי Elementor.</p>';
+		return;
+	}
+
+	$choices = sella_leads_form_choices();
+	?>
+	<table class="widefat striped sella-leads-forms">
+		<thead>
+			<tr>
+				<th>טופס</th>
+				<th>עמוד</th>
+				<th>שדות</th>
+				<th>רשימה</th>
+			</tr>
+		</thead>
+		<tbody>
+		<?php foreach ( $forms as $form ) : ?>
+			<?php
+			$labels = wp_list_pluck( $form['fields'], 'label' );
+			$fixed  = function_exists( 'sella_fc_connection' ) && null !== sella_fc_connection( $form['id'] );
+			$select = 'sella_leads_form_' . $form['id'];
+			?>
+			<tr>
+				<td><label for="<?php echo esc_attr( $select ); ?>"><?php echo esc_html( '' !== $form['name'] ? $form['name'] : 'טופס ללא שם' ); ?></label></td>
+				<td><a href="<?php echo esc_url( admin_url( 'post.php?post=' . (int) $form['post_id'] . '&action=elementor' ) ); ?>"><?php echo esc_html( '' !== $form['post_title'] ? $form['post_title'] : '#' . $form['post_id'] ); ?></a></td>
+				<td class="sella-leads-forms__fields"><?php echo esc_html( implode( ' · ', $labels ) ); ?></td>
+				<td>
+					<?php if ( $fixed ) : ?>
+						<span class="sella-leads-type sella-leads-type--first_chapter">פרק ראשון</span>
+						<span class="sella-leads-forms__note">מחובר בהגדרות פרק ראשון ושולח את הפרק</span>
+					<?php else : ?>
+						<select id="<?php echo esc_attr( $select ); ?>" name="forms[<?php echo esc_attr( $form['id'] ); ?>]">
+							<?php foreach ( $choices as $value => $label ) : ?>
+								<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $saved[ $form['id'] ] ?? 'auto', $value ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					<?php endif; ?>
+				</td>
+			</tr>
+		<?php endforeach; ?>
+		</tbody>
+	</table>
+	<?php
+}
+
+/**
  * The screen.
  */
 function sella_leads_render_admin_page() {
@@ -837,18 +944,28 @@ function sella_leads_render_admin_page() {
 		<?php endif; ?>
 
 		<p class="sella-leads-lead">
-			כל מה שגולשים משאירים באתר: פניות מטופס צור קשר (<code>[sella_contact_form]</code>), הרשמות לניוזלטר מהפופאפ ומטופס הפוטר,
-			כתובות מייל שהושארו לפני התשלום, בקשות לעדכון על ספר שחזר למלאי ובקשות לפרק ראשון. הייצוא כולל את הסינון והחיפוש שבחרתם.
+			שלוש רשימות: בקשות לפרק ראשון, פניות מטופס צור קשר ומטפסי Elementor, והרשמות לניוזלטר מהפופאפ ומטופס הפוטר.
+			לאיזו רשימה נכנס כל טופס Elementor בוחרים בהגדרות שבתחתית העמוד. הייצוא כולל את הסינון והחיפוש שבחרתם.
 		</p>
 
 		<ul class="subsubsub">
 			<li><a href="<?php echo esc_url( add_query_arg( array_filter( array( 'q' => $filters['q'] ) ), $base_url ) ); ?>" class="<?php echo '' === $filters['type'] ? 'current' : ''; ?>">הכול <span class="count">(<?php echo (int) $all_total; ?>)</span></a></li>
-			<?php foreach ( $types as $key => $label ) : ?>
+			<?php
+			// The three lists always; the other kinds only once they have rows.
+			$tabs = sella_leads_lists();
+			foreach ( array_keys( $types ) as $key ) {
+				if ( ! in_array( $key, $tabs, true ) && ( isset( $counts[ $key ] ) || $key === $filters['type'] ) ) {
+					$tabs[] = $key;
+				}
+			}
+			?>
+			<?php foreach ( $tabs as $key ) : ?>
 				<?php
 				$count = isset( $counts[ $key ] ) ? $counts[ $key ] : null;
 				$fresh = $count ? (int) $count->fresh : 0;
+				$minor = ! in_array( $key, sella_leads_lists(), true );
 				?>
-				<li>| <a href="<?php echo esc_url( add_query_arg( array_filter( array( 'type' => $key, 'q' => $filters['q'] ) ), $base_url ) ); ?>" class="<?php echo $key === $filters['type'] ? 'current' : ''; ?>"><?php echo esc_html( $label ); ?> <span class="count">(<?php echo (int) ( $count ? $count->total : 0 ); ?>)</span><?php if ( $fresh && 'contact' === $key ) : ?> <span class="sella-leads-fresh"><?php echo (int) $fresh; ?> חדשות</span><?php endif; ?></a></li>
+				<li class="<?php echo $minor ? 'sella-leads-tab--minor' : ''; ?>">| <a href="<?php echo esc_url( add_query_arg( array_filter( array( 'type' => $key, 'q' => $filters['q'] ) ), $base_url ) ); ?>" class="<?php echo $key === $filters['type'] ? 'current' : ''; ?>"><?php echo esc_html( $types[ $key ] ); ?> <span class="count">(<?php echo (int) ( $count ? $count->total : 0 ); ?>)</span><?php if ( $fresh && 'contact' === $key ) : ?> <span class="sella-leads-fresh"><?php echo (int) $fresh; ?> חדשות</span><?php endif; ?></a></li>
 			<?php endforeach; ?>
 		</ul>
 
@@ -977,9 +1094,14 @@ function sella_leads_render_admin_page() {
 		</form>
 
 		<form method="post" class="sella-leads-settings">
-			<h2>התראה במייל על פנייה חדשה</h2>
+			<h2>הגדרות</h2>
 			<?php wp_nonce_field( 'sella_leads_manage' ); ?>
 			<input type="hidden" name="sella_leads_form" value="settings" />
+
+			<h3>טופס צור קשר והתראה במייל על פנייה חדשה</h3>
+			<p class="description">
+				הטופס של דף צור קשר: הקוד <code>[sella_contact_form]</code> בווידג'ט "קוד קצר" של Elementor.
+			</p>
 			<p>
 				<label><input type="checkbox" name="notify" value="1" <?php checked( $settings['notify'] ); ?> /> לשלוח מייל על כל פנייה מטופס צור קשר</label>
 			</p>
@@ -987,7 +1109,15 @@ function sella_leads_render_admin_page() {
 				<label for="sella_leads_notify_email">לכתובת</label>
 				<input type="email" id="sella_leads_notify_email" name="notify_email" value="<?php echo esc_attr( $settings['notify_email'] ); ?>" class="regular-text" dir="ltr" />
 			</p>
-			<p class="description">אפשר לענות ללקוח ישירות מהמייל: כתובת התשובה היא שלו.</p>
+			<p class="description">אפשר לענות ללקוח ישירות מהמייל: כתובת התשובה היא שלו. פניות מטפסי Elementor נשלחות במייל לפי הגדרות הטופס ב-Elementor.</p>
+
+			<h3>טפסי Elementor</h3>
+			<p class="description">
+				כל טופס Elementor באתר, ולאיזו רשימה נכנס מי שממלא אותו. "אוטומטי": טופס שמבקש רק מייל (ושם) נכנס לניוזלטר, כל טופס אחר לצור קשר.
+				"פרק ראשון" רק רושם את הפונה ברשימה; כדי שהפרק יישלח אליו במייל, חברו את הטופס ב<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . ( defined( 'SELLA_FC_SETTINGS_SLUG' ) ? SELLA_FC_SETTINGS_SLUG : '' ) ) ); ?>">הגדרות פרק ראשון</a>.
+			</p>
+			<?php sella_leads_render_form_choices( $settings['forms'] ); ?>
+
 			<?php submit_button( 'שמירה', 'secondary', 'submit', false ); ?>
 		</form>
 	</div>
