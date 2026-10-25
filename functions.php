@@ -55,6 +55,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-first-chapter.php';
 	require_once get_stylesheet_directory() . '/inc/sella-seo.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shopify-import.php';
+	require_once get_stylesheet_directory() . '/inc/sella-merchant-feed.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
