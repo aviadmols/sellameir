@@ -144,6 +144,14 @@ function sella_si_token() {
 		return $settings['token'];
 	}
 
+	// The installed app (sella-shopify-app.php), when connected.
+	if ( function_exists( 'sella_sa_token' ) ) {
+		$app = sella_sa_token();
+		if ( is_wp_error( $app ) || '' !== $app ) {
+			return $app;
+		}
+	}
+
 	$cached = get_transient( SELLA_SI_TOKEN );
 	if ( $cached ) {
 		return $cached;
@@ -1484,7 +1492,7 @@ function sella_si_ajax_step() {
 	}
 
 	$name = isset( $_POST['job'] ) ? sanitize_key( wp_unslash( $_POST['job'] ) ) : '';
-	if ( ! in_array( $name, array( 'articles_site', 'articles', 'orders', 'orders_csv' ), true ) ) {
+	if ( ! in_array( $name, array( 'articles_site', 'articles', 'orders', 'orders_csv', 'seo' ), true ) ) {
 		wp_send_json_error( array( 'message' => 'משימה לא מוכרת.' ) );
 	}
 
@@ -1569,7 +1577,7 @@ function sella_si_admin_assets( $hook ) {
 	wp_enqueue_script( 'sella-shopify-import-admin', $base . '/assets/js/sella-shopify-import-admin.js', array( 'jquery' ), HELLO_ELEMENTOR_CHILD_VERSION, true );
 
 	$jobs = array();
-	foreach ( array( 'articles_site', 'articles', 'orders', 'orders_csv' ) as $name ) {
+	foreach ( array( 'articles_site', 'articles', 'orders', 'orders_csv', 'seo' ) as $name ) {
 		$jobs[ $name ] = sella_si_progress( sella_si_job( $name ) );
 	}
 	wp_localize_script(
@@ -1736,7 +1744,7 @@ function sella_si_render_page() {
 	?>
 	<div class="wrap sella-si-admin">
 		<h1>ייבוא משופיפיי</h1>
-		<p class="sella-si-lead">מעביר את מאמרי הבלוג ואת היסטוריית ההזמנות מחנות השופיפיי הישנה, בלי אפליקציה: המאמרים נקראים ישירות מהאתר, וההזמנות מקובץ הייצוא של שופיפיי. כל ייבוא רץ בצעדים קטנים, אפשר לעצור ולהמשיך בכל רגע, ומה שכבר יובא מדולג, כך שבטוח להריץ שוב. לא נשלחים מיילים ללקוחות והמלאי לא משתנה.</p>
+		<p class="sella-si-lead">מעביר מחנות השופיפיי הישנה את היסטוריית ההזמנות, את מאמרי הבלוג עם התמונות, ואת ה-SEO. הדרך העיקרית היא האפליקציה "Sella → WordPress". בלעדיה אפשר לקרוא את המאמרים מהאתר הישן ואת ההזמנות מקובץ הייצוא. כל ייבוא רץ בצעדים קטנים, אפשר לעצור ולהמשיך בכל רגע, ומה שכבר יובא מדולג, כך שבטוח להריץ שוב. לא נשלחים מיילים ללקוחות והמלאי לא משתנה.</p>
 
 		<?php if ( 'saved' === $notice ) : ?>
 			<div class="notice notice-success is-dismissible"><p>פרטי החיבור נשמרו.</p></div>
@@ -1748,7 +1756,7 @@ function sella_si_render_page() {
 			<div class="notice notice-error"><p><strong>החיבור נכשל:</strong> <?php echo esc_html( $check->get_error_message() ); ?></p></div>
 		<?php elseif ( is_array( $check ) ) : ?>
 			<?php
-			$missing = array_diff( array( 'read_content', 'read_orders', 'read_all_orders' ), $check['scopes'] );
+			$missing = array_diff( array( 'read_content', 'read_orders', 'read_all_orders', 'read_products', 'read_online_store_navigation' ), $check['scopes'] );
 			?>
 			<div class="notice <?php echo $missing ? 'notice-warning' : 'notice-success'; ?>">
 				<p><strong>מחובר לחנות <?php echo esc_html( $check['shop'] ); ?></strong> (<?php echo esc_html( $check['domain'] ); ?>).
@@ -1761,79 +1769,120 @@ function sella_si_render_page() {
 			</div>
 		<?php endif; ?>
 
+		<?php if ( 'app-connected' === $notice ) : ?>
+			<div class="notice notice-success is-dismissible"><p><strong>האפליקציה מחוברת.</strong> אפשר לייבא את המאמרים, ההזמנות וה-SEO.</p></div>
+		<?php elseif ( 'app-disconnected' === $notice ) : ?>
+			<div class="notice notice-success is-dismissible"><p>החיבור לאפליקציה נותק.</p></div>
+		<?php elseif ( 'app-missing' === $notice ) : ?>
+			<div class="notice notice-error is-dismissible"><p>קודם צריך לשמור את ה-Client ID וה-Client secret של האפליקציה.</p></div>
+		<?php endif; ?>
+
 		<div class="notice notice-warning inline"><p><strong>לייבא לפני העברת הדומיין.</strong> שופיפיי מגיש את תמונות המאמרים מהכתובת sellameir.com/cdn/shop, והיא מפסיקה לעבוד ברגע שהדומיין עובר לאתר הזה. הייבוא מוריד כל תמונה לספריית המדיה.</p></div>
 
+		<?php
+		$app      = function_exists( 'sella_sa_auth' ) ? sella_sa_auth() : array();
+		$has_keys = '' !== $settings['client_id'] && '' !== $settings['client_secret'];
+		?>
 		<section class="sella-si-section">
-			<h2>1. מאמרי הבלוג</h2>
-			<p class="description">כל מאמר הופך לפוסט עם התאריך המקורי, התגיות, התמונה הראשית, הכותרת והתיאור לגוגל. הכתובת הישנה של המאמר מפנה מעכשיו לפוסט החדש.</p>
-			<h3>מהאתר הישן, בלי אפליקציה</h3>
-			<p class="description">קורא כל מאמר ישירות מ-sellameir.com, לפי רשימת המאמרים ב-sitemap. לא צריך שום פרטי חיבור. הקצב איטי בכוונה (כ-10 דקות לכל המאמרים), כי שופיפיי חוסם קריאה מהירה. אם שופיפיי מבקש להאט, הייבוא ממתין דקה וממשיך לבד.</p>
-			<?php sella_si_render_job( 'articles_site', 'ייבוא כל המאמרים', true ); ?>
-			<?php if ( $connected ) : ?>
-				<h3>או דרך ה-API</h3>
-				<p class="description">מאמר שכבר יובא מהאתר מדולג, ולהפך.</p>
-				<?php sella_si_render_job( 'articles', 'ייבוא דרך ה-API', true ); ?>
+			<h2>1. האפליקציה בשופיפיי</h2>
+			<?php if ( $app ) : ?>
+				<p class="sella-si-connected"><strong>מחובר לחנות <?php echo esc_html( $app['shop'] ); ?></strong> מאז <?php echo esc_html( wp_date( 'j.n.Y H:i', $app['connected_at'] ) ); ?>. הרשאות: <code><?php echo esc_html( $app['scope'] ); ?></code></p>
+			<?php else : ?>
+				<p class="description">האפליקציה "Sella → WordPress" נמצאת ב-<a href="https://github.com/aviadmols/sella" target="_blank" rel="noopener">github.com/aviadmols/sella</a>. אחרי שמתקינים אותה על החנות, האתר מושך דרכה את כל ההזמנות, המאמרים, התמונות וה-SEO.</p>
 			<?php endif; ?>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>2. היסטוריית ההזמנות</h2>
-			<p class="description">כל הזמנה נוצרת ב-WooCommerce בסטטוס הסופי שלה (שולמה → הושלמה, בוטלה, הוחזרה), עם מספר ההזמנה משופיפיי (למשל S-1001), התאריך, הסכומים ששולמו בפועל ופרטי הלקוח. שורות ההזמנה מקושרות לספרים באתר כשיש התאמה. אם יש באתר לקוח עם אותו אימייל, ההזמנה מופיעה בחשבון שלו. לקוחות שיירשמו בהמשך יקבלו את ההזמנות שלהם לחשבון אוטומטית.</p>
-			<h3>מקובץ CSV, בלי אפליקציה</h3>
-			<p class="description">בניהול של שופיפיי: <b>Orders</b> ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b> ← <b>Export orders</b>. כשיש הרבה הזמנות, שופיפיי שולח את הקובץ למייל. מעלים אותו כאן ולוחצים "ייבוא מהקובץ". הקובץ נמחק מהשרת בסוף הייבוא.</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="sella-si-upload">
-				<?php $form( 'csv' ); ?>
-				<input type="file" name="csv" accept=".csv,text/csv">
-				<button type="submit" class="button">העלאת הקובץ</button>
-			</form>
-			<?php sella_si_render_job( 'orders_csv', 'ייבוא מהקובץ', '' !== $csv_job['file'] ); ?>
-			<?php if ( $connected ) : ?>
-				<h3>או דרך ה-API</h3>
-				<p class="description">הזמנה שכבר יובאה מהקובץ מדולגת, ולהפך.</p>
-				<?php sella_si_render_job( 'orders', 'ייבוא דרך ה-API', true ); ?>
-			<?php endif; ?>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>3. אחרי הייבוא</h2>
-			<ul class="sella-si-after">
-				<li>WooCommerce ← הגדרות ← <b>Analytics</b> ← <b>Import historical data</b>: כדי שההזמנות הישנות ייכנסו לדוחות המכירות.</li>
-				<li>שורות שלא נמצא להן ספר תואם מופיעות ביומן למעלה. ההזמנה עצמה יובאה עם שם הספר והסכום.</li>
-			</ul>
-		</section>
-
-		<section class="sella-si-section">
-			<h2>4. חיבור לאפליקציה בשופיפיי (לא חובה)</h2>
-			<p class="description">צריך את זה רק כדי לייבא דרך ה-API. המאמרים והזמנות מה-CSV עובדים בלעדיו.</p>
-			<details class="sella-si-help">
-				<summary>איך יוצרים את האפליקציה בשופיפיי</summary>
+			<details class="sella-si-help" <?php echo $app ? '' : 'open'; ?>>
+				<summary>איך מתקינים</summary>
 				<ol>
-					<li>להיכנס ל-<a href="https://dev.shopify.com/dashboard" target="_blank" rel="noopener">Shopify Dev Dashboard</a> עם החשבון שמנהל את החנות, וללחוץ <b>Create app</b>. שם לדוגמה: "ייבוא לוורדפרס".</li>
-					<li>ב-<b>Versions</b>, בגרסה החדשה, לבחור את ההרשאות <code>read_content</code>, <code>read_orders</code> ו-<code>read_all_orders</code>, ולשחרר את הגרסה (<b>Release</b>). בלי <code>read_all_orders</code> שופיפיי מחזיר רק הזמנות מ-60 הימים האחרונים, ולפעמים הוא מבקש לאשר את ההרשאה הזו.</li>
-					<li>בהגדרות האפליקציה, בחלק של <b>Protected customer data</b>: לבקש גישה לשם, אימייל, טלפון וכתובת. בלי זה ההזמנות ייובאו בלי פרטי הלקוח. אם זה מסתבך, אפשר לייבא את ההזמנות מקובץ CSV (בהמשך העמוד), ואז ההרשאות האלה לא נחוצות.</li>
-					<li>להתקין את האפליקציה על החנות מלשונית <b>Home</b> ← <b>Install app</b>.</li>
-					<li>ב-<b>Settings</b> להעתיק את ה-<b>Client ID</b> וה-<b>Client secret</b> לשדות כאן.</li>
+					<li>בתיקיית האפליקציה: <code>npm install</code> ואז <code>npm run config:link</code>. נפתח דפדפן להתחברות לשופיפיי, והאפליקציה נוצרת בחשבון.</li>
+					<li><code>npm run deploy</code>. הפקודה מעלה לשופיפיי את ההרשאות ואת שתי הכתובות של האתר.</li>
+					<li>ב-<a href="https://dev.shopify.com/dashboard" target="_blank" rel="noopener">Dev Dashboard</a>, באפליקציה: לבקש גישה ל-<b>Protected customer data</b> (שם, אימייל, טלפון, כתובת) ולהרשאה <code>read_all_orders</code> (כל ההזמנות, לא רק 60 הימים האחרונים).</li>
+					<li>ב-<b>Settings</b> של האפליקציה להעתיק את ה-<b>Client ID</b> וה-<b>Client secret</b> לשדות כאן, ולשמור.</li>
+					<li>להתקין את האפליקציה על החנות (<b>Install app</b>), או ללחוץ כאן על "חיבור דרך האפליקציה". שופיפיי מבקש אישור ומחזיר לכאן.</li>
 				</ol>
-				<p>אם כבר יש אפליקציה ישנה עם Admin API access token (מתחיל ב-<code>shpat_</code>), אפשר להדביק אותו במקום.</p>
+				<p>הכתובות שמוגדרות באפליקציה (בקובץ <code>shopify.app.toml</code>), ואמורות להיות זהות לאלה:</p>
+				<p><label class="sella-si-field"><span>App URL</span><input type="text" class="large-text code" dir="ltr" readonly value="<?php echo esc_attr( sella_sa_install_url() ); ?>" onclick="this.select();"></label>
+				<label class="sella-si-field"><span>Allowed redirection URL</span><input type="text" class="large-text code" dir="ltr" readonly value="<?php echo esc_attr( sella_sa_callback_url() ); ?>" onclick="this.select();"></label></p>
 			</details>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="sella-si-form" autocomplete="off">
 				<?php $form( 'settings' ); ?>
 				<label class="sella-si-field"><span>כתובת החנות</span><input type="text" name="shop" class="regular-text code" dir="ltr" value="<?php echo esc_attr( $settings['shop'] ); ?>"></label>
 				<label class="sella-si-field"><span>Client ID</span><input type="text" name="client_id" class="regular-text code" dir="ltr" value="<?php echo esc_attr( $settings['client_id'] ); ?>"></label>
 				<label class="sella-si-field"><span>Client secret</span><input type="password" name="client_secret" class="regular-text code" dir="ltr" placeholder="<?php echo '' !== $settings['client_secret'] ? esc_attr( 'שמור. להשאיר ריק כדי לא לשנות.' ) : ''; ?>"></label>
-				<label class="sella-si-field"><span>או Admin API access token</span><input type="password" name="token" class="regular-text code" dir="ltr" placeholder="<?php echo '' !== $settings['token'] ? esc_attr( 'שמור. להשאיר ריק כדי לא לשנות.' ) : 'shpat_…'; ?>">
-					<?php if ( '' !== $settings['token'] ) : ?>
-						<small><label><input type="checkbox" name="clear_token" value="1"> למחוק את הטוקן השמור</label></small>
-					<?php endif; ?>
-				</label>
-				<p><button type="submit" class="button button-primary">שמירה</button></p>
+				<details>
+					<summary>יש כבר Admin API access token?</summary>
+					<label class="sella-si-field"><span>Admin API access token</span><input type="password" name="token" class="regular-text code" dir="ltr" placeholder="<?php echo '' !== $settings['token'] ? esc_attr( 'שמור. להשאיר ריק כדי לא לשנות.' ) : 'shpat_…'; ?>">
+						<?php if ( '' !== $settings['token'] ) : ?>
+							<small><label><input type="checkbox" name="clear_token" value="1"> למחוק את הטוקן השמור</label></small>
+						<?php endif; ?>
+					</label>
+				</details>
+				<p><button type="submit" class="button">שמירה</button></p>
 			</form>
-			<?php if ( $connected ) : ?>
+			<div class="sella-si-actions">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php $form( 'check' ); ?>
-					<button type="submit" class="button">בדיקת חיבור</button>
+					<input type="hidden" name="action" value="sella_sa">
+					<input type="hidden" name="sella_sa" value="<?php echo $app ? 'disconnect' : 'connect'; ?>">
+					<?php wp_nonce_field( 'sella_sa' ); ?>
+					<?php if ( $app ) : ?>
+						<button type="submit" class="button-link">ניתוק</button>
+					<?php else : ?>
+						<button type="submit" class="button button-primary" <?php disabled( ! $has_keys ); ?>>חיבור דרך האפליקציה</button>
+					<?php endif; ?>
 				</form>
+				<?php if ( $connected ) : ?>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php $form( 'check' ); ?>
+						<button type="submit" class="button">בדיקת חיבור</button>
+					</form>
+				<?php endif; ?>
+			</div>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>2. מאמרי הבלוג</h2>
+			<p class="description">כל מאמר הופך לפוסט עם התאריך המקורי, התגיות, התמונה הראשית, התמונות שבתוכן, הכותרת והתיאור לגוגל. הכתובת הישנה של המאמר מפנה מעכשיו לפוסט החדש. מאמר שכבר יובא בדרך אחת מדולג בשנייה.</p>
+			<?php if ( $connected ) : ?>
+				<h3>דרך האפליקציה</h3>
+				<?php sella_si_render_job( 'articles', 'ייבוא כל המאמרים', true ); ?>
 			<?php endif; ?>
+			<h3><?php echo $connected ? 'או' : ''; ?> מהאתר הישן, בלי אפליקציה</h3>
+			<p class="description">קורא כל מאמר ישירות מ-sellameir.com. איטי בכוונה (כ-10 דקות), כי שופיפיי חוסם קריאה מהירה. אם שופיפיי מבקש להאט, הייבוא ממתין דקה וממשיך לבד.</p>
+			<?php sella_si_render_job( 'articles_site', 'ייבוא מהאתר הישן', true ); ?>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>3. היסטוריית ההזמנות</h2>
+			<p class="description">כל הזמנה נוצרת ב-WooCommerce בסטטוס הסופי שלה (שולמה → הושלמה, בוטלה, הוחזרה), עם מספר ההזמנה משופיפיי (למשל S-1001), התאריך, הסכומים ששולמו בפועל ופרטי הלקוח. שורות ההזמנה מקושרות לספרים באתר כשיש התאמה. אם יש באתר לקוח עם אותו אימייל, ההזמנה מופיעה בחשבון שלו. הזמנה שכבר יובאה בדרך אחת מדולגת בשנייה.</p>
+			<?php if ( $connected ) : ?>
+				<h3>דרך האפליקציה</h3>
+				<?php sella_si_render_job( 'orders', 'ייבוא כל ההזמנות', true ); ?>
+			<?php endif; ?>
+			<h3><?php echo $connected ? 'או' : ''; ?> מקובץ CSV, בלי אפליקציה</h3>
+			<p class="description">בניהול של שופיפיי: <b>Orders</b> ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b> ← <b>Export orders</b>. מעלים את הקובץ כאן בלי לפתוח אותו ב-Excel. הקובץ נמחק מהשרת בסוף הייבוא.</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="sella-si-upload">
+				<?php $form( 'csv' ); ?>
+				<input type="file" name="csv" accept=".csv,text/csv">
+				<button type="submit" class="button">העלאת הקובץ</button>
+			</form>
+			<?php sella_si_render_job( 'orders_csv', 'ייבוא מהקובץ', '' !== $csv_job['file'] ); ?>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>4. SEO</h2>
+			<p class="description">כותרת ותיאור ה-SEO של כל מוצר בשופיפיי נכנסים ל-Yoast בספר התואם, אם עוד אין שם כותרת או תיאור. ההפניות שהוגדרו בשופיפיי (Online Store ← Navigation ← URL Redirects) מצטרפות להפניות מהאתר הישן. ה-SEO של המאמרים נכנס כבר עם ייבוא המאמרים.</p>
+			<?php if ( $connected ) : ?>
+				<?php sella_si_render_job( 'seo', 'ייבוא ה-SEO', true ); ?>
+			<?php else : ?>
+				<p><em>זמין אחרי חיבור האפליקציה.</em></p>
+			<?php endif; ?>
+		</section>
+
+		<section class="sella-si-section">
+			<h2>5. אחרי הייבוא</h2>
+			<ul class="sella-si-after">
+				<li>WooCommerce ← הגדרות ← <b>Analytics</b> ← <b>Import historical data</b>: כדי שההזמנות הישנות ייכנסו לדוחות המכירות.</li>
+				<li>שורות שלא נמצא להן ספר תואם מופיעות ביומן למעלה. ההזמנה עצמה יובאה עם שם הספר והסכום.</li>
+			</ul>
 		</section>
 	</div>
 	<?php

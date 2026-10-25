@@ -56,6 +56,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-first-chapter.php';
 	require_once get_stylesheet_directory() . '/inc/sella-seo.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shopify-import.php';
+	require_once get_stylesheet_directory() . '/inc/sella-shopify-app.php';
 	require_once get_stylesheet_directory() . '/inc/sella-merchant-feed.php';
 	require_once get_stylesheet_directory() . '/inc/sella-hidden-categories.php';
 	require_once get_stylesheet_directory() . '/inc/sella-promo-five-books.php';

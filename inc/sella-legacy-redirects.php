@@ -62,6 +62,42 @@ function sella_lr_record_move( $old_path, $post_id ) {
 }
 
 /**
+ * The URL redirects set up in Shopify, imported by the SEO import
+ * (sella-shopify-app.php): old path => Shopify target, a path or a URL.
+ *
+ * @return array<string, string>
+ */
+function sella_lr_shopify_redirects() {
+	$map = get_option( 'sella_lr_shopify', array() );
+	return is_array( $map ) ? $map : array();
+}
+
+/**
+ * Where a Shopify redirect ends up here: its target is itself a Shopify path
+ * (or a URL on the old domain), so it goes through the same rules once more.
+ *
+ * @param string $target Shopify target.
+ * @return string Path here, or a full URL elsewhere.
+ */
+function sella_lr_resolve_shopify_target( $target ) {
+	$host = (string) wp_parse_url( $target, PHP_URL_HOST );
+	if ( '' !== $host && ! preg_match( '/(^|\.)sellameir\.com$/i', $host ) ) {
+		return $target; // Another site.
+	}
+	$path = strtolower( rtrim( rawurldecode( (string) wp_parse_url( $target, PHP_URL_PATH ) ), '/' ) );
+	$path = '' === $path ? '/' : $path;
+
+	static $depth = 0;
+	if ( $depth > 2 ) {
+		return $path;
+	}
+	++$depth;
+	$found = sella_lr_target( $path );
+	--$depth;
+	return '' !== $found ? $found : $path;
+}
+
+/**
  * The request path, decoded, lower-case ASCII, without a trailing slash.
  *
  * @return string
@@ -113,6 +149,11 @@ function sella_lr_target( $path ) {
 	$moved = sella_lr_moved();
 	if ( isset( $moved[ $path ] ) && 'publish' === get_post_status( $moved[ $path ] ) ) {
 		return rawurldecode( (string) wp_parse_url( get_permalink( $moved[ $path ] ), PHP_URL_PATH ) );
+	}
+
+	$shopify = sella_lr_shopify_redirects();
+	if ( isset( $shopify[ $path ] ) ) {
+		return sella_lr_resolve_shopify_target( $shopify[ $path ] );
 	}
 
 	if ( preg_match( '#^/(products|blogs/[^/]+)/([^/]+)$#', $path, $m ) && 'tagged' !== $m[2] ) {
@@ -216,7 +257,10 @@ function sella_lr_redirect() {
 	}
 
 	$path = sella_lr_request_path();
-	if ( ! preg_match( '#^/(products|collections|pages|blogs|policies|account|search|agents\.md)(/|$)#', $path ) ) {
+	// Any other path only through a Shopify redirect, and only when it is not
+	// a page here.
+	if ( ! preg_match( '#^/(products|collections|pages|blogs|policies|account|search|agents\.md)(/|$)#', $path )
+		&& ! ( is_404() && isset( sella_lr_shopify_redirects()[ $path ] ) ) ) {
 		return;
 	}
 
@@ -237,7 +281,12 @@ function sella_lr_redirect() {
 		$url = add_query_arg( $keep, $url );
 	}
 
-	wp_safe_redirect( $url, 301, 'Sella legacy redirects' );
+	if ( 0 === strpos( $target, 'http' ) ) {
+		// A Shopify redirect to another site, set up by the store owner.
+		wp_redirect( $url, 301, 'Sella legacy redirects' ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+	} else {
+		wp_safe_redirect( $url, 301, 'Sella legacy redirects' );
+	}
 	exit;
 }
 // Before redirect_canonical (10), which would otherwise guess a page for an unknown path.
