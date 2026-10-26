@@ -62,7 +62,9 @@
     root.className = 'sella-offers sella-offers--' + layout;
     root.hidden = true;
     root.innerHTML =
-      '<div class="sella-offers__backdrop" data-offers-close></div>' +
+      // A click on the backdrop does not close the popup: only × and the
+      // "no thanks" button do (and Escape, for the keyboard).
+      '<div class="sella-offers__backdrop"></div>' +
       '<div class="sella-offers__dialog" role="dialog" aria-modal="true" tabindex="-1">' +
         '<button type="button" class="sella-offers__close" data-offers-close>&times;</button>' +
         '<p class="sella-offers__timer" role="timer" hidden>' +
