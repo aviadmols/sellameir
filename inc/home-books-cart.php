@@ -9,8 +9,8 @@
  * plus a .book-add-to-cart-btn button. The button is handled site-wide by the
  * delegated AJAX click handler in the "סל קניות" snippet.
  *
- * The books and their order come from the "ספרים בדף הבית" screen
- * (sella-home-books.php); with an empty list the slider shows 12 random books.
+ * The card and slider markup is shared with [sella_home_books]
+ * (sella-home-books.php), which shows books chosen in the admin.
  *
  * @package HelloElementorChild
  */
@@ -91,28 +91,35 @@ function sella_home_book_card_html( $product, $card_class = 'book-card-item stat
  * @return string
  */
 function sella_random_books_shortcode() {
-	$chosen = function_exists( 'sella_home_books_products' ) ? sella_home_books_products( 'bestsellers' ) : array();
+	$loop = new WP_Query(
+		array(
+			'post_type'      => 'product',
+			'posts_per_page' => 12,
+			'orderby'        => 'rand',
+			'fields'         => 'ids',
+		)
+	);
 
 	$products = array();
-	if ( $chosen ) {
-		$products = $chosen;
-	} else {
-		$loop = new WP_Query(
-			array(
-				'post_type'      => 'product',
-				'posts_per_page' => 12,
-				'orderby'        => 'rand',
-				'fields'         => 'ids',
-			)
-		);
-		foreach ( $loop->posts as $product_id ) {
-			$product = wc_get_product( $product_id );
-			if ( $product ) {
-				$products[] = $product;
-			}
+	foreach ( $loop->posts as $product_id ) {
+		$product = wc_get_product( $product_id );
+		if ( $product ) {
+			$products[] = $product;
 		}
 	}
 
+	return sella_home_books_slider_html( $products );
+}
+
+/**
+ * The books slider: a scrolling row with arrows. The arrows are wired by the
+ * site-wide script for .static-books-section; the look comes from the custom
+ * CSS of the shortcode widget on the homepage.
+ *
+ * @param WC_Product[] $products Books, in order.
+ * @return string Empty without books.
+ */
+function sella_home_books_slider_html( $products ) {
 	if ( ! $products ) {
 		return '';
 	}

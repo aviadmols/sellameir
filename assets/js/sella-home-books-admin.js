@@ -26,6 +26,10 @@
       dirty = false;
     });
 
+    function books(count) {
+      return count === 1 ? 'ספר אחד' : count + ' ספרים';
+    }
+
     function meta(item) {
       var line = $('<span class="sella-hb-meta"></span>');
       if (item.author) {
@@ -75,12 +79,35 @@
       li[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
+    form.on('click', '[data-hb-copy]', function () {
+      var button = $(this);
+      var text = button.data('hb-copy');
+      var done = function () {
+        button.text('הועתק ✓');
+        setTimeout(function () {
+          button.text('העתקה');
+        }, 1500);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done);
+      } else {
+        var field = $('<textarea></textarea>').val(text).appendTo('body').trigger('select');
+        document.execCommand('copy');
+        field.remove();
+        done();
+      }
+    });
+
     $('[data-hb-panel]').each(function () {
       var panel = $(this);
       var key = panel.data('hb-panel');
       var list = panel.find('[data-hb-list]');
+      var searchBox = panel.find('.sella-hb-search');
       var input = panel.find('[data-hb-search]');
+      var cat = panel.find('.sella-hb-search__cat');
+      var popup = panel.find('[data-hb-popup]');
       var results = panel.find('[data-hb-results]');
+      var addAll = panel.find('[data-hb-add-all]');
       var spinner = panel.find('[data-hb-spinner]');
       var found = [];
       var active = -1;
@@ -89,7 +116,7 @@
 
       function refresh() {
         var count = list.children().length;
-        panel.find('[data-hb-count]').text(count === 1 ? '(ספר אחד)' : count ? '(' + count + ' ספרים)' : '');
+        panel.find('[data-hb-count]').text(count ? '(' + books(count) + ')' : '');
         panel.find('[data-hb-empty]').prop('hidden', count > 0);
         panel.find('[data-hb-clear]').prop('hidden', count === 0);
       }
@@ -98,23 +125,55 @@
         return list.children('[data-id="' + id + '"]');
       }
 
+      function query() {
+        return { term: $.trim(input.val()), cat: parseInt(cat.val(), 10) || 0 };
+      }
+
       function close() {
-        results.prop('hidden', true).empty();
+        popup.prop('hidden', true);
+        results.empty();
         input.attr('aria-expanded', 'false').removeAttr('aria-activedescendant');
         found = [];
         active = -1;
       }
 
+      function options() {
+        return results.children('[role="option"]');
+      }
+
       function highlight(index) {
-        var options = results.children('[role="option"]');
-        if (!options.length) {
+        var all = options();
+        if (!all.length) {
           return;
         }
-        active = (index + options.length) % options.length;
-        options.removeClass('is-active').attr('aria-selected', 'false');
-        var current = options.eq(active).addClass('is-active').attr('aria-selected', 'true');
+        active = (index + all.length) % all.length;
+        all.removeClass('is-active');
+        var current = all.eq(active).addClass('is-active');
         input.attr('aria-activedescendant', current.attr('id'));
         current[0].scrollIntoView({ block: 'nearest' });
+      }
+
+      /* Mark which results are in the list, and what "add all" would add. */
+      function syncState() {
+        var missing = 0;
+        options().each(function () {
+          var option = $(this);
+          var added = inList(found[option.data('index')].id).length > 0;
+          option.toggleClass('is-added', added).attr('aria-selected', added ? 'true' : 'false');
+          option.find('.sella-hb-result__state').text(added ? '✓ ברשימה' : '+ הוספה');
+          option.attr('title', added ? 'לחיצה תסיר מהרשימה' : '');
+          if (!added) {
+            missing++;
+          }
+        });
+
+        var q = query();
+        addAll.prop('hidden', !q.cat || found.length < 2).prop('disabled', missing === 0);
+        if (missing === 0) {
+          addAll.text('הכל כבר ברשימה');
+        } else {
+          addAll.text((q.term ? 'הוספת כל התוצאות' : 'הוספת כל הקטגוריה') + ' (' + missing + ')');
+        }
       }
 
       function render(items) {
@@ -122,24 +181,23 @@
         found = items;
         active = -1;
 
+        panel.find('[data-hb-found]').text(items.length ? books(items.length) : '');
         if (!items.length) {
           results.append('<li class="sella-hb-result is-none">לא נמצאו ספרים</li>');
         }
         $.each(items, function (i, item) {
-          var added = inList(item.id).length > 0;
-          var option = $('<li class="sella-hb-result" role="option" aria-selected="false"></li>')
+          var option = $('<li class="sella-hb-result" role="option"></li>')
             .attr('id', 'sella-hb-option-' + key + '-' + i)
-            .attr('data-index', i)
-            .toggleClass('is-added', added);
-          option.append($('<img class="sella-hb-result__thumb" alt="" />').attr('src', item.thumb));
+            .attr('data-index', i);
+          option.append($('<img class="sella-hb-result__thumb" alt="" loading="lazy" />').attr('src', item.thumb));
           var body = $('<span class="sella-hb-result__body"></span>');
           body.append($('<strong class="sella-hb-result__title"></strong>').text(item.title), meta(item), tags(item));
-          option.append(body);
-          option.append($('<span class="sella-hb-result__state"></span>').text(added ? '✓ ברשימה' : '+ הוספה'));
+          option.append(body, '<span class="sella-hb-result__state"></span>');
           results.append(option);
         });
 
-        results.prop('hidden', false);
+        syncState();
+        popup.prop('hidden', false);
         input.attr('aria-expanded', 'true');
         if (items.length) {
           highlight(0);
@@ -147,35 +205,66 @@
       }
 
       function add(item) {
+        var li = listItem(item, key);
+        list.append(li);
+        return li;
+      }
+
+      /* Add a result, or take it out if it is already in the list. The results stay open. */
+      function toggle(index) {
+        var item = found[index];
+        if (!item) {
+          return;
+        }
         var existing = inList(item.id);
         if (existing.length) {
-          flash(existing);
+          existing.remove();
         } else {
-          var li = listItem(item, key);
-          list.append(li);
+          flash(add(item));
+        }
+        refresh();
+        setDirty();
+        syncState();
+      }
+
+      function addAllFound() {
+        var last = null;
+        $.each(found, function (i, item) {
+          if (!inList(item.id).length) {
+            last = add(item);
+          }
+        });
+        if (last) {
           refresh();
           setDirty();
-          flash(li);
+          syncState();
+          flash(last);
         }
-        input.val('');
-        close();
         input.trigger('focus');
       }
 
-      function search(term) {
-        if (cache[term]) {
-          render(cache[term]);
+      function search() {
+        var q = query();
+        var cacheKey = q.cat + '|' + q.term;
+        clearTimeout(timer);
+        if (!q.term && !q.cat) {
+          close();
+          return;
+        }
+        if (cache[cacheKey]) {
+          render(cache[cacheKey]);
           return;
         }
         if (request) {
           request.abort();
         }
         spinner.addClass('is-active');
-        request = $.get(data.ajaxUrl, { action: 'sella_home_books_search', nonce: data.nonce, term: term })
+        request = $.get(data.ajaxUrl, { action: 'sella_home_books_search', nonce: data.nonce, term: q.term, cat: q.cat })
           .done(function (response) {
             if (response && response.success) {
-              cache[term] = response.data;
-              if ($.trim(input.val()) === term) {
+              cache[cacheKey] = response.data;
+              var now = query();
+              if (now.cat + '|' + now.term === cacheKey) {
                 render(response.data);
               }
             }
@@ -187,27 +276,42 @@
       }
 
       input.on('input', function () {
-        var term = $.trim(input.val());
         clearTimeout(timer);
-        if (term.length < 2 && !/^\d+$/.test(term)) {
-          close();
-          return;
-        }
-        timer = setTimeout(function () {
-          search(term);
-        }, 220);
+        timer = setTimeout(search, 200);
+      });
+
+      cat.on('change', function () {
+        search();
+        input.trigger('focus');
       });
 
       input.on('keydown', function (event) {
-        var open = !results.prop('hidden');
+        var open = !popup.prop('hidden');
         if (event.key === 'Enter') {
           event.preventDefault();
           if (open && found[active]) {
-            add(found[active]);
+            var adding = !inList(found[active].id).length;
+            toggle(active);
+            /* Move on to the next book not yet in the list, for quick runs of Enter. */
+            if (adding) {
+              for (var step = 1; step < found.length; step++) {
+                var next = (active + step) % found.length;
+                if (!inList(found[next].id).length) {
+                  highlight(next);
+                  break;
+                }
+              }
+            }
+          } else if (!open) {
+            search();
           }
-        } else if (event.key === 'ArrowDown' && open) {
+        } else if (event.key === 'ArrowDown') {
           event.preventDefault();
-          highlight(active + 1);
+          if (open) {
+            highlight(active + 1);
+          } else {
+            search();
+          }
         } else if (event.key === 'ArrowUp' && open) {
           event.preventDefault();
           highlight(active - 1);
@@ -218,16 +322,20 @@
       });
 
       input.on('focus', function () {
-        var term = $.trim(input.val());
-        if (term && cache[term]) {
-          render(cache[term]);
+        if (popup.prop('hidden')) {
+          var q = query();
+          if (cache[q.cat + '|' + q.term]) {
+            render(cache[q.cat + '|' + q.term]);
+          }
         }
       });
 
       /* mousedown, not click: it runs before the input loses focus. */
       results.on('mousedown', '[role="option"]', function (event) {
         event.preventDefault();
-        add(found[$(this).data('index')]);
+        var index = $(this).data('index');
+        highlight(index);
+        toggle(index);
       });
       results.on('mousemove', '[role="option"]', function () {
         var index = $(this).data('index');
@@ -236,8 +344,16 @@
         }
       });
 
+      addAll.on('mousedown', function (event) {
+        event.preventDefault();
+      }).on('click', addAllFound);
+
+      panel.find('[data-hb-close]').on('mousedown', function (event) {
+        event.preventDefault();
+      }).on('click', close);
+
       $(document).on('mousedown', function (event) {
-        if (!$(event.target).closest(panel.find('.sella-hb-search')).length) {
+        if (!popup.prop('hidden') && !$.contains(searchBox[0], event.target)) {
           close();
         }
       });
@@ -260,18 +376,20 @@
         $(this).closest('.sella-hb-item').remove();
         refresh();
         setDirty();
+        syncState();
       });
 
       panel.find('[data-hb-clear]').on('click', function () {
-        if (window.confirm('להסיר את כל הספרים מהרשימה? אחרי שמירה האזור יחזור להיות מוצג כמו היום.')) {
+        if (window.confirm('להסיר את כל הספרים מהרשימה? אחרי שמירה השורטקוד לא יציג כלום.')) {
           list.empty();
           refresh();
           setDirty();
+          syncState();
         }
       });
 
       $.each(data.lists[key] || [], function (i, item) {
-        list.append(listItem(item, key));
+        add(item);
       });
       refresh();
 

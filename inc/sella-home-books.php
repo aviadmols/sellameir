@@ -1,16 +1,16 @@
 <?php
 /**
- * Homepage book sliders: pick the books and their order (מוצרים > ספרים בדף הבית).
+ * Homepage book lists, picked in the admin (פופאפים של Upsell > ספרים בדף הבית)
+ * and shown with [sella_home_books list="..."].
  *
- * Two sections on the homepage:
- * - "bestsellers": the "רבי המכר" slider, our [random_three_books] shortcode
- *   (home-books-cart.php).
- * - "breakthrough": the "ספרים פורצי דרך" marquee, rendered by a WPCode snippet
- *   whose shortcode we do not control. Its output is recognized by the
- *   .books-marquee-section wrapper and replaced with the same markup holding
- *   the chosen books.
+ * Two lists:
+ * - "bestsellers": a slider with arrows, the markup of [random_three_books].
+ * - "breakthrough": a marquee, the markup of the WPCode "ספרים פורצי דרך" snippet.
  *
- * An empty list leaves its section as it was (random books, or the snippet's own).
+ * The look of both comes from the custom CSS of the Elementor shortcode
+ * widgets on the homepage, so the new shortcode goes into those same widgets
+ * in place of the old one. The old shortcodes are left as they were.
+ *
  * The lists are one option, so saving it from the admin purges the page cache.
  *
  * @package HelloElementorChild
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'SELLA_HOME_BOOKS_OPTION', 'sella_home_books' );
 
 /**
- * The homepage sections that take a book list.
+ * The lists.
  *
  * @return array<string, array<string, string>>
  */
@@ -31,19 +31,21 @@ function sella_home_books_sections() {
 	return array(
 		'bestsellers'  => array(
 			'title'       => 'רבי מכר',
-			'description' => 'הסליידר "רבי המכר שמעצבים שיחה ישראלית חדשה". כשהרשימה ריקה מוצגים 12 ספרים אקראיים.',
+			'description' => 'סליידר עם חיצים, לאזור "רבי המכר שמעצבים שיחה ישראלית חדשה".',
+			'layout'      => 'slider',
 		),
 		'breakthrough' => array(
 			'title'       => 'ספרים פורצי דרך',
-			'description' => 'הפס הנע "ספרים פורצי דרך במחירים מיוחדים". כשהרשימה ריקה מוצגים הספרים שהוגדרו בו עד היום.',
+			'description' => 'פס נע, לאזור "ספרים פורצי דרך במחירים מיוחדים".',
+			'layout'      => 'marquee',
 		),
 	);
 }
 
 /**
- * Stored product IDs of one section, in order.
+ * Stored product IDs of one list, in order.
  *
- * @param string $key Section key.
+ * @param string $key List key.
  * @return int[]
  */
 function sella_home_books_ids( $key ) {
@@ -54,10 +56,10 @@ function sella_home_books_ids( $key ) {
 }
 
 /**
- * Published products of one section, in order. Drafts, private and deleted
+ * Published products of one list, in order. Drafts, private and deleted
  * products are skipped so the homepage never links to a missing page.
  *
- * @param string $key Section key.
+ * @param string $key List key.
  * @return WC_Product[]
  */
 function sella_home_books_products( $key ) {
@@ -80,18 +82,18 @@ function sella_home_books_products( $key ) {
 
 /*
  * ------------------------------------------------------------------
- * Front end: the "ספרים פורצי דרך" marquee
+ * Front end
  * ------------------------------------------------------------------
  */
 
 /**
- * The marquee with the chosen books, in the snippet's markup: the books twice,
- * so the CSS loop (.books-marquee-track, 30s) runs without a gap.
+ * The marquee, in the snippet's markup: the books twice, so the CSS loop
+ * (.books-marquee-track) runs without a gap.
  *
- * @return string Empty when no books were chosen.
+ * @param WC_Product[] $products Books, in order.
+ * @return string Empty without books.
  */
-function sella_home_books_marquee_html() {
-	$products = sella_home_books_products( 'breakthrough' );
+function sella_home_books_marquee_html( $products ) {
 	if ( ! $products ) {
 		return '';
 	}
@@ -115,20 +117,35 @@ function sella_home_books_marquee_html() {
 }
 
 /**
- * Swap the snippet's marquee for the chosen books.
+ * [sella_home_books list="bestsellers|breakthrough" layout="slider|marquee"]
  *
- * @param string|false $output Shortcode output.
- * @return string|false
+ * The layout defaults to the list's own. An empty list shows nothing.
+ *
+ * @param array|string $atts Shortcode attributes.
+ * @return string
  */
-function sella_home_books_replace_marquee( $output ) {
-	if ( ! is_string( $output ) || false === strpos( $output, 'books-marquee-section' ) ) {
-		return $output;
+function sella_home_books_shortcode( $atts ) {
+	$sections = sella_home_books_sections();
+	$atts     = shortcode_atts(
+		array(
+			'list'   => 'bestsellers',
+			'layout' => '',
+		),
+		$atts,
+		'sella_home_books'
+	);
+
+	$key = sanitize_key( $atts['list'] );
+	if ( ! isset( $sections[ $key ] ) ) {
+		return '';
 	}
 
-	$html = sella_home_books_marquee_html();
-	return '' !== $html ? $html : $output;
+	$layout   = in_array( $atts['layout'], array( 'slider', 'marquee' ), true ) ? $atts['layout'] : $sections[ $key ]['layout'];
+	$products = sella_home_books_products( $key );
+
+	return 'marquee' === $layout ? sella_home_books_marquee_html( $products ) : sella_home_books_slider_html( $products );
 }
-add_filter( 'do_shortcode_tag', 'sella_home_books_replace_marquee' );
+add_shortcode( 'sella_home_books', 'sella_home_books_shortcode' );
 
 /*
  * ------------------------------------------------------------------
@@ -137,11 +154,11 @@ add_filter( 'do_shortcode_tag', 'sella_home_books_replace_marquee' );
  */
 
 /**
- * "ספרים בדף הבית" under the Products menu.
+ * "ספרים בדף הבית" under the upsell menu.
  */
 function sella_home_books_register_admin_page() {
 	add_submenu_page(
-		'edit.php?post_type=product',
+		'sella-upsell-popups',
 		'ספרים בדף הבית',
 		'ספרים בדף הבית',
 		'manage_woocommerce',
@@ -206,7 +223,7 @@ function sella_home_books_item( $product ) {
  * @param int    $limit Most results.
  * @return int[]
  */
-function sella_home_books_search_ids( $term, $limit = 20 ) {
+function sella_home_books_search_ids( $term, $limit ) {
 	global $wpdb;
 
 	$ids = array();
@@ -235,6 +252,51 @@ function sella_home_books_search_ids( $term, $limit = 20 ) {
 }
 
 /**
+ * Books for the screen's search: by text, by category, or both. A category
+ * alone lists all its published books (subcategories included), in the shop's
+ * order, so the whole category can be added at once.
+ *
+ * @param string $term   Search text.
+ * @param int    $cat_id Category term ID, 0 for all.
+ * @return int[]
+ */
+function sella_home_books_find( $term, $cat_id ) {
+	if ( ! $cat_id ) {
+		return sella_home_books_search_ids( $term, 30 );
+	}
+
+	$args = array(
+		'post_type'      => 'product',
+		'post_status'    => 'publish',
+		'fields'         => 'ids',
+		'posts_per_page' => 200,
+		'no_found_rows'  => true,
+		'orderby'        => array(
+			'menu_order' => 'ASC',
+			'title'      => 'ASC',
+		),
+		'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+			array(
+				'taxonomy' => 'product_cat',
+				'field'    => 'term_id',
+				'terms'    => $cat_id,
+			),
+		),
+	);
+
+	if ( '' !== $term ) {
+		$ids = sella_home_books_search_ids( $term, 200 );
+		if ( ! $ids ) {
+			return array();
+		}
+		$args['post__in'] = $ids;
+		$args['orderby']  = 'post__in';
+	}
+
+	return array_map( 'intval', ( new WP_Query( $args ) )->posts );
+}
+
+/**
  * AJAX: search books for the screen.
  */
 function sella_home_books_ajax_search() {
@@ -243,30 +305,33 @@ function sella_home_books_ajax_search() {
 		wp_send_json_error( null, 403 );
 	}
 
-	$term = isset( $_GET['term'] ) ? trim( sanitize_text_field( wp_unslash( $_GET['term'] ) ) ) : '';
-	if ( '' === $term ) {
+	$term   = isset( $_GET['term'] ) ? trim( sanitize_text_field( wp_unslash( $_GET['term'] ) ) ) : '';
+	$cat_id = isset( $_GET['cat'] ) ? absint( $_GET['cat'] ) : 0;
+	if ( '' === $term && ! $cat_id ) {
 		wp_send_json_success( array() );
 	}
 
 	$items = array();
-	foreach ( sella_home_books_search_ids( $term ) as $id ) {
+	foreach ( sella_home_books_find( $term, $cat_id ) as $id ) {
 		$product = wc_get_product( $id );
 		if ( $product ) {
 			$items[] = sella_home_books_item( $product );
 		}
 	}
 
-	// Titles that start with the search come first, then other title matches.
-	$rank = static function ( $item ) use ( $term ) {
-		$pos = mb_stripos( $item['title'], $term );
-		return false === $pos ? 2 : ( 0 === $pos ? 0 : 1 );
-	};
-	usort(
-		$items,
-		static function ( $a, $b ) use ( $rank ) {
-			return $rank( $a ) - $rank( $b );
-		}
-	);
+	if ( '' !== $term ) {
+		// Titles that start with the search come first, then other title matches.
+		$rank = static function ( $item ) use ( $term ) {
+			$pos = mb_stripos( $item['title'], $term );
+			return false === $pos ? 2 : ( 0 === $pos ? 0 : 1 );
+		};
+		usort(
+			$items,
+			static function ( $a, $b ) use ( $rank ) {
+				return $rank( $a ) - $rank( $b );
+			}
+		);
+	}
 
 	wp_send_json_success( $items );
 }
@@ -297,7 +362,7 @@ function sella_home_books_handle_save() {
 	// Autoloaded: the homepage reads it on every uncached view.
 	update_option( SELLA_HOME_BOOKS_OPTION, $lists, true );
 
-	wp_safe_redirect( admin_url( 'edit.php?post_type=product&page=sella-home-books&saved=1' ) );
+	wp_safe_redirect( admin_url( 'admin.php?page=sella-home-books&saved=1' ) );
 	exit;
 }
 add_action( 'admin_init', 'sella_home_books_handle_save' );
@@ -312,7 +377,8 @@ function sella_home_books_render_admin_page() {
 	?>
 	<div class="wrap sella-hb" dir="rtl">
 		<h1>ספרים בדף הבית</h1>
-		<p class="sella-hb__intro">בוחרים אילו ספרים יוצגו בכל אזור בדף הבית ובאיזה סדר. מקלידים בתיבת החיפוש שם ספר, מחבר, מק״ט או מספר מוצר, ובוחרים מהרשימה (אפשר עם החצים ו-Enter). את הסדר משנים בגרירה או בכפתורי החצים.</p>
+		<p class="sella-hb__intro">בוחרים אילו ספרים יוצגו בכל אזור ובאיזה סדר. מקלידים שם ספר, מחבר, מק״ט או מספר מוצר, או בוחרים קטגוריה כדי לראות את כל הספרים שבה. החלון נשאר פתוח, כך שאפשר להוסיף כמה ספרים ברצף. את הסדר משנים בגרירה או בכפתורי החצים.</p>
+		<p class="sella-hb__intro">כדי להציג רשימה באתר, מדביקים את השורטקוד שלה בווידג׳ט השורטקוד של האזור באלמנטור, במקום השורטקוד הקיים. כך העיצוב של האזור נשמר. רשימה ריקה לא מציגה כלום.</p>
 
 		<?php if ( ! empty( $_GET['saved'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification ?>
 			<div class="notice notice-success is-dismissible"><p>הסדר נשמר. דף הבית מתעדכן מיד.</p></div>
@@ -324,21 +390,51 @@ function sella_home_books_render_admin_page() {
 
 			<div class="sella-hb__panels">
 				<?php foreach ( sella_home_books_sections() as $key => $section ) : ?>
+					<?php $shortcode = '[sella_home_books list="' . $key . '"]'; ?>
 					<section class="sella-hb-panel" data-hb-panel="<?php echo esc_attr( $key ); ?>">
 						<header class="sella-hb-panel__head">
 							<h2><?php echo esc_html( $section['title'] ); ?> <span class="sella-hb-panel__count" data-hb-count></span></h2>
 							<p class="description"><?php echo esc_html( $section['description'] ); ?></p>
+							<p class="sella-hb-shortcode">
+								<code><?php echo esc_html( $shortcode ); ?></code>
+								<button type="button" class="button button-small" data-hb-copy="<?php echo esc_attr( $shortcode ); ?>">העתקה</button>
+							</p>
 						</header>
 
 						<div class="sella-hb-search">
-							<label class="screen-reader-text" for="sella-hb-search-<?php echo esc_attr( $key ); ?>">חיפוש ספר להוספה</label>
-							<input type="search" id="sella-hb-search-<?php echo esc_attr( $key ); ?>" class="sella-hb-search__input" data-hb-search placeholder="חיפוש ספר להוספה…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sella-hb-results-<?php echo esc_attr( $key ); ?>" />
-							<span class="spinner" data-hb-spinner></span>
-							<ul class="sella-hb-search__results" id="sella-hb-results-<?php echo esc_attr( $key ); ?>" role="listbox" data-hb-results hidden></ul>
+							<div class="sella-hb-search__row">
+								<label class="screen-reader-text" for="sella-hb-cat-<?php echo esc_attr( $key ); ?>">קטגוריה</label>
+								<?php
+								wp_dropdown_categories(
+									array(
+										'taxonomy'        => 'product_cat',
+										'hierarchical'    => true,
+										'show_count'      => true,
+										'hide_empty'      => true,
+										'show_option_all' => 'כל הקטגוריות',
+										'orderby'         => 'name',
+										'name'            => '',
+										'id'              => 'sella-hb-cat-' . $key,
+										'class'           => 'sella-hb-search__cat',
+									)
+								);
+								?>
+								<label class="screen-reader-text" for="sella-hb-search-<?php echo esc_attr( $key ); ?>">חיפוש ספר להוספה</label>
+								<input type="search" id="sella-hb-search-<?php echo esc_attr( $key ); ?>" class="sella-hb-search__input" data-hb-search placeholder="חיפוש ספר להוספה…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sella-hb-results-<?php echo esc_attr( $key ); ?>" />
+								<span class="spinner" data-hb-spinner></span>
+							</div>
+							<div class="sella-hb-search__popup" data-hb-popup hidden>
+								<div class="sella-hb-search__bar">
+									<span data-hb-found></span>
+									<button type="button" class="button button-small" data-hb-add-all hidden></button>
+									<button type="button" class="sella-hb-btn" data-hb-close title="סגירה" aria-label="סגירת התוצאות"><span class="dashicons dashicons-no-alt"></span></button>
+								</div>
+								<ul class="sella-hb-search__results" id="sella-hb-results-<?php echo esc_attr( $key ); ?>" role="listbox" aria-multiselectable="true" data-hb-results></ul>
+							</div>
 						</div>
 
 						<ol class="sella-hb-list" data-hb-list></ol>
-						<p class="sella-hb-empty" data-hb-empty hidden>הרשימה ריקה, האזור מוצג כמו היום.</p>
+						<p class="sella-hb-empty" data-hb-empty hidden>הרשימה ריקה, השורטקוד לא מציג כלום.</p>
 
 						<p class="sella-hb-panel__foot">
 							<button type="button" class="button-link sella-hb-clear" data-hb-clear>ניקוי הרשימה</button>
