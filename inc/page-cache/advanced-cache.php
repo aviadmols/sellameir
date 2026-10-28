@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SELLA_PC_DROPIN', '1.1.0' );
+define( 'SELLA_PC_DROPIN', '1.2.0' );
 
 if ( ! defined( 'SELLA_PC_DIR' ) ) {
 	define( 'SELLA_PC_DIR', WP_CONTENT_DIR . '/cache/sella-page-cache' );
@@ -89,6 +89,49 @@ function sella_pc_request_file() {
 }
 
 /**
+ * The security headers (sella-security.php sends the same ones on the pages
+ * WordPress builds, by calling this).
+ */
+function sella_pc_security_headers() {
+	header( 'X-Content-Type-Options: nosniff' );
+	header( 'X-Frame-Options: SAMEORIGIN' );
+	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+	header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), usb=()' );
+	$https = ( ! empty( $_SERVER['HTTPS'] ) && 'off' !== strtolower( $_SERVER['HTTPS'] ) )
+		|| ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && 'https' === strtolower( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) );
+	if ( $https ) {
+		header( 'Strict-Transport-Security: max-age=31536000' );
+	}
+	header_remove( 'X-Powered-By' );
+}
+
+/**
+ * Whether the request is an attack or a scan, turned away before WordPress
+ * connects to the database: files nobody should ask for (.env, .git,
+ * backups, database tools), and addresses carrying SQL injection, path
+ * traversal, script injection or code execution. The patterns are narrow,
+ * so a real visitor (a search in Hebrew, an ad click) is never caught.
+ *
+ * @param string $path Request path, decoded.
+ * @return bool
+ */
+function sella_pc_attack( $path ) {
+	if ( preg_match( '#/(\.(env|git|svn|hg|aws|ssh|htpasswd|htaccess|DS_Store|idea|vscode)(/|$)|wp-config\.php.|(php|my|pma)?myadmin|adminer|phpinfo\.php|vendor/phpunit|cgi-bin/)#i', $path ) ) {
+		return true;
+	}
+	if ( preg_match( '#\.(sql|sql\.gz|bak|old|orig|swp|save|tar|tgz|7z)$#i', $path ) ) {
+		return true;
+	}
+
+	$query = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
+	$all   = $path . '?' . rawurldecode( rawurldecode( $query ) );
+	return (bool) preg_match(
+		'#(\.\./|\.\.\\\\|/etc/passwd|/proc/self/|php://(input|filter)|phar://|expect://|<\s*script|javascript:\s*\S|\$\{jndi:|\bunion\b[\s+/*]+(all[\s+/*]+)?select\b|\bselect\b.{1,60}\bfrom\b.{1,60}\b(information_schema|wp_users|mysql\.user)\b|\b(sleep|benchmark|load_file)\s*\(|\binto\s+(out|dump)file\b|\b(base64_decode|eval|assert|shell_exec|passthru|proc_open|popen)\s*\()#i',
+		$all
+	);
+}
+
+/**
  * What to answer a request left over from the old Shopify store, or 0.
  *
  * Pages and tabs opened while the domain was Shopify's keep sending its
@@ -126,10 +169,29 @@ function sella_pc_redirect_file( $path ) {
 	return '' === $host ? null : SELLA_PC_DIR . '/' . $host . '/redirects/' . md5( $path ) . '.txt';
 }
 
+// Behind Cloudflare, PHP sees plain http, and WordPress builds http:// links
+// (fonts, uploads, og:url) that browsers block on the https site. The proxy
+// says which scheme the visitor used; WordPress is told before it loads.
+if ( empty( $_SERVER['HTTPS'] ) || 'off' === strtolower( $_SERVER['HTTPS'] ) ) {
+	$sella_pc_visitor = isset( $_SERVER['HTTP_CF_VISITOR'] ) ? (string) $_SERVER['HTTP_CF_VISITOR'] : '';
+	if ( ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && 'https' === strtolower( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) || false !== strpos( $sella_pc_visitor, '"https"' ) ) {
+		$_SERVER['HTTPS']       = 'on';
+		$_SERVER['SERVER_PORT'] = 443;
+	}
+	unset( $sella_pc_visitor );
+}
+
 $sella_pc_method = isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '';
 $sella_pc_path   = rawurldecode( (string) parse_url( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '', PHP_URL_PATH ) );
 
 if ( 'cli' !== PHP_SAPI ) {
+	if ( sella_pc_attack( $sella_pc_path ) ) {
+		http_response_code( 403 );
+		header( 'X-Sella-Cache: BLOCKED' );
+		header( 'Cache-Control: no-store' );
+		exit;
+	}
+
 	$sella_pc_status = sella_pc_shopify_leftover( $sella_pc_path );
 	if ( $sella_pc_status ) {
 		http_response_code( $sella_pc_status );
@@ -170,6 +232,7 @@ if ( $sella_pc_file ) {
 	if ( is_file( $sella_pc_file ) && filemtime( $sella_pc_file ) > time() - SELLA_PC_TTL ) {
 		header( 'Content-Type: text/html; charset=UTF-8' );
 		header( 'X-Sella-Cache: HIT' );
+		sella_pc_security_headers();
 		if ( 'HEAD' !== $_SERVER['REQUEST_METHOD'] ) {
 			readfile( $sella_pc_file );
 		}
