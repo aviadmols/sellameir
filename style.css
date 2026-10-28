@@ -2308,3 +2308,68 @@ body.sella-shop-sortable #sibolet-archive-grid:not(.sella-sorted) {
   align-items: center;
   justify-content: center;
 }
+
+/* Terms and privacy (inc/sella-legal-pages.php): the text on a white card. */
+.sella-legal {
+  max-width: 860px;
+  margin: 48px auto 64px;
+  padding: 40px 44px 44px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+  color: #222;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.sella-legal h1 {
+  margin: 0 0 24px;
+  color: #1a1a1a;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.sella-legal h2 {
+  margin: 32px 0 12px;
+  color: #1a1a1a;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sella-legal p,
+.sella-legal ol {
+  margin: 0 0 12px;
+}
+
+.sella-legal ol {
+  padding-inline-start: 1.5em;
+}
+
+.sella-legal li + li {
+  margin-top: 4px;
+}
+
+.sella-legal a {
+  color: #746fed;
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .sella-legal {
+    margin: 24px 16px 40px;
+    padding: 28px 20px 30px;
+    border-radius: 16px;
+    font-size: 16px;
+  }
+
+  .sella-legal h1 {
+    font-size: 26px;
+  }
+
+  .sella-legal h2 {
+    margin-top: 26px;
+    font-size: 20px;
+  }
+}
