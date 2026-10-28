@@ -1810,6 +1810,51 @@ body.search.post-type-archive-product #sibolet-archive-grid:not(.sella-search-fi
   }
 }
 
+/* Shop sorting (assets/js/sella-shop-sort.js): the archive prints the books
+   א–ת and the script orders them newest first, so the grid waits for it rather
+   than jumping. Should the script not run, the grid shows after a moment. */
+body.sella-shop-sortable #sibolet-archive-grid:not(.sella-sorted) {
+  visibility: hidden;
+  animation: sella-search-reveal 0s 2.5s forwards;
+}
+
+.sella-shop-sort {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  font-family: 'polin', sans-serif;
+}
+
+.sella-shop-sort label {
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sella-shop-sort select {
+  min-width: 150px;
+  margin: 0;
+  padding: 8px 18px 8px 38px;
+  border: 1px solid #746fed;
+  border-radius: 50px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23746fed' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat left 16px center;
+  color: #746fed;
+  font-family: 'polin', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.sella-shop-sort select:focus-visible {
+  outline: 2px solid rgba(116, 111, 237, 0.35);
+  outline-offset: 2px;
+}
+
 #sibolet-archive-grid .sella-search-empty {
   grid-column: 1 / -1;
   margin: 24px 0;
