@@ -90,6 +90,7 @@ function sella_si_job( $job ) {
 			'cursor'   => null,
 			'done'     => false,
 			'imported' => 0,
+			'updated'  => 0,
 			'skipped'  => 0,
 			'failed'   => 0,
 			'total'    => 0,
@@ -192,11 +193,17 @@ function sella_si_token() {
 /**
  * Run a GraphQL query. Waits and retries when Shopify throttles.
  *
- * @param string $query     Query.
- * @param array  $variables Variables.
+ * Shopify answers a query it can partly fulfil with the data and an error
+ * per field it withheld (customer details, without protected customer data
+ * access, come back null); those messages go to $partial.
+ *
+ * @param string     $query     Query.
+ * @param array      $variables Variables.
+ * @param array|null $partial   Set to the errors that came with the data.
  * @return array|WP_Error The data object.
  */
-function sella_si_graphql( $query, $variables = array() ) {
+function sella_si_graphql( $query, $variables = array(), &$partial = null ) {
+	$partial = array();
 	$token = sella_si_token();
 	if ( is_wp_error( $token ) ) {
 		return $token;
@@ -243,16 +250,17 @@ function sella_si_graphql( $query, $variables = array() ) {
 			continue;
 		}
 
-		if ( ! empty( $body['errors'] ) && empty( $body['data'] ) ) {
-			$messages = array();
-			foreach ( (array) $body['errors'] as $error ) {
-				$messages[] = is_array( $error ) && isset( $error['message'] ) ? $error['message'] : (string) $error;
-			}
+		$messages = array();
+		foreach ( isset( $body['errors'] ) ? (array) $body['errors'] : array() as $error ) {
+			$messages[] = is_array( $error ) && isset( $error['message'] ) ? $error['message'] : (string) $error;
+		}
+		if ( $messages && empty( $body['data'] ) ) {
 			return new WP_Error( 'sella_si_graphql', implode( ' / ', $messages ) );
 		}
 		if ( ! isset( $body['data'] ) ) {
 			return new WP_Error( 'sella_si_http', 'תשובה לא צפויה משופיפיי (HTTP ' . $code . ').' );
 		}
+		$partial = array_values( array_unique( $messages ) );
 		return $body['data'];
 	}
 
@@ -962,8 +970,8 @@ function sella_si_step_articles_site( &$job ) {
  * orders with up to 50 lines each stay well under it.
  */
 define( 'SELLA_SI_ORDERS_PER_PAGE', 10 );
-define( 'SELLA_SI_ORDER_PAGES_PER_STEP', 3 );
-define( 'SELLA_SI_CSV_ORDERS_PER_STEP', 40 );
+define( 'SELLA_SI_ORDER_PAGES_PER_STEP', 1 );
+define( 'SELLA_SI_CSV_ORDERS_PER_STEP', 15 );
 
 /**
  * Amount from a Shopify MoneyBag.
@@ -1251,6 +1259,82 @@ function sella_si_existing_order( $name ) {
 }
 
 /**
+ * Whether an order has who and where: a name, an email or an address.
+ *
+ * @param array  $billing  Billing fields.
+ * @param array  $shipping Shipping fields.
+ * @param string $email    Email.
+ * @return bool
+ */
+function sella_si_has_customer( $billing, $shipping, $email ) {
+	foreach ( array( $billing, $shipping ) as $a ) {
+		if ( '' !== $a['first_name'] || '' !== $a['last_name'] || '' !== $a['address_1'] ) {
+			return true;
+		}
+	}
+	return '' !== $email;
+}
+
+/**
+ * The customer's details on a WooCommerce order: billing, shipping, email,
+ * and the account with that email.
+ *
+ * @param WC_Order $order Order.
+ * @param array    $o     Shopify order, in the common shape.
+ */
+function sella_si_set_customer( $order, $o ) {
+	$billing = $o['billing'];
+	if ( '' === $billing['phone'] ) {
+		$billing['phone'] = $o['phone'];
+	}
+	$billing['email'] = $o['email'];
+	foreach ( $billing as $key => $value ) {
+		$order->{'set_billing_' . $key}( $value );
+	}
+	foreach ( $o['shipping_addr'] as $key => $value ) {
+		$order->{'set_shipping_' . $key}( $value );
+	}
+
+	if ( '' !== $o['email'] ) {
+		$user = get_user_by( 'email', $o['email'] );
+		if ( $user ) {
+			$order->set_customer_id( $user->ID );
+		}
+	}
+}
+
+/**
+ * An order imported before without its customer (the API withheld the
+ * details) gets them now, when this run has them.
+ *
+ * @param int   $order_id WooCommerce order.
+ * @param array $o        Shopify order.
+ * @return bool Whether the details were added.
+ */
+function sella_si_fill_customer( $order_id, $o ) {
+	if ( ! sella_si_has_customer( $o['billing'], $o['shipping_addr'], $o['email'] ) ) {
+		return false;
+	}
+	$order = wc_get_order( $order_id );
+	if ( ! $order ) {
+		return false;
+	}
+	$fields = function ( $type ) use ( $order ) {
+		return array(
+			'first_name' => $order->{'get_' . $type . '_first_name'}(),
+			'last_name'  => $order->{'get_' . $type . '_last_name'}(),
+			'address_1'  => $order->{'get_' . $type . '_address_1'}(),
+		);
+	};
+	if ( sella_si_has_customer( $fields( 'billing' ), $fields( 'shipping' ), $order->get_billing_email() ) ) {
+		return false;
+	}
+	sella_si_set_customer( $order, $o );
+	$order->save();
+	return true;
+}
+
+/**
  * Create one WooCommerce order from the common shape.
  *
  * @param array $o   Order.
@@ -1261,9 +1345,15 @@ function sella_si_import_order( $o, &$job ) {
 		++$job['skipped'];
 		return;
 	}
-	if ( sella_si_existing_order( $o['name'] ) ) {
-		++$job['skipped'];
-		sella_si_log( $job, 'skip', $o['name'] . ' כבר יובאה.' );
+	$existing = sella_si_existing_order( $o['name'] );
+	if ( $existing ) {
+		if ( sella_si_fill_customer( $existing, $o ) ) {
+			++$job['updated'];
+			sella_si_log( $job, 'ok', $o['name'] . ' כבר יובאה, ועכשיו נוספו לה פרטי הלקוח.' );
+		} else {
+			++$job['skipped'];
+			sella_si_log( $job, 'skip', $o['name'] . ' כבר יובאה.' );
+		}
 		return;
 	}
 
@@ -1288,25 +1378,7 @@ function sella_si_import_order( $o, &$job ) {
 		}
 		$order->set_payment_method_title( $o['payment'] );
 		$order->set_customer_note( $o['note'] );
-
-		$billing = $o['billing'];
-		if ( '' === $billing['phone'] ) {
-			$billing['phone'] = $o['phone'];
-		}
-		$billing['email'] = $o['email'];
-		foreach ( $billing as $key => $value ) {
-			$order->{'set_billing_' . $key}( $value );
-		}
-		foreach ( $o['shipping_addr'] as $key => $value ) {
-			$order->{'set_shipping_' . $key}( $value );
-		}
-
-		if ( '' !== $o['email'] ) {
-			$user = get_user_by( 'email', $o['email'] );
-			if ( $user ) {
-				$order->set_customer_id( $user->ID );
-			}
-		}
+		sella_si_set_customer( $order, $o );
 
 		$unmatched = array();
 		foreach ( $o['items'] as $line ) {
@@ -1414,7 +1486,8 @@ function sella_si_step_orders( &$job ) {
 			array(
 				'after' => $job['cursor'],
 				'first' => SELLA_SI_ORDERS_PER_PAGE,
-			)
+			),
+			$partial
 		);
 		if ( is_wp_error( $data ) ) {
 			return $data;
@@ -1423,8 +1496,25 @@ function sella_si_step_orders( &$job ) {
 			return new WP_Error( 'sella_si_orders', 'שופיפיי לא החזיר הזמנות. כנראה לאפליקציה חסרה ההרשאה read_orders או הגישה לנתוני לקוחות.' );
 		}
 
-		foreach ( array_filter( $data['orders']['nodes'] ) as $node ) {
-			sella_si_import_order( sella_si_order_from_api( $node ), $job );
+		// Orders without their customers are not imported: the run stops
+		// here, at this page, and goes on from it once the access is granted.
+		$orders   = array_map( 'sella_si_order_from_api', array_filter( $data['orders']['nodes'] ) );
+		$withheld = $orders && ! array_filter(
+			$orders,
+			function ( $o ) {
+				return sella_si_has_customer( $o['billing'], $o['shipping_addr'], $o['email'] );
+			}
+		);
+		if ( $partial || $withheld ) {
+			return new WP_Error(
+				'sella_si_customer_data',
+				'שופיפיי לא מסר את פרטי הלקוחות (שם, כתובת, אימייל, טלפון), ולכן הייבוא נעצר לפני שיובאו הזמנות בלעדיהם. צריך לאשר לאפליקציה ב-Dev Dashboard את Protected customer data עם השדות Name, Email, Phone ו-Address, ואז ללחוץ "המשך ייבוא". אפשר גם לייבא מקובץ ה-CSV למטה, שבו הפרטים קיימים תמיד.'
+				. ( $partial ? ' שופיפיי: ' . implode( ' / ', array_slice( $partial, 0, 2 ) ) : '' )
+			);
+		}
+
+		foreach ( $orders as $o ) {
+			sella_si_import_order( $o, $job );
 		}
 
 		$info          = $data['orders']['pageInfo'];
@@ -1535,6 +1625,39 @@ function sella_si_quiet() {
 }
 
 /**
+ * Seconds after which a step's lock counts as left behind (a step that died
+ * without releasing it). Longer than a step may run.
+ */
+define( 'SELLA_SI_LOCK_TTL', 330 );
+
+/**
+ * Take a job's lock, so one step runs at a time. A step the browser gave up
+ * on may still be running on the server; a second one beside it doubles the
+ * load on the database, and both would import the same orders.
+ *
+ * add_option() fails when the row exists, so two requests cannot both get it.
+ *
+ * @param string $name Job.
+ * @return bool
+ */
+function sella_si_lock( $name ) {
+	$key = 'sella_si_lock_' . $name;
+	if ( ! add_option( $key, time(), '', false ) ) {
+		if ( (int) get_option( $key ) > time() - SELLA_SI_LOCK_TTL ) {
+			return false;
+		}
+		update_option( $key, time(), false );
+	}
+	add_action(
+		'shutdown',
+		function () use ( $key ) {
+			delete_option( $key );
+		}
+	);
+	return true;
+}
+
+/**
  * AJAX: run one step of a job and report progress.
  */
 function sella_si_ajax_step() {
@@ -1548,6 +1671,11 @@ function sella_si_ajax_step() {
 		wp_send_json_error( array( 'message' => 'משימה לא מוכרת.' ) );
 	}
 
+	if ( ! sella_si_lock( $name ) ) {
+		// The previous step is still running: ask again in a little while.
+		wp_send_json_success( array_merge( sella_si_progress( sella_si_job( $name ), PHP_INT_MAX ), array( 'wait' => 20, 'busy' => true ) ) );
+	}
+
 	$job = sella_si_job( $name );
 	if ( ! empty( $_POST['restart'] ) ) {
 		$job = array_merge(
@@ -1556,6 +1684,7 @@ function sella_si_ajax_step() {
 				'cursor'   => null,
 				'done'     => false,
 				'imported' => 0,
+				'updated'  => 0,
 				'skipped'  => 0,
 				'failed'   => 0,
 				'log'      => array(),
@@ -1593,6 +1722,7 @@ function sella_si_progress( $job, $seen = 0 ) {
 	return array(
 		'done'     => (bool) $job['done'],
 		'imported' => (int) $job['imported'],
+		'updated'  => (int) $job['updated'],
 		'skipped'  => (int) $job['skipped'],
 		'failed'   => (int) $job['failed'],
 		'total'    => (int) $job['total'],
@@ -1647,6 +1777,7 @@ function sella_si_admin_assets( $hook ) {
 				'error'    => 'הייבוא נעצר בגלל שגיאה. אפשר לתקן ולהמשיך.',
 				'retrying' => 'אין תשובה מהשרת, מנסה שוב…',
 				'waiting'  => 'שופיפיי ביקש להאט. ממשיך לבד בעוד דקה…',
+				'busy'     => 'הצעד הקודם עוד רץ בשרת. ממתין לו וממשיך…',
 			),
 		)
 	);
@@ -1727,6 +1858,7 @@ function sella_si_handle_post() {
 				'cursor'   => null,
 				'done'     => false,
 				'imported' => 0,
+				'updated'  => 0,
 				'skipped'  => 0,
 				'failed'   => 0,
 				'log'      => array(),
@@ -1756,6 +1888,9 @@ function sella_si_render_job( $name, $start, $ready ) {
 	<div class="sella-si-job" data-si-job="<?php echo esc_attr( $name ); ?>">
 		<div class="sella-si-counts">
 			<span><b data-si-count="imported"><?php echo esc_html( number_format_i18n( $job['imported'] ) ); ?></b> יובאו</span>
+			<?php if ( in_array( $name, array( 'orders', 'orders_csv' ), true ) ) : ?>
+				<span><b data-si-count="updated"><?php echo esc_html( number_format_i18n( $job['updated'] ) ); ?></b> קיבלו פרטי לקוח</span>
+			<?php endif; ?>
 			<span><b data-si-count="skipped"><?php echo esc_html( number_format_i18n( $job['skipped'] ) ); ?></b> דולגו</span>
 			<span><b data-si-count="failed"><?php echo esc_html( number_format_i18n( $job['failed'] ) ); ?></b> נכשלו</span>
 			<span class="sella-si-status" data-si-status><?php echo $job['done'] ? 'הייבוא הסתיים.' : ( $has ? 'נעצר באמצע. אפשר להמשיך.' : '' ); ?></span>

@@ -9,6 +9,8 @@
   var cfg = window.sellaSiAdmin || {};
   var text = cfg.text || {};
   var MAX_RETRIES = 3;
+  /* A breath between steps, so the import never keeps the database busy non-stop. */
+  var PAUSE = 1500;
 
   function initJob(el) {
     var $job = $(el);
@@ -30,7 +32,7 @@
     }
 
     function show(data) {
-      ['imported', 'skipped', 'failed'].forEach(function (key) {
+      ['imported', 'updated', 'skipped', 'failed'].forEach(function (key) {
         $job.find('[data-si-count="' + key + '"]').text((data[key] || 0).toLocaleString('he-IL'));
       });
       (data.log || []).forEach(function (line) {
@@ -67,8 +69,9 @@
             return;
           }
           if (data.wait) {
-            // The old store asked to slow down: the same step runs again after the pause.
-            $status.text(text.waiting);
+            // The old store asked to slow down, or the previous step is still
+            // running on the server: the same step runs again after the pause.
+            $status.text(data.busy ? text.busy : text.waiting);
             setTimeout(function () {
               if (stopping) {
                 setRunning(false);
@@ -80,16 +83,17 @@
             }, data.wait * 1000);
             return;
           }
-          $status.text(data.total ? text.running + ' ' + (data.imported + data.skipped + data.failed) + ' / ' + data.total : text.running);
-          step(false);
+          $status.text(data.total ? text.running + ' ' + (data.imported + data.updated + data.skipped + data.failed) + ' / ' + data.total : text.running);
+          setTimeout(function () { step(false); }, PAUSE);
         })
         .fail(function () {
           // A step that ran past the server's time limit: the work it did is
-          // saved, so asking again continues from there.
+          // saved, so asking again continues from there. The wait is long, so
+          // a server that is struggling gets the time to recover.
           if (retries < MAX_RETRIES && !stopping) {
             retries++;
             $status.text(text.retrying);
-            setTimeout(function () { step(false); }, 4000 * retries);
+            setTimeout(function () { step(false); }, 15000 * retries);
             return;
           }
           retries = 0;
