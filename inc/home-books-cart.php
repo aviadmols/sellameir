@@ -9,6 +9,9 @@
  * plus a .book-add-to-cart-btn button. The button is handled site-wide by the
  * delegated AJAX click handler in the "סל קניות" snippet.
  *
+ * The books and their order come from the "ספרים בדף הבית" screen
+ * (sella-home-books.php); with an empty list the slider shows 12 random books.
+ *
  * @package HelloElementorChild
  */
 
@@ -17,55 +20,59 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Render the homepage books slider with add-to-cart buttons.
+ * Author of a book: the "מחבר" field, or the older _author meta.
  *
+ * @param int $product_id Product ID.
+ * @return string Empty when the book has no author.
+ */
+function sella_home_book_author( $product_id ) {
+	$author_name = get_post_meta( $product_id, 'מחבר', true );
+	if ( ! $author_name ) {
+		$author_name = get_post_meta( $product_id, '_author', true );
+	}
+	return (string) $author_name;
+}
+
+/**
+ * One homepage book card.
+ *
+ * @param WC_Product $product    Product.
+ * @param string     $card_class Classes on the card.
+ * @param bool       $lazy       Lazy-load the cover.
+ * @param bool       $focusable  False for the hidden copy in the marquee, so
+ *                               keyboard users do not tab through every book twice.
  * @return string
  */
-function sella_random_books_shortcode() {
-	$args = array(
-		'post_type'      => 'product',
-		'posts_per_page' => 12,
-		'orderby'        => 'rand',
-	);
-	$loop = new WP_Query( $args );
+function sella_home_book_card_html( $product, $card_class = 'book-card-item static-book-card', $lazy = true, $focusable = true ) {
+	$product_id    = $product->get_id();
+	$product_title = get_the_title( $product_id );
+	$author_name   = sella_home_book_author( $product_id );
+	if ( ! $author_name ) {
+		$author_name = 'מחבר לא ידוע';
+	}
 
-	$products_html = '';
-	if ( $loop->have_posts() ) {
-		while ( $loop->have_posts() ) {
-			$loop->the_post();
-			global $product;
+	$product_price   = $product->get_price_html();
+	// The back of the book (--bg-img) is barely seen; 'medium' is plenty for it.
+	$product_image   = get_the_post_thumbnail_url( $product_id, 'medium' );
+	// The front shows up to 265px wide on desktop and 110px on mobile, so the
+	// browser picks from every size of the cover: 'medium' alone (about 200px
+	// wide) was stretched on desktop and looked pixelated.
+	$thumb_id        = (int) get_post_thumbnail_id( $product_id );
+	$cover_srcset    = $thumb_id ? wp_get_attachment_image_srcset( $thumb_id, 'medium' ) : '';
+	$product_url     = $product->get_permalink();
+	$add_to_cart_url = $product->add_to_cart_url();
+	$tabindex        = $focusable ? '' : ' tabindex="-1"';
 
-			$author_name = get_post_meta( get_the_ID(), 'מחבר', true );
-			if ( ! $author_name ) {
-				$author_name = get_post_meta( get_the_ID(), '_author', true );
-			}
-			if ( ! $author_name ) {
-				$author_name = 'מחבר לא ידוע';
-			}
+	$bg_img_style = $product_image
+		? ' style="--bg-img:url(\'' . esc_url( $product_image ) . '\')"'
+		: '';
 
-			$product_id      = $product->get_id();
-			$product_title   = get_the_title();
-			$product_price   = $product->get_price_html();
-			// The back of the book (--bg-img) is barely seen; 'medium' is plenty for it.
-			$product_image   = get_the_post_thumbnail_url( get_the_ID(), 'medium' );
-			// The front shows up to 265px wide on desktop and 110px on mobile, so the
-			// browser picks from every size of the cover: 'medium' alone (about 200px
-			// wide) was stretched on desktop and looked pixelated.
-			$thumb_id        = (int) get_post_thumbnail_id();
-			$cover_srcset    = $thumb_id ? wp_get_attachment_image_srcset( $thumb_id, 'medium' ) : '';
-			$product_url     = get_permalink();
-			$add_to_cart_url = $product->add_to_cart_url();
-
-			$bg_img_style = $product_image
-				? ' style="--bg-img:url(\'' . esc_url( $product_image ) . '\')"'
-				: '';
-
-			$products_html .= '
-			<div class="book-card-item static-book-card">
-				<a href="' . esc_url( $product_url ) . '" class="book-link-wrapper">
+	return '
+			<div class="' . esc_attr( $card_class ) . '">
+				<a href="' . esc_url( $product_url ) . '" class="book-link-wrapper"' . $tabindex . '>
 					<div class="book-3d-container">
 						<div class="book-3d"' . $bg_img_style . '>
-							<img src="' . esc_url( $product_image ) . '"' . ( $cover_srcset ? ' srcset="' . esc_attr( $cover_srcset ) . '" sizes="(max-width: 767px) 120px, 270px"' : '' ) . ' alt="' . esc_attr( $product_title ) . '" class="book-cover-img" loading="lazy" decoding="async">
+							<img src="' . esc_url( $product_image ) . '"' . ( $cover_srcset ? ' srcset="' . esc_attr( $cover_srcset ) . '" sizes="(max-width: 767px) 120px, 270px"' : '' ) . ' alt="' . esc_attr( $product_title ) . '" class="book-cover-img"' . ( $lazy ? ' loading="lazy"' : '' ) . ' decoding="async">
 						</div>
 					</div>
 					<h3 class="book-title">' . esc_html( $product_title ) . '</h3>
@@ -73,13 +80,46 @@ function sella_random_books_shortcode() {
 					<div class="book-price">' . $product_price . '</div>
 				</a>
 				<div class="book-action-area">
-					<a href="' . esc_url( $add_to_cart_url ) . '" class="book-add-to-cart-btn" data-product_id="' . absint( $product_id ) . '">הוספה לסל</a>
+					<a href="' . esc_url( $add_to_cart_url ) . '" class="book-add-to-cart-btn" data-product_id="' . absint( $product_id ) . '"' . $tabindex . '>הוספה לסל</a>
 				</div>
 			</div>';
-		}
-		wp_reset_postdata();
+}
+
+/**
+ * Render the homepage books slider with add-to-cart buttons.
+ *
+ * @return string
+ */
+function sella_random_books_shortcode() {
+	$chosen = function_exists( 'sella_home_books_products' ) ? sella_home_books_products( 'bestsellers' ) : array();
+
+	$products = array();
+	if ( $chosen ) {
+		$products = $chosen;
 	} else {
+		$loop = new WP_Query(
+			array(
+				'post_type'      => 'product',
+				'posts_per_page' => 12,
+				'orderby'        => 'rand',
+				'fields'         => 'ids',
+			)
+		);
+		foreach ( $loop->posts as $product_id ) {
+			$product = wc_get_product( $product_id );
+			if ( $product ) {
+				$products[] = $product;
+			}
+		}
+	}
+
+	if ( ! $products ) {
 		return '';
+	}
+
+	$products_html = '';
+	foreach ( $products as $product ) {
+		$products_html .= sella_home_book_card_html( $product );
 	}
 
 	return '
