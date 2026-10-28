@@ -157,31 +157,48 @@ function sella_legal_content( $page, $privacy_url ) {
 }
 
 /**
- * Make the pages, once.
+ * Make the pages, once each.
+ *
+ * The option keeps each page's ID: the page made here (or taken over), or 0
+ * for an address already used by someone else's published page, which is
+ * left alone. A page is made until it has an entry, so a later run makes
+ * the one an earlier run could not.
+ *
+ * An unpublished page on the address (WordPress's own draft privacy page,
+ * which every install has at /privacy-policy/) becomes this one: its text is
+ * replaced and it is published.
  */
 function sella_legal_first_run() {
-	if ( false !== get_option( SELLA_LEGAL_OPTION ) || ! current_user_can( 'publish_pages' ) || wp_doing_ajax() ) {
+	$ids = get_option( SELLA_LEGAL_OPTION );
+	$ids = is_array( $ids ) ? $ids : array();
+	if ( isset( $ids['privacy'], $ids['terms'] ) || ! current_user_can( 'publish_pages' ) || wp_doing_ajax() ) {
 		return;
 	}
 
-	// Only the pages made here get the card's title handling.
-	$ids         = array();
 	$privacy_url = home_url( '/privacy-policy/' );
 	foreach ( sella_legal_pages() as $key => $page ) {
-		$existing = get_page_by_path( $page['slug'] );
-		if ( $existing ) {
-			$id = (int) $existing->ID;
+		if ( isset( $ids[ $key ] ) ) {
+			if ( 'privacy' === $key && $ids[ $key ] ) {
+				$privacy_url = get_permalink( $ids[ $key ] );
+			}
+			continue;
+		}
+
+		$post     = array(
+			'post_type'    => 'page',
+			'post_status'  => 'publish',
+			'post_title'   => $page['title'],
+			'post_name'    => $page['slug'],
+			'post_content' => sella_legal_content( $page, $privacy_url ),
+		);
+		$existing = get_page_by_path( $page['slug'], OBJECT, 'page' );
+		if ( $existing && 'publish' === $existing->post_status ) {
+			$ids[ $key ] = 0; // Someone else's page: not ours to change.
+			$id          = (int) $existing->ID;
 		} else {
-			$id = wp_insert_post(
-				array(
-					'post_type'    => 'page',
-					'post_status'  => 'publish',
-					'post_title'   => $page['title'],
-					'post_name'    => $page['slug'],
-					'post_content' => sella_legal_content( $page, $privacy_url ),
-				),
-				true
-			);
+			$id = $existing
+				? wp_update_post( array( 'ID' => (int) $existing->ID ) + $post, true )
+				: wp_insert_post( $post, true );
 			if ( is_wp_error( $id ) ) {
 				continue;
 			}
@@ -203,7 +220,8 @@ add_action( 'admin_init', 'sella_legal_first_run' );
  */
 function sella_legal_is_page() {
 	$ids = get_option( SELLA_LEGAL_OPTION );
-	return is_array( $ids ) && $ids && is_page( array_values( $ids ) );
+	$ids = is_array( $ids ) ? array_filter( array_map( 'intval', $ids ) ) : array();
+	return $ids && is_page( array_values( $ids ) );
 }
 
 /**

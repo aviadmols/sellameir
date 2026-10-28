@@ -200,6 +200,27 @@ function sella_lr_target( $path ) {
 }
 
 /**
+ * A target that is not a public page here (a book not published, a category
+ * removed, emptied of its slug or hidden) goes to the shop instead of a 404.
+ * Checked on each redirect, so a book taken down later is covered too.
+ *
+ * @param string $target Decoded path on this site.
+ * @return string
+ */
+function sella_lr_live_target( $target ) {
+	if ( preg_match( '#^/product/([^/]+)/?$#', $target, $m ) ) {
+		$post = get_page_by_path( $m[1], OBJECT, 'product' );
+		return $post && 'publish' === $post->post_status ? $target : '/shop/';
+	}
+	if ( preg_match( '#^/product-category/(?:[^/]+/)*([^/]+)/?$#', $target, $m ) ) {
+		$term   = get_term_by( 'slug', sanitize_title( $m[1] ), 'product_cat' );
+		$hidden = $term && function_exists( 'sella_hc_ids' ) && in_array( (int) $term->term_id, sella_hc_ids(), true );
+		return $term && ! $hidden ? $target : '/shop/';
+	}
+	return $target;
+}
+
+/**
  * Encode a path the way WordPress writes its own permalinks (lower-case %xx),
  * so the redirect lands on the canonical URL and WordPress does not redirect
  * it a second time.
@@ -267,6 +288,9 @@ function sella_lr_redirect() {
 	$target = sella_lr_target( $path );
 	if ( '' === $target ) {
 		return;
+	}
+	if ( 0 !== strpos( $target, 'http' ) ) {
+		$target = sella_lr_live_target( $target );
 	}
 
 	$url = 0 === strpos( $target, 'http' ) ? $target : home_url( sella_lr_encode_path( $target ) );
