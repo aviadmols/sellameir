@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.46' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.47' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';

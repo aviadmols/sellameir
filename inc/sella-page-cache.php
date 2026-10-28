@@ -184,6 +184,30 @@ function sella_pc_store( $html ) {
 }
 
 /**
+ * Keep the redirect of an old Shopify URL for the drop-in, which then sends
+ * it without loading WordPress. Cleared with the rest of the cache, so a
+ * product or post published later under the old handle is found again.
+ *
+ * @param string $url Where the old URL goes, without campaign parameters.
+ */
+function sella_pc_store_redirect( $url ) {
+	if ( ! defined( 'SELLA_PC_REDIRECT_FILE' ) || '' === $url || preg_match( '/[\r\n]/', $url ) ) {
+		return;
+	}
+	$file = SELLA_PC_REDIRECT_FILE;
+	if ( ! is_dir( dirname( $file ) ) && ! wp_mkdir_p( dirname( $file ) ) ) {
+		return;
+	}
+	$tmp = $file . '.' . uniqid( '', true ) . '.tmp';
+	if ( false !== file_put_contents( $tmp, $url ) ) {
+		@rename( $tmp, $file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+	}
+	if ( is_file( $tmp ) ) {
+		@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+	}
+}
+
+/**
  * Last checks on the finished response, after every plugin had its say.
  *
  * @param string $html Page HTML.

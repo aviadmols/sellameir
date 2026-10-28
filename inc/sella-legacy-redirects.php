@@ -271,6 +271,11 @@ function sella_lr_redirect() {
 
 	$url = 0 === strpos( $target, 'http' ) ? $target : home_url( sella_lr_encode_path( $target ) );
 
+	// The next request for this path is redirected by the page cache drop-in.
+	if ( function_exists( 'sella_pc_store_redirect' ) ) {
+		sella_pc_store_redirect( $url );
+	}
+
 	$keep = array();
 	foreach ( $_GET as $key => $value ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( 0 === strpos( (string) $key, 'utm_' ) && is_string( $value ) ) {
