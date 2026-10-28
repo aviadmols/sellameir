@@ -83,7 +83,7 @@
             }, data.wait * 1000);
             return;
           }
-          $status.text(data.total ? text.running + ' ' + (data.imported + data.updated + data.skipped + data.failed) + ' / ' + data.total : text.running);
+          $status.text(data.note || (data.total ? text.running + ' ' + (data.imported + data.updated + data.skipped + data.failed) + ' / ' + data.total : text.running));
           setTimeout(function () { step(false); }, PAUSE);
         })
         .fail(function () {
@@ -127,7 +127,88 @@
     });
   }
 
+  /**
+   * The orders CSV goes up in parts (cfg.chunk bytes each), so a file with
+   * any number of orders gets past the server's upload limit. A part whose
+   * answer was lost is not sent again blindly: the server says how much of
+   * the file it holds, and the upload goes on from there.
+   */
+  function initUpload(form) {
+    var $form = $(form);
+    var input = form.querySelector('input[type="file"]');
+    var $button = $form.find('button[type="submit"]');
+    var $status = $('<p class="sella-si-upload-status" role="status"></p>').insertAfter($form);
+
+    if (!input || !window.FormData || !window.Blob || !window.Blob.prototype.slice || !cfg.chunk) {
+      return; // The plain form post, for small files.
+    }
+
+    $form.on('submit', function (event) {
+      var file = input.files && input.files[0];
+      if (!file) {
+        return; // The server answers that no file came.
+      }
+      event.preventDefault();
+
+      var upload = '';
+      for (var i = 0; i < 24; i++) {
+        upload += 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36));
+      }
+      var newest = $form.find('[name="newest"]').val() || '';
+      var retries = 0;
+
+      function failed(message) {
+        $button.prop('disabled', false);
+        $status.text(text.uploadFailed + (message ? ' ' + message : ''));
+      }
+
+      function send(offset) {
+        var end = Math.min(offset + cfg.chunk, file.size);
+        var data = new FormData();
+        data.append('action', 'sella_si_csv_chunk');
+        data.append('nonce', cfg.nonce);
+        data.append('upload', upload);
+        data.append('offset', offset);
+        data.append('last', end >= file.size ? 1 : 0);
+        data.append('newest', newest);
+        if (end > offset) {
+          data.append('chunk', file.slice(offset, end), 'part.csv');
+        }
+        $status.text(text.uploading + ' ' + (file.size ? Math.floor(offset / file.size * 100) : 0) + '%');
+
+        $.ajax({ url: cfg.ajaxUrl, type: 'POST', data: data, processData: false, contentType: false })
+          .done(function (res) {
+            retries = 0;
+            var d = (res && res.data) || {};
+            if (res && res.success && d.done) {
+              $status.text(text.uploading + ' 100%');
+              window.location.href = cfg.uploadedUrl;
+            } else if (res && res.success) {
+              send(d.offset);
+            } else if (typeof d.offset === 'number' && d.offset <= file.size) {
+              send(d.offset);
+            } else {
+              failed(d.message);
+            }
+          })
+          .fail(function () {
+            if (retries < 5) {
+              retries++;
+              $status.text(text.uploadRetry);
+              setTimeout(function () { send(offset); }, 3000 * retries);
+              return;
+            }
+            failed();
+          });
+      }
+
+      $button.prop('disabled', true);
+      send(0);
+    });
+  }
+
   $(function () {
     $('[data-si-job]').each(function () { initJob(this); });
+    $('.sella-si-upload').each(function () { initUpload(this); });
   });
 })(jQuery);

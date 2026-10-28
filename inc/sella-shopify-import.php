@@ -94,6 +94,12 @@ function sella_si_job( $job ) {
 			'skipped'  => 0,
 			'failed'   => 0,
 			'total'    => 0,
+			'orders'   => 0, // CSV: orders in the file.
+			'newest'   => 0, // CSV: only this many of the newest, or 0 for all.
+			'since'    => 0, // CSV: the creation time those start from.
+			'phase'    => '', // CSV: 'scan' while the file's orders are counted.
+			'top'      => array(), // CSV, while counting: the newest creation times so far.
+			'last'     => '', // CSV, while counting: the order counted last.
 			'log'      => array(),
 			'file'     => '',
 			'header'   => array(),
@@ -1525,6 +1531,246 @@ function sella_si_step_orders( &$job ) {
 }
 
 /**
+ * Open the orders CSV at its first data row.
+ *
+ * @param string $file Path.
+ * @return array{0: resource, 1: array}|WP_Error The handle and the header.
+ */
+function sella_si_csv_open( $file ) {
+	$fh = fopen( $file, 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+	if ( ! $fh ) {
+		return new WP_Error( 'sella_si_csv', 'לא ניתן לפתוח את קובץ ה-CSV.' );
+	}
+	// Skip a UTF-8 BOM first: in front of the opening quote it would make
+	// the first column read as "Name" with its quotes.
+	if ( "\xEF\xBB\xBF" !== fread( $fh, 3 ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
+		rewind( $fh );
+	}
+	$header = fgetcsv( $fh, 0, ',', '"', '' );
+	$header = is_array( $header ) ? array_map( 'trim', $header ) : array( '' );
+	if ( ! in_array( 'Name', $header, true ) || ! in_array( 'Lineitem name', $header, true ) ) {
+		fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		return new WP_Error( 'sella_si_csv', 'זה לא קובץ ייצוא הזמנות של שופיפיי: חסרות העמודות Name ו-Lineitem name.' );
+	}
+	return array( $fh, $header );
+}
+
+/**
+ * Seconds of reading per step of a CSV job, under the time limits of the
+ * server and of the proxy in front of it. A step stops at the next order
+ * after this, so the file may be as large as it likes.
+ */
+define( 'SELLA_SI_CSV_SECONDS', 15 );
+
+/**
+ * Bytes per uploaded part: well under the smallest upload_max_filesize.
+ */
+define( 'SELLA_SI_CSV_CHUNK', 1048576 );
+
+/**
+ * A new, random place for an uploaded CSV. The file holds customers' details
+ * and sits under uploads until the import ends; the folder answers no one.
+ *
+ * @return string Path.
+ */
+function sella_si_csv_new_path() {
+	$uploads = wp_upload_dir();
+	$dir     = trailingslashit( $uploads['basedir'] ) . 'sella-shopify-import';
+	wp_mkdir_p( $dir );
+	if ( ! is_file( $dir . '/index.php' ) ) {
+		file_put_contents( $dir . '/index.php', "<?php\n// Silence.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+	}
+	if ( ! is_file( $dir . '/.htaccess' ) ) {
+		file_put_contents( $dir . '/.htaccess', "Require all denied\nDeny from all\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+	}
+	return $dir . '/orders-' . wp_generate_password( 24, false ) . '.csv';
+}
+
+/**
+ * A new CSV for the import: the job starts over on it, first counting its
+ * orders (and finding the newest ones, when only those are wanted).
+ *
+ * @param string $file   Path.
+ * @param int    $newest The newest this many orders, or 0 for all.
+ */
+function sella_si_csv_start( $file, $newest ) {
+	$job = sella_si_job( 'orders_csv' );
+	if ( '' !== $job['file'] && $job['file'] !== $file ) {
+		wp_delete_file( $job['file'] );
+	}
+	sella_si_save_job(
+		'orders_csv',
+		array_merge(
+			$job,
+			array(
+				'file'     => $file,
+				'phase'    => 'scan',
+				'newest'   => $newest,
+				'since'    => 0,
+				'orders'   => 0,
+				'top'      => array(),
+				'last'     => '',
+				'total'    => 0,
+				'header'   => array(),
+				'cursor'   => null,
+				'done'     => false,
+				'imported' => 0,
+				'updated'  => 0,
+				'skipped'  => 0,
+				'failed'   => 0,
+				'log'      => array(),
+			)
+		)
+	);
+}
+
+/**
+ * A step of counting the file's orders. With a number of newest orders
+ * asked for, keeps the creation times of that many newest seen so far (a
+ * min-heap, so it stays that small however long the file is); at the end
+ * the oldest of them is where the import starts.
+ *
+ * The export's order is Shopify's own, so the dates decide which are newest.
+ *
+ * @param array $job Progress, changed in place.
+ * @return true|WP_Error
+ */
+function sella_si_csv_scan_step( &$job ) {
+	$open = sella_si_csv_open( $job['file'] );
+	if ( is_wp_error( $open ) ) {
+		return $open;
+	}
+	list( $fh, $header ) = $open;
+	if ( null !== $job['cursor'] ) {
+		fseek( $fh, (int) $job['cursor'] );
+	}
+
+	$name_col = (int) array_search( 'Name', $header, true );
+	$date_col = array_search( 'Created at', $header, true );
+	$limit    = (int) $job['newest'];
+	$heap     = new SplMinHeap();
+	foreach ( $job['top'] as $ts ) {
+		$heap->insert( (int) $ts );
+	}
+
+	$start = microtime( true );
+	$eof   = false;
+	while ( microtime( true ) - $start < SELLA_SI_CSV_SECONDS ) {
+		$row = fgetcsv( $fh, 0, ',', '"', '' );
+		if ( false === $row ) {
+			$eof = true;
+			break;
+		}
+		$name = isset( $row[ $name_col ] ) ? trim( (string) $row[ $name_col ] ) : '';
+		if ( '' === $name || $name === $job['last'] ) {
+			continue; // A blank line, or the order's next line item.
+		}
+		$job['last'] = $name;
+		++$job['orders'];
+		if ( $limit ) {
+			$created = false !== $date_col && isset( $row[ $date_col ] ) ? trim( (string) $row[ $date_col ] ) : '';
+			$heap->insert( '' !== $created ? (int) strtotime( $created ) : 0 );
+			if ( $heap->count() > $limit ) {
+				$heap->extract();
+			}
+		}
+	}
+	$job['cursor'] = ftell( $fh );
+	fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+
+	$job['top'] = array();
+	foreach ( clone $heap as $ts ) {
+		$job['top'][] = $ts;
+	}
+	if ( ! $eof ) {
+		return true;
+	}
+
+	// Counted: the import itself starts at the top of the file.
+	$job['since']  = $limit && $job['orders'] > $limit ? max( 1, (int) $heap->top() ) : 0;
+	$job['newest'] = $job['since'] ? $limit : 0;
+	$job['total']  = $job['since'] ? $limit : $job['orders'];
+	$job['phase']  = '';
+	$job['top']    = array();
+	$job['last']   = '';
+	$job['cursor'] = null;
+	sella_si_log(
+		$job,
+		'ok',
+		$job['since']
+			? sprintf( 'בקובץ %s הזמנות. מייבא את %s האחרונות, מ-%s והלאה.', number_format_i18n( $job['orders'] ), number_format_i18n( $limit ), wp_date( 'j.n.Y', $job['since'] ) )
+			: sprintf( 'בקובץ %s הזמנות. מייבא את כולן.', number_format_i18n( $job['orders'] ) )
+	);
+	return true;
+}
+
+/**
+ * AJAX: one part of a CSV upload. The screen sends the file in parts of
+ * SELLA_SI_CSV_CHUNK bytes, so its size is not bound by the server's upload
+ * limits. Each part says where in the file it starts; a part sent twice
+ * (an answer lost on the way) is told where the file really is, and the
+ * screen goes on from there.
+ */
+function sella_si_ajax_csv_chunk() {
+	check_ajax_referer( 'sella_si', 'nonce' );
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_send_json_error( array( 'message' => 'אין הרשאה.' ) );
+	}
+
+	$upload = isset( $_POST['upload'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['upload'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+	$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+	$last   = ! empty( $_POST['last'] );
+	$chunk  = ! empty( $_FILES['chunk']['tmp_name'] ) && is_uploaded_file( $_FILES['chunk']['tmp_name'] ) ? $_FILES['chunk']['tmp_name'] : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+	if ( strlen( $upload ) < 16 ) {
+		wp_send_json_error( array( 'message' => 'העלאה לא מזוהה.' ) );
+	}
+
+	$key  = 'sella_si_upload_' . get_current_user_id();
+	$part = get_transient( $key );
+	if ( 0 === $offset ) {
+		// A new upload; one left unfinished before is thrown away.
+		if ( is_array( $part ) && $part['upload'] !== $upload && is_file( $part['file'] ) ) {
+			wp_delete_file( $part['file'] );
+		}
+		if ( ! is_array( $part ) || $part['upload'] !== $upload ) {
+			$part = array(
+				'upload' => $upload,
+				'file'   => sella_si_csv_new_path(),
+			);
+			touch( $part['file'] );
+		}
+	} elseif ( ! is_array( $part ) || $part['upload'] !== $upload ) {
+		wp_send_json_error( array( 'message' => 'ההעלאה נקטעה (אולי התחילה העלאה אחרת). צריך להעלות את הקובץ שוב.' ) );
+	}
+
+	clearstatcache( true, $part['file'] );
+	$size = is_file( $part['file'] ) ? (int) filesize( $part['file'] ) : 0;
+	if ( $size !== $offset ) {
+		wp_send_json_error( array( 'offset' => $size ) );
+	}
+
+	if ( '' !== $chunk ) {
+		$data = file_get_contents( $chunk ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $data || false === file_put_contents( $part['file'], $data, FILE_APPEND ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			wp_send_json_error( array( 'message' => 'לא ניתן לשמור את הקובץ בשרת. אולי נגמר המקום באחסון.' ) );
+		}
+		$offset += strlen( $data );
+	} elseif ( ! $last ) {
+		wp_send_json_error( array( 'message' => 'חלק מהקובץ לא הגיע לשרת.' ) );
+	}
+
+	if ( ! $last ) {
+		set_transient( $key, $part, DAY_IN_SECONDS );
+		wp_send_json_success( array( 'offset' => $offset ) );
+	}
+
+	delete_transient( $key );
+	sella_si_csv_start( $part['file'], isset( $_POST['newest'] ) ? absint( $_POST['newest'] ) : 0 );
+	wp_send_json_success( array( 'done' => true ) );
+}
+add_action( 'wp_ajax_sella_si_csv_chunk', 'sella_si_ajax_csv_chunk' );
+
+/**
  * One step of the CSV order import: reads whole orders from the saved byte
  * offset, so a step never splits an order's rows.
  *
@@ -1535,25 +1781,18 @@ function sella_si_step_orders_csv( &$job ) {
 	if ( '' === $job['file'] || ! is_readable( $job['file'] ) ) {
 		return new WP_Error( 'sella_si_csv', 'קובץ ה-CSV לא נמצא. צריך להעלות אותו שוב.' );
 	}
-
-	$fh = fopen( $job['file'], 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-	if ( ! $fh ) {
-		return new WP_Error( 'sella_si_csv', 'לא ניתן לפתוח את קובץ ה-CSV.' );
+	if ( 'scan' === $job['phase'] ) {
+		return sella_si_csv_scan_step( $job );
 	}
 
+	$open = sella_si_csv_open( $job['file'] );
+	if ( is_wp_error( $open ) ) {
+		return $open;
+	}
+	$fh = $open[0];
+
 	if ( null === $job['cursor'] ) {
-		// Skip a UTF-8 BOM first: in front of the opening quote it would make
-		// the first column read as "Name" with its quotes.
-		if ( "\xEF\xBB\xBF" !== fread( $fh, 3 ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
-			rewind( $fh );
-		}
-		$header = fgetcsv( $fh, 0, ',', '"', '' );
-		$header = is_array( $header ) ? array_map( 'trim', $header ) : array( '' );
-		if ( ! in_array( 'Name', $header, true ) || ! in_array( 'Lineitem name', $header, true ) ) {
-			fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-			return new WP_Error( 'sella_si_csv', 'זה לא קובץ ייצוא הזמנות של שופיפיי: חסרות העמודות Name ו-Lineitem name.' );
-		}
-		$job['header'] = $header;
+		$job['header'] = $open[1];
 		$job['cursor'] = ftell( $fh );
 	}
 
@@ -1562,6 +1801,7 @@ function sella_si_step_orders_csv( &$job ) {
 	$name_col = (int) array_search( 'Name', $header, true );
 	$rows     = array();
 	$count    = 0;
+	$start    = microtime( true );
 
 	while ( true ) {
 		$at  = ftell( $fh );
@@ -1574,15 +1814,20 @@ function sella_si_step_orders_csv( &$job ) {
 		$name = false === $row ? '' : trim( (string) ( isset( $row[ $name_col ] ) ? $row[ $name_col ] : '' ) );
 		if ( false === $row || ( $rows && $name !== $rows[0]['Name'] ) ) {
 			if ( $rows ) {
-				sella_si_import_order( sella_si_order_from_csv( $rows ), $job );
-				++$count;
+				// Older than the newest chosen on upload: passed over, uncounted.
+				$o = sella_si_order_from_csv( $rows );
+				if ( ! $job['since'] || $o['created'] >= $job['since'] ) {
+					sella_si_import_order( $o, $job );
+					++$count;
+				}
 				$rows = array();
 			}
 			if ( false === $row ) {
 				$job['done'] = true;
 				break;
 			}
-			if ( $count >= SELLA_SI_CSV_ORDERS_PER_STEP ) {
+			// Enough orders, or a long run of older ones passed over.
+			if ( $count >= SELLA_SI_CSV_ORDERS_PER_STEP || microtime( true ) - $start > SELLA_SI_CSV_SECONDS ) {
 				$job['cursor'] = $at; // The next step starts on this order's first row.
 				break;
 			}
@@ -1690,6 +1935,9 @@ function sella_si_ajax_step() {
 				'log'      => array(),
 			)
 		);
+		if ( 'scan' === $job['phase'] ) {
+			$job = array_merge( $job, array( 'orders' => 0, 'top' => array(), 'last' => '' ) );
+		}
 	}
 
 	$seen        = count( $job['log'] );
@@ -1727,6 +1975,7 @@ function sella_si_progress( $job, $seen = 0 ) {
 		'failed'   => (int) $job['failed'],
 		'total'    => (int) $job['total'],
 		'wait'     => (int) $job['wait'],
+		'note'     => 'scan' === $job['phase'] ? sprintf( 'סופר את ההזמנות בקובץ… %s עד עכשיו', number_format_i18n( $job['orders'] ) ) : '',
 		'log'      => array_slice( $job['log'], max( 0, min( $seen, count( $job['log'] ) ) ) ),
 	);
 }
@@ -1766,10 +2015,15 @@ function sella_si_admin_assets( $hook ) {
 		'sella-shopify-import-admin',
 		'sellaSiAdmin',
 		array(
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'sella_si' ),
-			'jobs'    => $jobs,
-			'text'    => array(
+			'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+			'nonce'       => wp_create_nonce( 'sella_si' ),
+			'jobs'        => $jobs,
+			'chunk'       => (int) min( SELLA_SI_CSV_CHUNK, max( 65536, (int) ( wp_max_upload_size() / 2 ) ) ),
+			'uploadedUrl' => admin_url( 'admin.php?page=' . SELLA_SI_SLUG . '&notice=uploaded#sella-si-csv' ),
+			'text'        => array(
+				'uploading'    => 'מעלה את הקובץ…',
+				'uploadFailed' => 'ההעלאה נכשלה.',
+				'uploadRetry'  => 'אין תשובה מהשרת, מנסה שוב…',
 				'running'  => 'מייבא…',
 				'stopping' => 'עוצר אחרי הצעד הנוכחי…',
 				'stopped'  => 'נעצר. אפשר להמשיך מאותה נקודה.',
@@ -1791,9 +2045,17 @@ function sella_si_handle_post() {
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		wp_die( 'אין הרשאה.' );
 	}
+
+	$back = admin_url( 'admin.php?page=' . SELLA_SI_SLUG );
+
+	// A file over the server's post_max_size arrives as an empty post, without
+	// the nonce either: say so instead of "the link you followed has expired".
+	if ( empty( $_POST ) && isset( $_SERVER['CONTENT_LENGTH'] ) && (int) $_SERVER['CONTENT_LENGTH'] > 0 ) {
+		wp_safe_redirect( add_query_arg( 'notice', 'toobig', $back ) );
+		exit;
+	}
 	check_admin_referer( 'sella_si_form' );
 
-	$back   = admin_url( 'admin.php?page=' . SELLA_SI_SLUG );
 	$action = isset( $_POST['sella_si_action'] ) ? sanitize_key( wp_unslash( $_POST['sella_si_action'] ) ) : '';
 
 	if ( 'settings' === $action ) {
@@ -1829,42 +2091,22 @@ function sella_si_handle_post() {
 	}
 
 	if ( 'csv' === $action ) {
+		$error = isset( $_FILES['csv']['error'] ) ? (int) $_FILES['csv']['error'] : UPLOAD_ERR_NO_FILE;
+		if ( in_array( $error, array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) ) {
+			wp_safe_redirect( add_query_arg( 'notice', 'toobig', $back ) );
+			exit;
+		}
 		if ( empty( $_FILES['csv']['tmp_name'] ) || ! is_uploaded_file( $_FILES['csv']['tmp_name'] ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			wp_safe_redirect( add_query_arg( 'notice', 'nofile', $back ) );
 			exit;
 		}
-		$uploads = wp_upload_dir();
-		$dir     = trailingslashit( $uploads['basedir'] ) . 'sella-shopify-import';
-		wp_mkdir_p( $dir );
-		if ( ! is_file( $dir . '/index.php' ) ) {
-			file_put_contents( $dir . '/index.php', "<?php\n// Silence.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		}
-		// A random name: the file holds customers' details and sits under uploads until the import ends.
-		$file = $dir . '/orders-' . wp_generate_password( 24, false ) . '.csv';
+		// The upload without the screen's script (which sends the file in parts).
+		$file = sella_si_csv_new_path();
 		if ( ! move_uploaded_file( $_FILES['csv']['tmp_name'], $file ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			wp_safe_redirect( add_query_arg( 'notice', 'nofile', $back ) );
 			exit;
 		}
-
-		$job = sella_si_job( 'orders_csv' );
-		if ( '' !== $job['file'] ) {
-			wp_delete_file( $job['file'] );
-		}
-		$job = array_merge(
-			$job,
-			array(
-				'file'     => $file,
-				'header'   => array(),
-				'cursor'   => null,
-				'done'     => false,
-				'imported' => 0,
-				'updated'  => 0,
-				'skipped'  => 0,
-				'failed'   => 0,
-				'log'      => array(),
-			)
-		);
-		sella_si_save_job( 'orders_csv', $job );
+		sella_si_csv_start( $file, isset( $_POST['newest'] ) ? absint( $_POST['newest'] ) : 0 );
 		wp_safe_redirect( add_query_arg( 'notice', 'uploaded', $back ) );
 		exit;
 	}
@@ -1939,6 +2181,8 @@ function sella_si_render_page() {
 			<div class="notice notice-success is-dismissible"><p>הקובץ הועלה. אפשר להתחיל לייבא.</p></div>
 		<?php elseif ( 'nofile' === $notice ) : ?>
 			<div class="notice notice-error is-dismissible"><p>לא התקבל קובץ. צריך לבחור את קובץ ה-CSV ולנסות שוב.</p></div>
+		<?php elseif ( 'toobig' === $notice ) : ?>
+			<div class="notice notice-error is-dismissible"><p>הקובץ גדול מהמותר בשרת (<?php echo esc_html( size_format( wp_max_upload_size() ) ); ?>). אפשר לבקש מהאחסון להגדיל את upload_max_filesize ואת post_max_size, או לייצא משופיפיי רק חלק מההזמנות (למשל לפי טווח תאריכים) ולהעלות כל קובץ בנפרד.</p></div>
 		<?php elseif ( is_wp_error( $check ) ) : ?>
 			<div class="notice notice-error"><p><strong>החיבור נכשל:</strong> <?php echo esc_html( $check->get_error_message() ); ?></p></div>
 		<?php elseif ( is_array( $check ) ) : ?>
@@ -2044,13 +2288,27 @@ function sella_si_render_page() {
 				<h3>דרך האפליקציה</h3>
 				<?php sella_si_render_job( 'orders', 'ייבוא כל ההזמנות', true ); ?>
 			<?php endif; ?>
-			<h3><?php echo $connected ? 'או' : ''; ?> מקובץ CSV, בלי אפליקציה</h3>
-			<p class="description">בניהול של שופיפיי: <b>Orders</b> ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b> ← <b>Export orders</b>. מעלים את הקובץ כאן בלי לפתוח אותו ב-Excel. הקובץ נמחק מהשרת בסוף הייבוא.</p>
+			<h3 id="sella-si-csv"><?php echo $connected ? 'או' : ''; ?> מקובץ CSV, בלי אפליקציה</h3>
+			<p class="description">בניהול של שופיפיי: <b>Orders</b> ← <b>Export</b> ← <b>All orders</b> ← <b>CSV for Excel, Numbers, or other spreadsheet programs</b> ← <b>Export orders</b>. כשיש הרבה הזמנות שופיפיי שולח את הקובץ למייל. מעלים את הקובץ כאן בלי לפתוח אותו ב-Excel. הקובץ נמחק מהשרת בסוף הייבוא.</p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="sella-si-upload">
 				<?php $form( 'csv' ); ?>
 				<input type="file" name="csv" accept=".csv,text/csv">
+				<label class="sella-si-newest">רק ההזמנות האחרונות:
+					<input type="number" name="newest" min="1" step="1" inputmode="numeric" placeholder="הכל" class="small-text">
+				</label>
 				<button type="submit" class="button">העלאת הקובץ</button>
 			</form>
+			<p class="description">קובץ בכל גודל: הוא עולה בחלקים, ואם ההעלאה נקטעת היא ממשיכה מאותה נקודה. בשדה "רק ההזמנות האחרונות" אפשר לכתוב מספר, למשל 4000, ואז ייובאו רק ההזמנות החדשות ביותר בקובץ לפי תאריך ההזמנה. שדה ריק מייבא את כל ההזמנות.</p>
+			<?php if ( '' !== $csv_job['file'] && $csv_job['orders'] && 'scan' !== $csv_job['phase'] ) : ?>
+				<p class="sella-si-csv-info">
+					בקובץ <?php echo esc_html( number_format_i18n( $csv_job['orders'] ) ); ?> הזמנות.
+					<?php if ( $csv_job['since'] ) : ?>
+						ייובאו <?php echo esc_html( number_format_i18n( $csv_job['total'] ) ); ?> האחרונות, מ-<?php echo esc_html( wp_date( 'j.n.Y', $csv_job['since'] ) ); ?> והלאה.
+					<?php else : ?>
+						ייובאו כולן.
+					<?php endif; ?>
+				</p>
+			<?php endif; ?>
 			<?php sella_si_render_job( 'orders_csv', 'ייבוא מהקובץ', '' !== $csv_job['file'] ); ?>
 		</section>
 
