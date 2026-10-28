@@ -1683,7 +1683,7 @@ body.sella-has-sticky-product-cart {
   display: none !important;
 }
 
-/* Shop filter bar — the archive search field opens the site search overlay
+/* Shop filter bar — the archive search field opens the LETS search
    (assets/js/sella-shop-search.js), so it behaves like a button. */
 #sibolet-book-search.sella-shop-search-trigger {
   cursor: pointer;
@@ -1713,45 +1713,6 @@ body.sella-has-sticky-product-cart {
 #sibolet-book-search.sella-shop-search-trigger:focus-visible {
   outline: 2px solid rgba(116, 111, 237, 0.35);
   outline-offset: 2px;
-}
-
-/* Docked shop search — the Smart Cart panel opens inside the filter bar
-   (assets/js/sella-shop-search.js moves the whole #sc-search root in here). */
-.sibolet-archive-filter-bar.sella-search-host {
-  position: relative;
-}
-
-body.sella-search-docked-open.sc-search-open {
-  overflow: visible;
-}
-
-#sc-search.sella-search-docked {
-  position: absolute;
-  inset: auto;
-  inset-block-start: calc(100% + 10px);
-  inset-inline-start: 0;
-  width: 100%;
-  height: auto;
-}
-
-/* Docked, the panel is a dropdown: no dimming, and no second search field —
-   the shopper types in the archive field and the script forwards the term. */
-#sc-search.sella-search-docked .sc-search__backdrop,
-#sc-search.sella-search-docked .sc-search__bar {
-  display: none;
-}
-
-#sc-search.sella-search-docked .sc-search__panel {
-  width: 100%;
-  max-width: none;
-  max-height: min(72vh, 620px);
-  margin: 0;
-}
-
-@media (max-width: 767px) {
-  #sc-search.sella-search-docked .sc-search__panel {
-    max-height: min(68vh, 520px);
-  }
 }
 
 /* Larger text in the Smart Cart search panel. assets/js/sella-font-scale.js
@@ -2372,4 +2333,119 @@ body.sella-shop-sortable #sibolet-archive-grid:not(.sella-sorted) {
     margin-top: 26px;
     font-size: 20px;
   }
+}
+
+/* Checkout coupon card (Elementor's .e-coupon-box): the question with a tag
+   icon, the link in the accent colour, and the code field and its button on
+   one line, the button a filled pill as tall as the field. Elementor's widget
+   CSS styles the button by its own element id, hence the !important. */
+.woocommerce-checkout .e-coupon-box .e-woocommerce-coupon-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  margin: 0;
+  color: var(--sella-field-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.woocommerce-checkout .e-coupon-box .e-woocommerce-coupon-nudge::before {
+  content: "";
+  flex: none;
+  width: 22px;
+  height: 22px;
+  background: var(--sella-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.woocommerce-checkout .e-coupon-box .e-show-coupon-form {
+  color: var(--sella-accent) !important;
+  font-weight: 600;
+  text-decoration: none !important;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.woocommerce-checkout .e-coupon-box .e-show-coupon-form:hover,
+.woocommerce-checkout .e-coupon-box .e-show-coupon-form:focus-visible {
+  border-bottom-color: currentColor;
+}
+
+.woocommerce-checkout .e-coupon-box .e-coupon-anchor-description {
+  display: block;
+  margin: 16px 0 10px;
+  color: var(--sella-field-label);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.woocommerce-checkout .e-coupon-box .form-row {
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce-checkout .e-coupon-box .coupon-container-grid {
+  display: flex !important;
+  gap: 10px;
+  align-items: center;
+}
+
+.woocommerce-checkout .e-coupon-box .coupon-container-grid .col {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.woocommerce-checkout .e-coupon-box .coupon-col-1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.woocommerce-checkout .e-coupon-box .coupon-col-2 {
+  flex: none;
+}
+
+.woocommerce-checkout form.checkout .e-coupon-box .form-row .input-text {
+  letter-spacing: 0.02em;
+}
+
+.woocommerce-checkout .e-coupon-box .e-apply-coupon {
+  height: var(--sella-field-height) !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 28px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  color: #fff !important;
+  background: var(--sella-accent) !important;
+  box-shadow: none !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.woocommerce-checkout .e-coupon-box .e-apply-coupon:hover {
+  background: #5f59e0 !important;
+}
+
+.woocommerce-checkout .e-coupon-box .e-apply-coupon:active {
+  transform: scale(0.98);
+}
+
+.woocommerce-checkout .e-coupon-box .e-apply-coupon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--sella-accent-ring) !important;
+}
+
+.woocommerce-checkout .e-coupon-box .e-apply-coupon:disabled,
+.woocommerce-checkout .e-coupon-box .e-apply-coupon.disabled {
+  opacity: 0.6;
+  cursor: default;
 }
