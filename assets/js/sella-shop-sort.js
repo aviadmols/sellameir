@@ -11,6 +11,9 @@
   var BAR_SELECTOR = '.sibolet-archive-filter-bar';
   var STORE_KEY = 'sellaShopSort';
   var SORTED_CLASS = 'sella-sorted';
+  /* The "מיון לפי" select is hidden for now: the books are always newest
+     first. true brings it back, with the shopper's choice remembered. */
+  var SHOW_CONTROL = false;
 
   var ORDERS = [
     { value: 'date-desc', label: 'החדשים ביותר' },
@@ -142,7 +145,7 @@
 
     var search = isSearch();
     var options = search ? [RELEVANCE].concat(ORDERS) : ORDERS;
-    var saved = stored();
+    var saved = SHOW_CONTROL ? stored() : null;
     var order = search ? RELEVANCE.value : (comparators[saved] ? saved : 'date-desc');
     var observer = window.MutationObserver ? new window.MutationObserver(apply) : null;
 
@@ -158,7 +161,7 @@
       }
     }
 
-    var bar = document.querySelector(BAR_SELECTOR);
+    var bar = SHOW_CONTROL ? document.querySelector(BAR_SELECTOR) : null;
     if (bar) {
       bar.appendChild(control(options, order, function (value) {
         order = value;
