@@ -464,11 +464,20 @@ html.sella-offers-lock {
     border-radius: 18px;
   }
 
-  .sella-offers .sella-offers__timer {
+  /* The band only: a card's countdown sits inside the scrolling list, where
+     the band's negative margin pulled it up under the list's edge. */
+  .sella-offers .sella-offers__timer:not(.sella-offers__timer--card) {
     margin: -26px -18px 16px;
     padding: 12px 48px;
     border-radius: 18px 18px 0 0;
+  }
+
+  .sella-offers .sella-offers__timer {
     font-size: 14px;
+  }
+
+  .sella-offers .sella-offers__timer-clock {
+    font-size: 17px;
   }
 
   .sella-offers .sella-offers__title {

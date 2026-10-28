@@ -36,6 +36,22 @@
     timerEnd = Date.now() + timer.left * 1000;
   }
 
+  /**
+   * This popup comes first on checkout. The upsell popups (sella-upsell.js)
+   * read the gate: while this one is still to open, or open, they wait for
+   * GATE_EVENT. Set now, before either script boots on DOMContentLoaded.
+   */
+  var GATE_EVENT = 'sella-offers-done';
+  var gate = window.sellaOffersGate = { busy: !!offers.length && !wasSeen() && !isTimeUp() };
+
+  function releaseGate() {
+    if (!gate.busy) {
+      return;
+    }
+    gate.busy = false;
+    document.dispatchEvent(new window.CustomEvent(GATE_EVENT));
+  }
+
   function wasSeen() {
     if (data.frequency !== 'session') {
       return false;
@@ -368,6 +384,7 @@
 
   function open() {
     if (!offers.length || isTimeUp()) {
+      releaseGate();
       return;
     }
     if (!root) {
@@ -403,6 +420,7 @@
     stopTimer();
     hideTimer = window.setTimeout(function () {
       root.hidden = true;
+      releaseGate();
     }, 300);
 
     if (returnFocus && returnFocus !== document.body && typeof returnFocus.focus === 'function') {
@@ -549,6 +567,7 @@
     window.setTimeout(function () {
       // Never cut into a field the shopper is filling in; the next visit will try again.
       if (isTyping()) {
+        releaseGate();
         return;
       }
       open();

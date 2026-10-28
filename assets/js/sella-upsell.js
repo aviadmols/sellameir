@@ -492,7 +492,32 @@
     return null;
   }
 
+  /**
+   * On checkout the offers popup (sella-checkout-offers.js) comes first:
+   * while it is still to open, or open, nothing opens here. Once it closes,
+   * whatever was waiting opens, after its fade.
+   */
+  var waitingForOffers = false;
+
+  function afterOffers() {
+    var gate = window.sellaOffersGate;
+    if (!gate || !gate.busy) {
+      return false;
+    }
+    if (!waitingForOffers) {
+      waitingForOffers = true;
+      document.addEventListener('sella-offers-done', function () {
+        waitingForOffers = false;
+        window.setTimeout(showEligible, 600);
+      }, { once: true });
+    }
+    return true;
+  }
+
   function showEligible() {
+    if (afterOffers()) {
+      return;
+    }
     openPopup(nextEligible());
   }
 
