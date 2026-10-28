@@ -26,6 +26,11 @@
   text-align: start;
 }
 
+/* Under a book's description (sella_fc_after_description). */
+.elementor-widget-woocommerce-product-content .sella-fc {
+  margin-top: 28px;
+}
+
 .sella-fc [hidden] {
   display: none !important;
 }

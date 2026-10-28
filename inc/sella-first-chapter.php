@@ -6,7 +6,9 @@
  *   file (uploaded to the media library or linked from elsewhere) and a cover
  *   for the email.
  * - [sella_first_chapter]: a name and email form for the product page. It shows
- *   only on the products given a chapter on the settings screen.
+ *   only on the products given a chapter on the settings screen, and on those
+ *   it is added under the description by itself (once, even when the template
+ *   has the shortcode too).
  * - Elementor Pro forms connected on the settings screen: which field holds the
  *   name, the email and the phone, and which chapter to send: by the answer to
  *   one of the form's fields, the chapter of the product page the form is on,
@@ -800,6 +802,16 @@ function sella_fc_shortcode( $atts ) {
 	$product_id = absint( $atts['product'] ) ? absint( $atts['product'] ) : sella_fc_current_product_id();
 	$chapter_id = absint( $atts['chapter'] ) ? absint( $atts['chapter'] ) : sella_fc_product_chapter( $product_id );
 
+	// A product's own form once per page: under the description
+	// (sella_fc_after_description) or from the shortcode in the template.
+	static $shown = array();
+	if ( ! absint( $atts['chapter'] ) && $chapter_id ) {
+		if ( isset( $shown[ $product_id ] ) ) {
+			return '';
+		}
+		$shown[ $product_id ] = true;
+	}
+
 	if ( ! sella_fc_chapter_ok( $chapter_id ) ) {
 		if ( ! sella_fc_in_elementor_editor() ) {
 			return '';
@@ -855,6 +867,26 @@ function sella_fc_shortcode( $atts ) {
 	return (string) ob_get_clean();
 }
 add_shortcode( 'sella_first_chapter', 'sella_fc_shortcode' );
+
+/**
+ * The form under the description of a book that has a chapter, so the
+ * product template needs no shortcode. After the "האם הספר מתאים לי?" row
+ * (sella-ai-consult.php, priority 20).
+ *
+ * @param string                 $content Widget HTML.
+ * @param \Elementor\Widget_Base $widget  Widget.
+ * @return string
+ */
+function sella_fc_after_description( $content, $widget ) {
+	if ( 'woocommerce-product-content' !== $widget->get_name() || ! function_exists( 'is_product' ) || ! is_product() ) {
+		return $content;
+	}
+	if ( ! sella_fc_product_chapter( get_queried_object_id() ) ) {
+		return $content;
+	}
+	return $content . sella_fc_shortcode( array( 'product' => get_queried_object_id() ) );
+}
+add_filter( 'elementor/widget/render_content', 'sella_fc_after_description', 30, 2 );
 
 /**
  * AJAX: a request from the form.
