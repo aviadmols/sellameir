@@ -222,3 +222,114 @@
 .sella-leads-forms-empty {
   color: #646970;
 }
+
+/* ActiveTrail (inc/sella-activetrail.php): the routing screen and the list column. */
+.sella-at-admin .sella-leads-settings {
+  max-width: 1200px;
+}
+
+.sella-at-ok {
+  margin-inline-start: 12px;
+  color: #1a7a3c;
+  font-weight: 600;
+}
+
+.sella-at-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.sella-at-placeholders code {
+  font-size: 12px;
+}
+
+.sella-at-routes th,
+.sella-at-routes td {
+  vertical-align: top;
+}
+
+.sella-at-routes tr.sella-at-kind th {
+  padding-top: 14px;
+  background: #f6f7f7;
+  font-size: 13px;
+}
+
+.sella-at-routes tr.sella-at-default td {
+  background: #fbfbfc;
+}
+
+.sella-at-group {
+  max-width: 260px;
+}
+
+.sella-at-more {
+  width: 110px;
+}
+
+.sella-at-routes .sella-at-fields {
+  width: 100%;
+  min-width: 180px;
+  min-height: 30px;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.sella-at-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  max-width: 1200px;
+}
+
+.sella-at-side .sella-leads-settings {
+  flex: 1 1 380px;
+  margin-top: 20px;
+}
+
+.sella-leads-table__activetrail {
+  white-space: nowrap;
+}
+
+.sella-at-mark {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f0f0f1;
+  color: #50575e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sella-at-mark--ok {
+  background: #e7f6ec;
+  color: #1a7a3c;
+}
+
+.sella-at-mark--error {
+  background: #fcf0f1;
+  color: #b32d2e;
+}
+
+.sella-at-mark--pending {
+  background: #fcf3e6;
+  color: #8a5300;
+}
+
+.sella-at-detail {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  color: #646970;
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.sella-at-resend {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}

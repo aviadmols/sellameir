@@ -20,6 +20,10 @@
  * with a hidden field bots fill in, a minimum time to fill the form and a
  * per-address rate limit.
  *
+ * Every lead carries a channel (the form or, for a first chapter, the page it
+ * came from); sella-activetrail.php routes it to an ActiveTrail group by that
+ * and keeps the answer in the activetrail column.
+ *
  * Admin: פניות ולידים (?page=sella-leads).
  *
  * @package HelloElementorChild
@@ -29,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SELLA_LEADS_DB_VERSION', '1' );
+define( 'SELLA_LEADS_DB_VERSION', '2' );
 define( 'SELLA_LEADS_SLUG', 'sella-leads' );
 define( 'SELLA_LEADS_SETTINGS', 'sella_leads_settings' );
 define( 'SELLA_LEADS_PER_PAGE', 50 );
@@ -76,10 +80,13 @@ function sella_leads_maybe_install() {
 		source varchar(190) NOT NULL DEFAULT '',
 		page_url varchar(255) NOT NULL DEFAULT '',
 		fields longtext NULL,
+		channel varchar(190) NOT NULL DEFAULT '',
+		activetrail varchar(255) NOT NULL DEFAULT '',
 		created_at datetime NOT NULL,
 		PRIMARY KEY  (id),
 		KEY type_status (type,status),
 		KEY email (email),
+		KEY channel (channel),
 		KEY created_at (created_at)
 		) {$wpdb->get_charset_collate()};"
 	);
@@ -164,7 +171,9 @@ function sella_leads_form_choices() {
  * Record a lead. Other modules call this.
  *
  * @param array $lead type, and any of name, email, phone, order_ref, message,
- *                    source, page_url, fields (array of label => value).
+ *                    source, page_url, fields (array of label => value),
+ *                    channel (the form it came from; the kind, or the kind
+ *                    and page for a first chapter, when left out).
  * @return int|false The row ID, or false when it could not be saved.
  */
 function sella_leads_add( $lead ) {
@@ -174,19 +183,27 @@ function sella_leads_add( $lead ) {
 	$type  = isset( $lead['type'], $types[ $lead['type'] ] ) ? $lead['type'] : 'form';
 	$email = isset( $lead['email'] ) ? strtolower( sanitize_email( $lead['email'] ) ) : '';
 	$table = sella_leads_table();
+	$page  = mb_substr( esc_url_raw( $lead['page_url'] ?? '' ), 0, 255 );
+
+	$channel = isset( $lead['channel'] ) ? sanitize_text_field( $lead['channel'] ) : '';
+	if ( '' === $channel ) {
+		$channel = function_exists( 'sella_at_lead_channel' ) ? sella_at_lead_channel( $type, $page ) : $type;
+	}
 
 	$row = array(
-		'type'       => $type,
-		'status'     => 'new',
-		'name'       => mb_substr( sanitize_text_field( $lead['name'] ?? '' ), 0, 190 ),
-		'email'      => mb_substr( $email, 0, 190 ),
-		'phone'      => mb_substr( sanitize_text_field( $lead['phone'] ?? '' ), 0, 40 ),
-		'order_ref'  => mb_substr( sanitize_text_field( $lead['order_ref'] ?? '' ), 0, 40 ),
-		'message'    => sanitize_textarea_field( $lead['message'] ?? '' ),
-		'source'     => mb_substr( sanitize_text_field( $lead['source'] ?? '' ), 0, 190 ),
-		'page_url'   => mb_substr( esc_url_raw( $lead['page_url'] ?? '' ), 0, 255 ),
-		'fields'     => ! empty( $lead['fields'] ) && is_array( $lead['fields'] ) ? wp_json_encode( $lead['fields'], JSON_UNESCAPED_UNICODE ) : null,
-		'created_at' => current_time( 'mysql' ),
+		'type'        => $type,
+		'status'      => 'new',
+		'name'        => mb_substr( sanitize_text_field( $lead['name'] ?? '' ), 0, 190 ),
+		'email'       => mb_substr( $email, 0, 190 ),
+		'phone'       => mb_substr( sanitize_text_field( $lead['phone'] ?? '' ), 0, 40 ),
+		'order_ref'   => mb_substr( sanitize_text_field( $lead['order_ref'] ?? '' ), 0, 40 ),
+		'message'     => sanitize_textarea_field( $lead['message'] ?? '' ),
+		'source'      => mb_substr( sanitize_text_field( $lead['source'] ?? '' ), 0, 190 ),
+		'page_url'    => $page,
+		'fields'      => ! empty( $lead['fields'] ) && is_array( $lead['fields'] ) ? wp_json_encode( $lead['fields'], JSON_UNESCAPED_UNICODE ) : null,
+		'channel'     => mb_substr( $channel, 0, 190 ),
+		'activetrail' => '',
+		'created_at'  => current_time( 'mysql' ),
 	);
 
 	if ( '' !== $row['email'] && in_array( $type, sella_leads_single_types(), true ) ) {
@@ -197,7 +214,32 @@ function sella_leads_add( $lead ) {
 	}
 
 	$saved = $wpdb->insert( $table, $row );
-	return $saved ? (int) $wpdb->insert_id : false;
+	if ( ! $saved ) {
+		return false;
+	}
+
+	/**
+	 * A lead was recorded.
+	 *
+	 * @param int   $id  Row ID.
+	 * @param array $row Values as inserted.
+	 */
+	do_action( 'sella_leads_added', (int) $wpdb->insert_id, $row );
+
+	return (int) $wpdb->insert_id;
+}
+
+/**
+ * One lead row.
+ *
+ * @param int $id Row ID.
+ * @return object|null
+ */
+function sella_leads_row( $id ) {
+	global $wpdb;
+	$table = sella_leads_table();
+	$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", (int) $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	return $row ? $row : null;
 }
 
 /**
@@ -611,6 +653,7 @@ function sella_leads_from_elementor_form( $record ) {
 	}
 	$lead['source']   = (string) $record->get_form_settings( 'form_name' );
 	$lead['page_url'] = isset( $meta['page_url']['value'] ) ? sella_leads_page_url( $meta['page_url']['value'] ) : '';
+	$lead['channel']  = '' !== $form_id ? 'form:' . $form_id : '';
 
 	sella_leads_add( $lead );
 }
@@ -740,7 +783,7 @@ function sella_leads_handle_admin_actions() {
 	} else {
 		// One row's button ("toggle:12"), or the bulk action on the ticked rows.
 		$row_action = isset( $_POST['row_action'] ) ? sanitize_text_field( wp_unslash( $_POST['row_action'] ) ) : '';
-		if ( preg_match( '/^(toggle|delete):(\d+)$/', $row_action, $m ) ) {
+		if ( preg_match( '/^(toggle|delete|activetrail):(\d+)$/', $row_action, $m ) ) {
 			$action = $m[1];
 			$ids    = array( (int) $m[2] );
 		} else {
@@ -759,6 +802,11 @@ function sella_leads_handle_admin_actions() {
 			} elseif ( in_array( $action, array( 'handled', 'new' ), true ) ) {
 				$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = %s WHERE id IN ({$in})", $action ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$notice = 'updated';
+			} elseif ( 'activetrail' === $action && function_exists( 'sella_at_send_lead' ) ) {
+				foreach ( $ids as $id ) {
+					sella_at_send_lead( $id, true );
+				}
+				$notice = 'activetrail';
 			}
 		}
 	}
@@ -926,10 +974,12 @@ function sella_leads_render_admin_page() {
 
 	$notice  = isset( $_GET['notice'] ) ? sanitize_key( wp_unslash( $_GET['notice'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$notices = array(
-		'updated'  => 'הסטטוס עודכן.',
-		'deleted'  => 'נמחק.',
-		'settings' => 'ההגדרות נשמרו.',
+		'updated'     => 'הסטטוס עודכן.',
+		'deleted'     => 'נמחק.',
+		'settings'    => 'ההגדרות נשמרו.',
+		'activetrail' => 'נשלח לאקטיב טרייל. התוצאה בעמודת "אקטיב טרייל".',
 	);
+	$activetrail  = function_exists( 'sella_at_status_cell' );
 	$filtered_url = add_query_arg( array_filter( $filters ), $base_url );
 	$export_url   = wp_nonce_url( add_query_arg( array_merge( array( 'action' => 'sella_leads_export' ), array_filter( $filters ) ), admin_url( 'admin-post.php' ) ), 'sella_leads_export' );
 	$pages        = (int) ceil( $total / SELLA_LEADS_PER_PAGE );
@@ -990,6 +1040,7 @@ function sella_leads_render_admin_page() {
 					<option value="">פעולה על המסומנים</option>
 					<option value="handled">סימון כטופל</option>
 					<option value="new">סימון כחדש</option>
+					<?php if ( $activetrail ) : ?><option value="activetrail">שליחה לאקטיב טרייל</option><?php endif; ?>
 					<option value="delete">מחיקה</option>
 				</select>
 				<button type="submit" class="button" onclick="return this.form.bulk_action.value !== 'delete' || confirm('למחוק את המסומנים? אי אפשר לבטל.');">ביצוע</button>
@@ -1008,13 +1059,14 @@ function sella_leads_render_admin_page() {
 						<th>הזמנה</th>
 						<th class="sella-leads-table__message">הודעה</th>
 						<th>מקור</th>
+						<?php if ( $activetrail ) : ?><th>אקטיב טרייל</th><?php endif; ?>
 						<th>סטטוס</th>
 						<th><span class="screen-reader-text">פעולות</span></th>
 					</tr>
 				</thead>
 				<tbody>
 				<?php if ( ! $rows ) : ?>
-					<tr><td colspan="11" class="sella-leads-empty"><?php echo $filters['q'] || $filters['type'] || $filters['status'] ? 'אין רשומות שמתאימות לסינון.' : 'עדיין לא התקבלו פניות או הרשמות.'; ?></td></tr>
+					<tr><td colspan="<?php echo $activetrail ? 12 : 11; ?>" class="sella-leads-empty"><?php echo $filters['q'] || $filters['type'] || $filters['status'] ? 'אין רשומות שמתאימות לסינון.' : 'עדיין לא התקבלו פניות או הרשמות.'; ?></td></tr>
 				<?php endif; ?>
 				<?php foreach ( $rows as $row ) : ?>
 					<?php
@@ -1058,6 +1110,14 @@ function sella_leads_render_admin_page() {
 							<?php echo esc_html( $row->source ); ?>
 							<?php if ( $row->page_url ) : ?><a href="<?php echo esc_url( $row->page_url ); ?>" target="_blank" rel="noopener">עמוד</a><?php endif; ?>
 						</td>
+						<?php if ( $activetrail ) : ?>
+							<td class="sella-leads-table__activetrail">
+								<?php echo sella_at_status_cell( $row ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+								<?php if ( $row->email ) : ?>
+									<button type="submit" name="row_action" value="activetrail:<?php echo (int) $row->id; ?>" class="button-link sella-at-resend" title="שליחה לאקטיב טרייל עכשיו, לפי הניתוב השמור"><?php echo 0 === strpos( (string) $row->activetrail, 'ok' ) ? 'שוב' : 'שליחה'; ?></button>
+								<?php endif; ?>
+							</td>
+						<?php endif; ?>
 						<td>
 							<button type="submit" name="row_action" value="toggle:<?php echo (int) $row->id; ?>" class="sella-leads-status <?php echo 'new' === $row->status ? 'is-new' : 'is-handled'; ?>" title="<?php echo 'new' === $row->status ? 'לחיצה תסמן כטופל' : 'לחיצה תחזיר לחדש'; ?>">
 								<?php echo 'new' === $row->status ? 'חדש' : 'טופל'; ?>
