@@ -7,9 +7,11 @@
  *   forced to "required" (see sella_require_phone_setting()).
  * - My Account > Account details gets its own phone field, stored as billing_phone.
  *
- * Marketing consent — an unchecked-by-default checkbox on checkout and on
- * Account details. Kept as user meta for customers with an account and on each
- * order, and shown to admins on the order screen and the user profile.
+ * Marketing consent — an unchecked-by-default checkbox on Account details,
+ * kept as user meta and editable on the user profile. The checkout no longer
+ * asks: the ActiveTrail plugin's own consent field does that there. Orders
+ * placed while the checkout had the checkbox still show the answer on the
+ * admin order screen.
  *
  * @package HelloElementorChild
  */
@@ -46,54 +48,6 @@ add_filter( 'pre_option_woocommerce_checkout_phone_field', 'sella_require_phone_
 function sella_has_marketing_consent( $user_id ) {
 	return (bool) get_user_meta( $user_id, SELLA_MARKETING_CONSENT_META, true );
 }
-
-/**
- * Checkout: the opt-in checkbox at the end of the billing fields.
- *
- * It sits in the billing form rather than next to the order button because
- * WooCommerce re-renders the payment box on every checkout update, which would
- * clear a ticked box. Logged-in customers see their saved choice.
- *
- * @param array $fields Checkout fields.
- * @return array
- */
-function sella_checkout_marketing_consent_field( $fields ) {
-	$fields['billing'][ SELLA_MARKETING_CONSENT_META ] = array(
-		'type'     => 'checkbox',
-		'label'    => SELLA_MARKETING_CONSENT_LABEL,
-		'required' => false,
-		'class'    => array( 'form-row-wide', 'sella-marketing-consent' ),
-		'priority' => 1000,
-	);
-	return $fields;
-}
-add_filter( 'woocommerce_checkout_fields', 'sella_checkout_marketing_consent_field', 20 );
-
-/**
- * Checkout: record the choice on the order, guest checkouts included.
- *
- * @param WC_Order $order Order being created.
- * @param array    $data  Posted checkout data.
- */
-function sella_checkout_save_order_marketing_consent( $order, $data ) {
-	if ( array_key_exists( SELLA_MARKETING_CONSENT_META, $data ) ) {
-		$order->update_meta_data( '_' . SELLA_MARKETING_CONSENT_META, empty( $data[ SELLA_MARKETING_CONSENT_META ] ) ? 'no' : 'yes' );
-	}
-}
-add_action( 'woocommerce_checkout_create_order', 'sella_checkout_save_order_marketing_consent', 10, 2 );
-
-/**
- * Checkout: keep the choice on the customer's account, so unticking it opts out.
- *
- * @param WC_Customer $customer Customer being saved.
- * @param array       $data     Posted checkout data.
- */
-function sella_checkout_save_customer_marketing_consent( $customer, $data ) {
-	if ( array_key_exists( SELLA_MARKETING_CONSENT_META, $data ) ) {
-		$customer->update_meta_data( SELLA_MARKETING_CONSENT_META, empty( $data[ SELLA_MARKETING_CONSENT_META ] ) ? '0' : '1' );
-	}
-}
-add_action( 'woocommerce_checkout_update_customer', 'sella_checkout_save_customer_marketing_consent', 10, 2 );
 
 /**
  * Account details: phone and opt-in, right after the email field.

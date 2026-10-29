@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.52' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.53' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';
@@ -65,6 +65,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-shop-sort.php';
 	require_once get_stylesheet_directory() . '/inc/sella-hidden-subscriptions.php';
 	require_once get_stylesheet_directory() . '/inc/sella-promo-five-books.php';
+	require_once get_stylesheet_directory() . '/inc/sella-members-only.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 
@@ -117,6 +118,18 @@ function hello_elementor_child_scripts_styles() {
 			[],
 			HELLO_ELEMENTOR_CHILD_VERSION,
 			true
+		);
+	}
+
+	// The cart block's labels, before the block renders them: in the head,
+	// since the block's own script is deferred and would run first otherwise.
+	if ( function_exists( 'is_cart' ) && is_cart() ) {
+		wp_enqueue_script(
+			'sella-cart-page',
+			get_stylesheet_directory_uri() . '/assets/js/sella-cart-page.js',
+			[ 'wp-hooks', 'wp-i18n' ],
+			HELLO_ELEMENTOR_CHILD_VERSION,
+			false
 		);
 	}
 

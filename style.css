@@ -629,8 +629,7 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   accent-color: var(--sella-accent);
 }
 
-/* Marketing opt-in (inc/sella-customer-fields.php) — checkout and Account details. */
-.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent label.checkbox,
+/* Marketing opt-in (inc/sella-customer-fields.php) — Account details. */
 .woocommerce-account form.edit-account .sella-marketing-consent label.checkbox {
   display: flex;
   align-items: flex-start;
@@ -643,18 +642,12 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   cursor: pointer;
 }
 
-.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent .input-checkbox,
 .woocommerce-account form.edit-account .sella-marketing-consent .input-checkbox {
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
   margin: 1px 0 0;
   accent-color: var(--sella-accent, #746fed);
-}
-
-/* An opt-in is optional by nature; the "(optional)" tag only adds noise. */
-.woocommerce-checkout form.checkout #customer_details .sella-marketing-consent .optional {
-  display: none;
 }
 
 /* Checkout panels are flat like the cart page — no drop shadows anywhere. */
@@ -2448,4 +2441,487 @@ body.sella-shop-sortable #sibolet-archive-grid:not(.sella-sorted) {
 .woocommerce-checkout .e-coupon-box .e-apply-coupon.disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Books for subscribers only (inc/sella-members-only.php): the card's button
+   is a filled black pill that leads to the subscription page, in the shape of
+   the "הוספה לסל" pill next to it. */
+.book-card-item .book-action-area .sella-members-btn,
+.static-book-card .book-action-area .sella-members-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  height: 36px;
+  padding: 7px 22px;
+  border: 2px solid #171717;
+  border-radius: 50px;
+  color: #fff !important;
+  background: #171717;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-decoration: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.book-card-item .book-action-area .sella-members-btn:hover,
+.static-book-card .book-action-area .sella-members-btn:hover {
+  border-color: #746fed;
+  background: #746fed;
+  color: #fff !important;
+}
+
+@media (max-width: 767px) {
+  .book-card-item .book-action-area .sella-members-btn,
+  .static-book-card .book-action-area .sella-members-btn {
+    min-width: 0;
+    height: auto;
+    padding: 5px 12px;
+    border-width: 1px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+}
+
+/* Cart and account pages (Hello Elementor's plain page template): room
+   between the content and the black footer. */
+body.woocommerce-cart main.site-main,
+body.woocommerce-account main.site-main {
+  padding-bottom: 80px;
+}
+
+@media (max-width: 767px) {
+  body.woocommerce-cart main.site-main,
+  body.woocommerce-account main.site-main {
+    padding-bottom: 48px;
+  }
+}
+
+/* Cart page (the WooCommerce cart block): the checkout's look — a white
+   card for the books and one for the summary, quiet column headers, the
+   accent pill button. The block paints itself in the browser, so every rule
+   sits under .wp-block-woocommerce-cart to outrank the block's own. */
+body.woocommerce-cart main.site-main {
+  max-width: 1160px !important;
+  margin-inline: auto;
+  padding-top: 24px;
+  padding-inline: 20px;
+}
+
+body.woocommerce-cart .page-header {
+  margin: 0 0 22px;
+}
+
+body.woocommerce-cart .page-header .entry-title {
+  margin: 0;
+  color: #171717;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* Hello Elementor gives .alignwide blocks -80px side margins, which pushed
+   the cart past the edge of a phone screen. */
+.woocommerce-cart .wp-block-woocommerce-cart.alignwide {
+  max-width: none;
+  margin-inline: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart {
+  --sella-accent: #746fed;
+  --sella-accent-ring: rgba(116, 111, 237, 0.16);
+  color: #171717;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__main,
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__sidebar {
+  padding: 26px 30px 30px;
+  border-radius: 20px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* Side by side: the block sizes the two as 65% + 35%, so a gap between the
+   cards has to come out of the books' column, or the summary wraps under it. */
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart.is-large .wc-block-cart__main,
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart.is-medium .wc-block-cart__main {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin-inline-end: 28px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart.is-large .wc-block-cart__sidebar,
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart.is-medium .wc-block-cart__sidebar {
+  flex: 0 0 36%;
+  width: 36%;
+  position: sticky;
+  top: 24px;
+  align-self: flex-start;
+}
+
+/* The books. */
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items {
+  border: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items__header th {
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+  color: #6b6b6b;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: none;
+  text-align: start;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items__header .wc-block-cart-items__header-total {
+  text-align: end;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items .wc-block-cart-items__row td {
+  padding: 20px 0;
+  border: 0;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items .wc-block-cart-items__row:last-child td {
+  border-bottom: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__image {
+  width: 92px;
+  padding-inline-end: 18px !important;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__image img {
+  display: block;
+  width: 92px;
+  border-radius: 7px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-product-name {
+  display: block;
+  margin-bottom: 4px;
+  color: #171717;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-product-name:hover {
+  color: var(--sella-accent);
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__prices .wc-block-components-product-price {
+  color: #444;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-product-metadata {
+  margin-top: 4px;
+  color: #6b6b6b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-product-metadata__description p {
+  margin: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__total {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__total .wc-block-components-product-price {
+  color: #171717;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Quantity: a soft grey box, like the checkout's fields, with the bin beside it. */
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__quantity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector {
+  width: 118px;
+  height: 40px;
+  margin: 0;
+  border: 1px solid #e7e7ee;
+  border-radius: 12px;
+  background: #f7f7f9;
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector::after {
+  display: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector .wc-block-components-quantity-selector__input {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #171717;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector .wc-block-components-quantity-selector__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector .wc-block-components-quantity-selector__button {
+  min-width: 34px;
+  color: #171717;
+  font-size: 16px;
+  opacity: 1;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-quantity-selector .wc-block-components-quantity-selector__button:hover {
+  color: var(--sella-accent);
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__remove-link {
+  margin: 0;
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: #9a9ea8;
+  line-height: 0;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__remove-link:hover {
+  color: #d7263d;
+}
+
+/* The summary. */
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__totals-title {
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  color: #171717;
+  font-size: 22px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-wrapper {
+  padding: 14px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-wrapper:first-of-type,
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__totals-title + .wc-block-components-totals-wrapper {
+  border-top: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-wrapper::after {
+  display: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-panel__button {
+  padding: 0;
+  color: #171717;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-panel__button:hover {
+  color: var(--sella-accent);
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-coupon__form {
+  margin-top: 14px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-coupon .wc-block-components-text-input input {
+  min-height: 48px;
+  border: 1px solid #e7e7ee;
+  border-radius: 12px;
+  background: #f7f7f9;
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-coupon .wc-block-components-text-input input:focus {
+  border-color: var(--sella-accent);
+  box-shadow: 0 0 0 4px var(--sella-accent-ring);
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-coupon__button {
+  min-height: 48px;
+  border: 1.7px solid var(--sella-accent);
+  border-radius: 50px;
+  color: var(--sella-accent);
+  background: transparent;
+  font-weight: 600;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-coupon__button:hover {
+  color: #fff;
+  background: var(--sella-accent);
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-item {
+  padding: 0;
+  color: #444;
+  font-size: 15px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-item__label {
+  font-weight: 500;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-item__value {
+  color: #171717;
+  font-weight: 600;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-item__description {
+  color: #6b6b6b;
+  font-size: 13px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-footer-item {
+  padding: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-footer-item .wc-block-components-totals-item__label,
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-totals-footer-item .wc-block-components-totals-item__value {
+  color: #171717;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+/* Paying: only the pill to the checkout. The PayPal plugin's express button
+   (and the "או" under it) is not shown on the cart; PayPal is offered at the
+   checkout with the other payment methods. */
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__payment-options {
+  display: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit {
+  padding: 0;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit-container {
+  padding: 0;
+  margin-top: 14px;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit-container--sticky {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit-button.wc-block-components-button {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 1.7px solid var(--sella-accent) !important;
+  border-radius: 50px !important;
+  color: #fff !important;
+  background: var(--sella-accent) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-decoration: none;
+  box-shadow: none;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit-button.wc-block-components-button:hover {
+  border-color: #5f59e0 !important;
+  background: #5f59e0 !important;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__submit-button.wc-block-components-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--sella-accent-ring);
+}
+
+/* No cart: a short word and the way to the shop. */
+.woocommerce-cart .wp-block-woocommerce-cart .wp-block-woocommerce-empty-cart-block {
+  padding: 48px 20px 24px;
+  border-radius: 20px;
+  background: #fff;
+  text-align: center;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__empty-cart__title {
+  color: #171717;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.woocommerce-cart .wp-block-woocommerce-cart .wp-block-woocommerce-empty-cart-block .wp-block-button__link {
+  border-radius: 50px;
+  background: var(--sella-accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  body.woocommerce-cart main.site-main {
+    padding-top: 12px;
+    padding-inline: 14px;
+  }
+
+  body.woocommerce-cart .page-header .entry-title {
+    font-size: 28px;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__main,
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__sidebar {
+    padding: 18px 16px 20px;
+    border-radius: 16px;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart__sidebar {
+    margin-top: 16px;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-items .wc-block-cart-items__row td {
+    padding: 16px 0;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__image,
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__image img {
+    width: 72px;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__image {
+    padding-inline-end: 14px !important;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-components-product-name {
+    font-size: 15px;
+  }
+
+  .woocommerce-cart .wp-block-woocommerce-cart .wc-block-cart-item__total .wc-block-components-product-price {
+    font-size: 15px;
+  }
 }

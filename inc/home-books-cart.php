@@ -67,6 +67,17 @@ function sella_home_book_card_html( $product, $card_class = 'book-card-item stat
 		? ' style="--bg-img:url(\'' . esc_url( $product_image ) . '\')"'
 		: '';
 
+	// A book for subscribers only (inc/sella-members-only.php): no price, and
+	// the button leads to the subscription page instead of adding to the cart.
+	$members_only = function_exists( 'sella_is_members_only' ) && sella_members_only_applies() && sella_is_members_only( $product );
+	$button       = $members_only
+		? sella_members_only_button_html( $product, $tabindex ? 'tabindex="-1"' : '' )
+		: '<a href="' . esc_url( $add_to_cart_url ) . '" class="book-add-to-cart-btn" data-product_id="' . absint( $product_id ) . '"' . $tabindex . '>הוספה לסל</a>';
+	if ( $members_only ) {
+		$product_url   = sella_members_only_url();
+		$product_price = '';
+	}
+
 	return '
 			<div class="' . esc_attr( $card_class ) . '">
 				<a href="' . esc_url( $product_url ) . '" class="book-link-wrapper"' . $tabindex . '>
@@ -77,10 +88,10 @@ function sella_home_book_card_html( $product, $card_class = 'book-card-item stat
 					</div>
 					<h3 class="book-title">' . esc_html( $product_title ) . '</h3>
 					<span class="book-author">' . esc_html( $author_name ) . '</span>
-					<div class="book-price">' . $product_price . '</div>
+					' . ( $product_price ? '<div class="book-price">' . $product_price . '</div>' : '' ) . '
 				</a>
 				<div class="book-action-area">
-					<a href="' . esc_url( $add_to_cart_url ) . '" class="book-add-to-cart-btn" data-product_id="' . absint( $product_id ) . '"' . $tabindex . '>הוספה לסל</a>
+					' . $button . '
 				</div>
 			</div>';
 }
