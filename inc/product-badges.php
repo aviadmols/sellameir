@@ -660,7 +660,14 @@ function sella_badge_get_for_product( $product_id ) {
 		}
 	}
 
-	return $matched;
+	/**
+	 * The badges of a product. A module may add its own (text, color,
+	 * text_color), such as "למנויים בלבד" in sella-members-only.php.
+	 *
+	 * @param array $matched    Badges.
+	 * @param int   $product_id Product ID.
+	 */
+	return (array) apply_filters( 'sella_badge_product_badges', $matched, $product_id );
 }
 
 /**
@@ -750,6 +757,14 @@ function sella_badge_build_product_map() {
 			$map[ $key ][] = $entry;
 		}
 	}
+
+	/**
+	 * product_id => badges, for the cards the browser decorates. Same hook
+	 * point as 'sella_badge_product_badges', for the whole catalogue at once.
+	 *
+	 * @param array $map Map.
+	 */
+	$map = (array) apply_filters( 'sella_badge_product_map', $map );
 
 	return $map;
 }

@@ -5,9 +5,10 @@
  * A checkbox on the product's General tab ("למנויים בלבד") marks a book that
  * comes with the Shibolet subscription instead of being sold. In the shop,
  * the categories, the homepage sliders and the related books the card keeps
- * its cover, name and author, but shows no price and its button reads
- * "למנויים בלבד" and leads to /subscription/. The book's own page sends
- * there too, and the book cannot be added to a cart by any route.
+ * its cover, name and author, but shows no price, wears a "למנויים בלבד"
+ * label on the cover (through the badges module, product-badges.php) and
+ * its button reads "להצטרפות" and leads to /subscription/. The book's own
+ * page sends there too, and the book cannot be added to a cart by any route.
  *
  * Editors (edit_products) still open the product page, to check it.
  *
@@ -20,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'SELLA_MEMBERS_ONLY_META', '_sella_members_only' );
 define( 'SELLA_MEMBERS_ONLY_LABEL', 'למנויים בלבד' );
+define( 'SELLA_MEMBERS_ONLY_BUTTON', 'להצטרפות' );
 define( 'SELLA_MEMBERS_ONLY_CACHE', 'sella_members_only_ids' );
 
 /**
@@ -66,9 +68,9 @@ function sella_members_only_applies() {
 }
 
 /**
- * The card button: a link to the subscription page. No add-to-cart classes,
- * so neither WooCommerce nor the tracking plugin treat the click as a
- * purchase.
+ * The card button, "להצטרפות": a link to the subscription page. No
+ * add-to-cart classes, so neither WooCommerce nor the tracking plugin treat
+ * the click as a purchase.
  *
  * @param WC_Product $product Product.
  * @param string     $attrs   Extra attributes, already escaped.
@@ -79,11 +81,60 @@ function sella_members_only_button_html( $product, $attrs = '' ) {
 		'<a href="%s" class="sella-members-btn" data-product_id="%d" aria-label="%s"%s>%s</a>',
 		esc_url( sella_members_only_url() ),
 		$product->get_id(),
-		esc_attr( SELLA_MEMBERS_ONLY_LABEL . ': ' . $product->get_name() . ' – לדף המנויים' ),
+		esc_attr( SELLA_MEMBERS_ONLY_BUTTON . ' למנויים: ' . $product->get_name() . ' ' . SELLA_MEMBERS_ONLY_LABEL ),
 		$attrs ? ' ' . $attrs : '',
-		esc_html( SELLA_MEMBERS_ONLY_LABEL )
+		esc_html( SELLA_MEMBERS_ONLY_BUTTON )
 	);
 }
+
+/**
+ * The label on the cover, in the badges module's shape.
+ *
+ * @return array{text:string,color:string,text_color:string}
+ */
+function sella_members_only_badge() {
+	return array(
+		'text'       => SELLA_MEMBERS_ONLY_LABEL,
+		'color'      => '#746FED', // The site's accent: seen on dark covers too.
+		'text_color' => '#ffffff',
+	);
+}
+
+/**
+ * "למנויים בלבד" first among a flagged book's badges.
+ *
+ * @param array $badges     Badges.
+ * @param int   $product_id Product ID.
+ * @return array
+ */
+function sella_members_only_product_badges( $badges, $product_id ) {
+	if ( sella_members_only_applies() && sella_is_members_only( $product_id ) ) {
+		array_unshift( $badges, sella_members_only_badge() );
+	}
+	return $badges;
+}
+add_filter( 'sella_badge_product_badges', 'sella_members_only_product_badges', 10, 2 );
+
+/**
+ * The same, in the map the cards get from the browser.
+ *
+ * @param array $map product_id => badges.
+ * @return array
+ */
+function sella_members_only_product_map( $map ) {
+	if ( ! sella_members_only_applies() ) {
+		return $map;
+	}
+	foreach ( sella_members_only_ids() as $product_id ) {
+		$key = (string) $product_id;
+		if ( ! isset( $map[ $key ] ) ) {
+			$map[ $key ] = array();
+		}
+		array_unshift( $map[ $key ], sella_members_only_badge() );
+	}
+	return $map;
+}
+add_filter( 'sella_badge_product_map', 'sella_members_only_product_map' );
 
 /*
  * ------------------------------------------------------------------
@@ -99,7 +150,7 @@ function sella_members_only_field() {
 		array(
 			'id'          => SELLA_MEMBERS_ONLY_META,
 			'label'       => SELLA_MEMBERS_ONLY_LABEL,
-			'description' => 'לא למכירה בחנות: בלי מחיר, הכפתור "למנויים בלבד" ולחיצה על הספר מובילה לדף המנויים',
+			'description' => 'לא למכירה בחנות: בלי מחיר, תגית "למנויים בלבד" על הכריכה, הכפתור "להצטרפות" ולחיצה על הספר מובילה לדף המנויים',
 		)
 	);
 }
@@ -190,7 +241,7 @@ add_filter( 'woocommerce_get_price_html', 'sella_members_only_price_html', 99, 2
 
 /**
  * The card button in every WooCommerce loop (the shop grid, the categories,
- * the related books): "למנויים בלבד", to the subscription page.
+ * the related books): "להצטרפות", to the subscription page.
  *
  * @param string     $link    Button HTML.
  * @param WC_Product $product Product.
