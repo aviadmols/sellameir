@@ -912,6 +912,141 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   font-weight: 700;
 }
 
+/* Payment methods: each one a card that is clicked as a whole; the chosen one
+   takes the accent. The radio sits inside the card, the gateway's note under
+   its title. ":has" marks the chosen card; without it all cards look alike. */
+.woocommerce-checkout #payment ul.payment_methods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  list-style: none;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #e5e5e5;
+  border-radius: 14px;
+  background: #fff;
+  list-style: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method:hover {
+  border-color: #c9c6f7;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method:has(> input.input-radio:checked) {
+  border-color: var(--sella-accent, #746fed);
+  background: #f6f5ff;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method > input.input-radio {
+  position: absolute;
+  top: 19px;
+  inset-inline-start: 16px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--sella-accent, #746fed);
+  cursor: pointer;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  margin: 0;
+  padding-block: 14px;
+  padding-inline: 46px 16px;
+  color: #171717;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+/* A card icon at the far end of the credit-card method. */
+.woocommerce-checkout #payment li.payment_method_lets_payplus > label::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 26px;
+  height: 20px;
+  margin-inline-start: auto;
+  background: #8a8a8a;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 20' fill='none' stroke='black' stroke-width='1.8'%3E%3Crect x='1' y='1' width='24' height='18' rx='3'/%3E%3Cpath d='M1 7h24M5 14h6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 20' fill='none' stroke='black' stroke-width='1.8'%3E%3Crect x='1' y='1' width='24' height='18' rx='3'/%3E%3Cpath d='M1 7h24M5 14h6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method > label img {
+  max-height: 24px;
+  margin-inline-start: auto;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method .payment_box {
+  margin: 0;
+  padding-block: 0 14px;
+  padding-inline: 46px 16px;
+  border: 0;
+  background: none;
+  color: #6b6b6b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method .payment_box::before {
+  display: none;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li.wc_payment_method .payment_box p {
+  margin: 0;
+}
+
+/* Terms: the box and its line aligned, in the same size as the methods. */
+.woocommerce-checkout #payment .woocommerce-terms-and-conditions-wrapper .form-row {
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce-checkout form.checkout #payment .woocommerce-terms-and-conditions-wrapper label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: #171717;
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.woocommerce-checkout form.checkout #payment .woocommerce-terms-and-conditions-wrapper .woocommerce-terms-and-conditions-checkbox-text {
+  color: #171717;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.woocommerce-checkout #payment .woocommerce-terms-and-conditions-wrapper label.checkbox #terms {
+  flex: 0 0 auto;
+  margin: 0;
+  margin-inline-end: 8px;
+}
+
+.woocommerce-checkout #payment .woocommerce-terms-and-conditions-link {
+  color: var(--sella-accent, #746fed);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.woocommerce-checkout #payment .woocommerce-terms-and-conditions-wrapper abbr.required {
+  color: var(--sella-error, #d63638);
+  text-decoration: none;
+}
+
 @media (max-width: 767px) {
   body.woocommerce-checkout {
     background: #fafafa;
