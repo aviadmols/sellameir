@@ -256,6 +256,80 @@ function sella_members_only_loop_button( $link, $product ) {
 add_filter( 'woocommerce_loop_add_to_cart_link', 'sella_members_only_loop_button', 99, 2 );
 
 /**
+ * The shop grid plugin builds its own button from the product's
+ * add_to_cart_url(), add_to_cart_text() and add_to_cart_description(): the
+ * three say "להצטרפות", to the subscription page. Each is a method of the
+ * product, so these run wherever the button is printed.
+ *
+ * @param string     $value   URL or text.
+ * @param WC_Product $product Product.
+ * @return string
+ */
+function sella_members_only_add_to_cart_url( $value, $product ) {
+	return $product instanceof WC_Product && sella_members_only_applies() && sella_is_members_only( $product ) ? sella_members_only_url() : $value;
+}
+add_filter( 'woocommerce_product_add_to_cart_url', 'sella_members_only_add_to_cart_url', 100, 2 );
+
+/**
+ * @param string     $text    Button text.
+ * @param WC_Product $product Product.
+ * @return string
+ */
+function sella_members_only_add_to_cart_text( $text, $product ) {
+	return $product instanceof WC_Product && sella_members_only_applies() && sella_is_members_only( $product ) ? SELLA_MEMBERS_ONLY_BUTTON : $text;
+}
+add_filter( 'woocommerce_product_add_to_cart_text', 'sella_members_only_add_to_cart_text', 100, 2 );
+add_filter( 'woocommerce_product_single_add_to_cart_text', 'sella_members_only_add_to_cart_text', 100, 2 );
+
+/**
+ * @param string     $text    The button's aria-label.
+ * @param WC_Product $product Product.
+ * @return string
+ */
+function sella_members_only_add_to_cart_description( $text, $product ) {
+	if ( ! $product instanceof WC_Product || ! sella_members_only_applies() || ! sella_is_members_only( $product ) ) {
+		return $text;
+	}
+	return SELLA_MEMBERS_ONLY_BUTTON . ' למנויים: ' . $product->get_name() . ' ' . SELLA_MEMBERS_ONLY_LABEL;
+}
+add_filter( 'woocommerce_product_add_to_cart_description', 'sella_members_only_add_to_cart_description', 100, 2 );
+
+/**
+ * The grid plugin's button keeps its add-to-cart classes whatever the text,
+ * and the cart drawer and the tracking would treat a click as an add to
+ * cart. A small script swaps the button on the flagged cards for the plain
+ * "להצטרפות" link, and points the card at the subscription page.
+ */
+function sella_members_only_assets() {
+	if ( is_admin() ) {
+		return;
+	}
+	$ids = sella_members_only_ids();
+	if ( ! $ids ) {
+		return;
+	}
+
+	wp_enqueue_script(
+		'sella-members-only',
+		get_stylesheet_directory_uri() . '/assets/js/sella-members-only.js',
+		array(),
+		HELLO_ELEMENTOR_CHILD_VERSION,
+		true
+	);
+	wp_localize_script(
+		'sella-members-only',
+		'sellaMembersOnly',
+		array(
+			'ids'   => array_map( 'strval', $ids ),
+			'url'   => sella_members_only_url(),
+			'text'  => SELLA_MEMBERS_ONLY_BUTTON,
+			'label' => SELLA_MEMBERS_ONLY_LABEL,
+		)
+	);
+}
+add_action( 'wp_enqueue_scripts', 'sella_members_only_assets', 25 );
+
+/**
  * The card itself links to the subscription page where WooCommerce prints
  * the link.
  *
