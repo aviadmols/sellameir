@@ -224,14 +224,290 @@
 }
 
 /* ActiveTrail (inc/sella-activetrail.php): the routing screen and the list column. */
-.sella-at-admin .sella-leads-settings {
-  max-width: 1200px;
+.sella-at-admin .sella-leads-lead {
+  max-width: 960px;
+}
+
+.sella-at-box {
+  max-width: 1100px;
+  margin-top: 16px;
+  padding: 16px 20px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sella-at-box h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.sella-at-connection__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px 20px;
+}
+
+@media (min-width: 1100px) {
+  .sella-at-connection__grid {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+}
+
+.sella-at-connection__grid label > span:first-child,
+.sella-at-card__group label > span:first-child {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.sella-at-connection__grid .description {
+  display: block;
+  margin-top: 4px;
+}
+
+.sella-at-connection__toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f1;
 }
 
 .sella-at-ok {
-  margin-inline-start: 12px;
   color: #1a7a3c;
   font-weight: 600;
+}
+
+.sella-at-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  max-width: 1100px;
+  margin: 26px 0 8px;
+}
+
+.sella-at-toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sella-at-toolbar__actions {
+  display: flex;
+  gap: 12px;
+  margin-inline-end: auto;
+}
+
+.sella-at-toolbar .submit {
+  margin: 0;
+  padding: 0;
+}
+
+.sella-at-toolbar--bottom {
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+
+.sella-at-section {
+  max-width: 1100px;
+  margin: 22px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #dcdcde;
+  color: #1d2327;
+  font-size: 13px;
+  text-transform: none;
+}
+
+.sella-at-section span {
+  color: #646970;
+  font-weight: 400;
+}
+
+.sella-at-card {
+  max-width: 1100px;
+  margin: 6px 0;
+  border: 1px solid #dcdcde;
+  border-inline-start: 4px solid #dcdcde;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sella-at-card.is-active {
+  border-inline-start-color: #1a7a3c;
+}
+
+.sella-at-card.is-off {
+  border-inline-start-color: #d63638;
+  background: #fafafa;
+}
+
+.sella-at-card--default {
+  border-inline-start-color: #2271b1;
+}
+
+.sella-at-card--global {
+  border-inline-start-color: #8a5300;
+}
+
+.sella-at-card > summary {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.3fr) minmax(0, 1.4fr) minmax(0, 1fr) 56px;
+  gap: 4px 16px;
+  align-items: center;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sella-at-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sella-at-card > summary::before {
+  content: "";
+  display: none;
+}
+
+.sella-at-card[open] > summary {
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.sella-at-card__title {
+  font-weight: 600;
+}
+
+.sella-at-card__title::before {
+  content: "▸";
+  display: inline-block;
+  margin-inline-end: 8px;
+  color: #8c8f94;
+  font-size: 11px;
+  transform: rotate(180deg);
+  transition: transform 0.15s;
+}
+
+.sella-at-card[open] .sella-at-card__title::before {
+  transform: rotate(270deg);
+}
+
+.sella-at-card__meta {
+  overflow: hidden;
+  color: #646970;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sella-at-card__meta a {
+  margin-inline-end: 6px;
+}
+
+.sella-at-card__state {
+  overflow: hidden;
+  color: #646970;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sella-at-card.is-active .sella-at-card__state {
+  color: #1a7a3c;
+  font-weight: 600;
+}
+
+.sella-at-card.is-off .sella-at-card__state {
+  color: #b32d2e;
+  font-weight: 600;
+}
+
+.sella-at-card__fields {
+  color: #646970;
+  font-size: 12px;
+  text-align: end;
+}
+
+.sella-at-card__body {
+  padding: 14px 16px 16px;
+}
+
+.sella-at-card__group {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px 20px;
+  margin-bottom: 14px;
+}
+
+.sella-at-card__group .sella-at-group {
+  width: 100%;
+  max-width: 100%;
+}
+
+.sella-at-card__group .sella-at-more {
+  width: 100%;
+}
+
+.sella-at-map__lead {
+  margin: 0 0 6px;
+  color: #50575e;
+  font-size: 12px;
+}
+
+.sella-at-map__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sella-at-map__table th {
+  padding: 4px 6px;
+  color: #646970;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: start;
+}
+
+.sella-at-map__table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.sella-at-map__table tbody:empty + template + .sella-at-map-add,
+.sella-at-map-add {
+  margin-top: 8px;
+}
+
+.sella-at-map__src,
+.sella-at-map__field {
+  width: 46%;
+}
+
+.sella-at-map__src .sella-at-src,
+.sella-at-map__field .sella-at-field {
+  width: 100%;
+  max-width: 100%;
+}
+
+.sella-at-map__src .sella-at-text {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.sella-at-map__arrow {
+  width: 24px;
+  color: #8c8f94;
+  text-align: center;
+}
+
+.sella-at-map__remove {
+  width: 28px;
+  text-align: center;
+}
+
+.sella-at-map-remove {
+  color: #b32d2e;
+  text-decoration: none;
 }
 
 .sella-at-inline {
@@ -241,52 +517,16 @@
   align-items: center;
 }
 
-.sella-at-placeholders code {
-  font-size: 12px;
-}
-
-.sella-at-routes th,
-.sella-at-routes td {
-  vertical-align: top;
-}
-
-.sella-at-routes tr.sella-at-kind th {
-  padding-top: 14px;
-  background: #f6f7f7;
-  font-size: 13px;
-}
-
-.sella-at-routes tr.sella-at-default td {
-  background: #fbfbfc;
-}
-
-.sella-at-group {
-  max-width: 260px;
-}
-
-.sella-at-more {
-  width: 110px;
-}
-
-.sella-at-routes .sella-at-fields {
-  width: 100%;
-  min-width: 180px;
-  min-height: 30px;
-  font-family: Consolas, Menlo, monospace;
-  font-size: 12px;
-  resize: vertical;
-}
-
 .sella-at-side {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  max-width: 1200px;
+  max-width: 1100px;
+  margin-top: 10px;
 }
 
-.sella-at-side .sella-leads-settings {
+.sella-at-side .sella-at-box {
   flex: 1 1 380px;
-  margin-top: 20px;
 }
 
 .sella-leads-table__activetrail {

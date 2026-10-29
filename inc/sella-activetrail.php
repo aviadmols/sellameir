@@ -6,10 +6,11 @@
  * Each lead carries a channel: the contact form, the newsletter popup, the
  * popup before checkout, a back-in-stock request, an Elementor form (by its
  * ID) or a first-chapter request by the page it was sent from. The screen
- * (פניות ולידים → אקטיב טרייל) lists the channels and, for each, the group
- * the contact joins and the fields it is given (ext1…, with placeholders
- * such as {book} and {page}). A channel without its own row falls back to
- * its kind (all first-chapter requests) and then to the default route.
+ * (פניות ולידים → אקטיב טרייל) shows a card per channel with the group the
+ * contact joins and a field map: what the site knows about the lead (name,
+ * book, page, the form's own fields, fixed text) into which ActiveTrail
+ * field (first name, SMS, ext1…). A channel without its own card falls
+ * back to its kind (all first-chapter requests) and then to the default.
  *
  * The contact is sent at the end of the request that recorded the lead,
  * after the visitor has their answer. The answer is kept on the lead row
@@ -31,6 +32,7 @@ define( 'SELLA_AT_SETTINGS', 'sella_activetrail_settings' );
 define( 'SELLA_AT_SLUG', 'sella-activetrail' );
 define( 'SELLA_AT_API', 'https://webapi.mymarketing.co.il/api/' );
 define( 'SELLA_AT_GROUPS_CACHE', 'sella_at_groups' );
+define( 'SELLA_AT_FIELDS_CACHE', 'sella_at_fields' );
 
 /**
  * ---------------------------------------------------------------------------
@@ -49,14 +51,14 @@ function sella_at_defaults() {
 		'status'   => 'Subscribe',
 		// Where the mobile number goes: sms, phone1 or both.
 		'phone_to' => 'both',
-		// Fields for every contact, "ext1=value" per line; placeholders allowed.
-		'fields'   => '',
-		// The route of a lead whose channel and kind have none: {groups, fields}.
+		// Fields for every contact: {map}.
+		'global'   => array( 'map' => array() ),
+		// The route of a lead whose channel and kind have none: {groups, map}.
 		'default'  => array(
 			'groups' => array(),
-			'fields' => '',
+			'map'    => array(),
 		),
-		// By channel: {groups, fields, off}.
+		// By channel: {groups, map, off}.
 		'routes'   => array(),
 	);
 }
@@ -66,7 +68,14 @@ function sella_at_defaults() {
  */
 function sella_at_settings() {
 	$saved = get_option( SELLA_AT_SETTINGS, array() );
-	return array_merge( sella_at_defaults(), is_array( $saved ) ? $saved : array() );
+	$saved = is_array( $saved ) ? $saved : array();
+
+	// The first version kept "ext1={book}" lines in 'fields'.
+	if ( isset( $saved['fields'] ) && ! isset( $saved['global'] ) ) {
+		$saved['global'] = array( 'map' => sella_at_map_from_lines( $saved['fields'] ) );
+	}
+
+	return array_merge( sella_at_defaults(), $saved );
 }
 
 /**
@@ -80,42 +89,111 @@ function sella_at_on() {
 }
 
 /**
- * The contact fields a route may fill.
+ * The ActiveTrail fields a map may fill: API key => label. The labels come
+ * from the account when they were fetched (the names given to ext1… there).
  *
- * @return string[]
+ * @return array<string, string>
  */
-function sella_at_field_names() {
-	$names = array( 'first_name', 'last_name', 'sms', 'phone1', 'phone2', 'city', 'street', 'zip_code' );
+function sella_at_target_fields() {
+	$fields = array(
+		'first_name' => 'שם פרטי',
+		'last_name'  => 'שם משפחה',
+		'sms'        => 'נייד (SMS)',
+		'phone1'     => 'טלפון',
+		'phone2'     => 'טלפון נוסף',
+		'street'     => 'רחוב',
+		'city'       => 'עיר',
+		'zip_code'   => 'מיקוד',
+		'fax'        => 'פקס',
+	);
 	for ( $i = 1; $i <= 25; $i++ ) {
-		$names[] = 'ext' . $i;
+		$fields[ 'ext' . $i ] = 'שדה נוסף ' . $i;
 	}
 	for ( $i = 1; $i <= 5; $i++ ) {
-		$names[] = 'num' . $i;
-		$names[] = 'date' . $i;
+		$fields[ 'num' . $i ] = 'שדה מספרי ' . $i;
+	}
+	for ( $i = 1; $i <= 5; $i++ ) {
+		$fields[ 'date' . $i ] = 'שדה תאריך ' . $i;
+	}
+
+	$account = get_transient( SELLA_AT_FIELDS_CACHE );
+	if ( is_array( $account ) ) {
+		foreach ( $account as $key => $label ) {
+			if ( isset( $fields[ $key ] ) && '' !== $label ) {
+				$fields[ $key ] = $label;
+			}
+		}
+	}
+	return $fields;
+}
+
+/**
+ * The account's names for its fields, API key => name. Cached with the groups.
+ *
+ * @param string $token A token to try instead of the saved one.
+ * @return array<string, string>
+ */
+function sella_at_fetch_fields( $token = '' ) {
+	$result = sella_at_request( 'GET', 'account/contactFields?FieldsType=1', null, $token );
+	$names  = array();
+	if ( '' !== $result['error'] || ! is_array( $result['data'] ) ) {
+		return $names;
+	}
+	$special = array(
+		'firstname' => 'first_name',
+		'lastname'  => 'last_name',
+		'zipcode'   => 'zip_code',
+	);
+	foreach ( $result['data'] as $field ) {
+		if ( empty( $field['field_name'] ) || empty( $field['is_active'] ) ) {
+			continue;
+		}
+		$key = strtolower( (string) $field['field_name'] );
+		$key = $special[ $key ] ?? $key;
+		if ( isset( $field['field_display_name'] ) ) {
+			$names[ $key ] = html_entity_decode( (string) $field['field_display_name'], ENT_QUOTES, 'UTF-8' );
+		}
 	}
 	return $names;
 }
 
 /**
- * "ext1=value" lines (or ; separated) into field => template.
+ * "ext1=value" lines into map entries, for settings saved by the first version.
  *
- * @param string $text As typed.
- * @return array<string, string>
+ * @param string $text Lines.
+ * @return array<int, array{src: string, field: string, text: string}>
  */
-function sella_at_parse_fields( $text ) {
-	$fields  = array();
-	$allowed = sella_at_field_names();
+function sella_at_map_from_lines( $text ) {
+	$map     = array();
+	$allowed = sella_at_target_fields();
 	foreach ( preg_split( '/[\r\n;]+/', (string) $text ) as $line ) {
 		if ( false === strpos( $line, '=' ) ) {
 			continue;
 		}
 		list( $key, $value ) = array_map( 'trim', explode( '=', $line, 2 ) );
 		$key                 = strtolower( $key );
-		if ( in_array( $key, $allowed, true ) && '' !== $value ) {
-			$fields[ $key ] = $value;
+		if ( isset( $allowed[ $key ] ) && '' !== $value ) {
+			$map[] = array(
+				'src'   => 'text',
+				'field' => $key,
+				'text'  => $value,
+			);
 		}
 	}
-	return $fields;
+	return $map;
+}
+
+/**
+ * A route's map, whichever version saved it.
+ *
+ * @param array $route Route or settings part.
+ * @return array<int, array{src: string, field: string, text: string}>
+ */
+function sella_at_route_map( $route ) {
+	if ( isset( $route['map'] ) && is_array( $route['map'] ) ) {
+		return $route['map'];
+	}
+	return isset( $route['fields'] ) ? sella_at_map_from_lines( $route['fields'] ) : array();
 }
 
 /**
@@ -157,43 +235,62 @@ function sella_at_lead_channel( $type, $page_url ) {
 /**
  * The channels the screen lists, in order: the fixed ones, the Elementor
  * forms, the first-chapter pages, then anything else that has reached the
- * list. Each: label, kind (a lead type), page (URL or ''), note.
+ * list. Each: label, kind (a lead type), page (URL or ''), note, fields
+ * (labels of the form's own fields, when known).
  *
- * @return array<string, array{label: string, kind: string, page: string, note: string}>
+ * @return array<string, array{label: string, kind: string, page: string, note: string, fields: string[]}>
  */
 function sella_at_channels() {
 	global $wpdb;
 
 	$channels = array(
 		'contact'        => array(
-			'label' => 'טופס צור קשר',
-			'kind'  => 'contact',
-			'page'  => '',
-			'note'  => 'הטופס [sella_contact_form] בדף צור קשר',
+			'label'  => 'טופס צור קשר',
+			'kind'   => 'contact',
+			'page'   => '',
+			'note'   => 'הטופס [sella_contact_form] בדף צור קשר',
+			'fields' => array(),
 		),
 		'newsletter'     => array(
-			'label' => 'פופאפ ניוזלטר',
-			'kind'  => 'newsletter',
-			'page'  => '',
-			'note'  => 'וכל טופס HTML אחר של ניוזלטר באתר',
+			'label'  => 'פופאפ ניוזלטר',
+			'kind'   => 'newsletter',
+			'page'   => '',
+			'note'   => 'וכל טופס HTML אחר של ניוזלטר באתר',
+			'fields' => array(),
 		),
 		'checkout_email' => array(
-			'label' => 'מייל לפני תשלום',
-			'kind'  => 'checkout_email',
-			'page'  => '',
-			'note'  => 'הפופאפ שמבקש מייל לפני המעבר לתשלום',
+			'label'  => 'מייל לפני תשלום',
+			'kind'   => 'checkout_email',
+			'page'   => '',
+			'note'   => 'הפופאפ שמבקש מייל לפני המעבר לתשלום',
+			'fields' => array(),
 		),
 		'back_in_stock'  => array(
-			'label' => 'עדכון כשהספר חוזר למלאי',
-			'kind'  => 'back_in_stock',
-			'page'  => '',
-			'note'  => 'הטופס בדף של ספר שאזל; {book} הוא שם הספר',
+			'label'  => 'עדכון כשהספר חוזר למלאי',
+			'kind'   => 'back_in_stock',
+			'page'   => '',
+			'note'   => 'הטופס בדף של ספר שאזל; "שם הספר" הוא הספר שביקשו',
+			'fields' => array(),
 		),
 	);
 
 	$forms = function_exists( 'sella_fc_elementor_forms' ) ? sella_fc_elementor_forms() : array();
 	$lists = function_exists( 'sella_leads_settings' ) ? sella_leads_settings()['forms'] : array();
 	$types = function_exists( 'sella_leads_types' ) ? sella_leads_types() : array();
+
+	$form_fields = function ( $form ) {
+		$labels = array();
+		foreach ( (array) ( $form['fields'] ?? array() ) as $field ) {
+			$label = (string) ( $field['label'] ?? '' );
+			if ( '' === $label ) {
+				$label = (string) ( $field['id'] ?? '' );
+			}
+			if ( '' !== $label && ! in_array( $field['type'] ?? '', array( 'hidden', 'honeypot', 'recaptcha', 'recaptcha_v3', 'html', 'step' ), true ) ) {
+				$labels[] = $label;
+			}
+		}
+		return $labels;
+	};
 
 	// Elementor forms that are not connected to a first chapter.
 	foreach ( $forms as $form ) {
@@ -205,10 +302,11 @@ function sella_at_channels() {
 			continue;
 		}
 		$channels[ 'form:' . $form['id'] ] = array(
-			'label' => 'טופס Elementor: ' . ( '' !== $form['name'] ? $form['name'] : 'ללא שם' ),
-			'kind'  => isset( $types[ $list ] ) ? $list : 'form',
-			'page'  => (string) get_permalink( (int) $form['post_id'] ),
-			'note'  => '' !== $form['post_title'] ? $form['post_title'] : '',
+			'label'  => '' !== $form['name'] ? $form['name'] : 'טופס Elementor ללא שם',
+			'kind'   => isset( $types[ $list ] ) ? $list : 'form',
+			'page'   => (string) get_permalink( (int) $form['post_id'] ),
+			'note'   => 'טופס Elementor' . ( '' !== $form['post_title'] ? ' בדף ' . $form['post_title'] : '' ),
+			'fields' => $form_fields( $form ),
 		);
 	}
 
@@ -222,10 +320,11 @@ function sella_at_channels() {
 			}
 			$url = $product->get_permalink();
 			$channels[ 'first_chapter:' . sella_at_path( $url ) ] = array(
-				'label' => 'פרק ראשון: ' . wp_strip_all_tags( $product->get_name() ),
-				'kind'  => 'first_chapter',
-				'page'  => $url,
-				'note'  => 'דף הספר',
+				'label'  => wp_strip_all_tags( $product->get_name() ),
+				'kind'   => 'first_chapter',
+				'page'   => $url,
+				'note'   => 'טופס הפרק הראשון בדף הספר',
+				'fields' => array(),
 			);
 		}
 		foreach ( $forms as $form ) {
@@ -239,10 +338,11 @@ function sella_at_channels() {
 				continue;
 			}
 			$channels[ $key ] = array(
-				'label' => 'פרק ראשון: ' . ( '' !== $form['name'] ? $form['name'] : $connection['label'] ),
-				'kind'  => 'first_chapter',
-				'page'  => $url,
-				'note'  => '' !== $form['post_title'] ? $form['post_title'] : 'טופס Elementor',
+				'label'  => '' !== $form['name'] ? $form['name'] : $connection['label'],
+				'kind'   => 'first_chapter',
+				'page'   => $url,
+				'note'   => 'טופס Elementor' . ( '' !== $form['post_title'] ? ' בדף ' . $form['post_title'] : '' ),
+				'fields' => $form_fields( $form ),
 			);
 		}
 	}
@@ -257,27 +357,46 @@ function sella_at_channels() {
 			}
 			$kind = isset( $types[ $row->type ] ) ? $row->type : 'form';
 			if ( 0 === strpos( $row->channel, 'first_chapter:' ) ) {
-				$label = 'פרק ראשון: ' . substr( $row->channel, strlen( 'first_chapter:' ) );
+				$label = substr( $row->channel, strlen( 'first_chapter:' ) );
 			} elseif ( 0 === strpos( $row->channel, 'form:' ) ) {
 				$label = 'טופס Elementor שכבר לא באתר';
 			} else {
 				$label = $row->channel;
 			}
 			$channels[ $row->channel ] = array(
-				'label' => $label,
-				'kind'  => $kind,
-				'page'  => (string) $row->page_url,
-				'note'  => (int) $row->total . ' רשומות',
+				'label'  => $label,
+				'kind'   => $kind,
+				'page'   => (string) $row->page_url,
+				'note'   => (int) $row->total . ' רשומות ברשימה',
+				'fields' => array(),
 			);
 		}
 	}
 
 	$channels['first_chapter'] = array(
-		'label' => 'פרק ראשון: כל שאר הבקשות',
-		'kind'  => 'first_chapter',
-		'page'  => '',
-		'note'  => 'בקשה מדף שאין לו שורה משלו למעלה',
+		'label'  => 'כל שאר הבקשות לפרק ראשון',
+		'kind'   => 'first_chapter',
+		'page'   => '',
+		'note'   => 'בקשה מדף שאין לו כרטיס משלו',
+		'fields' => array(),
 	);
+
+	// The labels of the extra fields the channel's leads carried, for the map.
+	if ( function_exists( 'sella_leads_table' ) && get_option( 'sella_leads_db_version' ) ) {
+		$table = sella_leads_table();
+		foreach ( $channels as $key => &$channel ) {
+			$rows = $wpdb->get_col( $wpdb->prepare( "SELECT fields FROM {$table} WHERE channel = %s AND fields IS NOT NULL ORDER BY id DESC LIMIT 20", $key ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			foreach ( (array) $rows as $json ) {
+				$fields = json_decode( (string) $json, true );
+				foreach ( is_array( $fields ) ? array_keys( $fields ) : array() as $label ) {
+					if ( ! in_array( (string) $label, $channel['fields'], true ) ) {
+						$channel['fields'][] = (string) $label;
+					}
+				}
+			}
+		}
+		unset( $channel );
+	}
 
 	return $channels;
 }
@@ -286,7 +405,7 @@ function sella_at_channels() {
  * The route of a lead: its channel's, else its kind's, else the default.
  *
  * @param object $row Lead row (channel, type).
- * @return array{groups: int[], fields: string, via: string}|null Null when it is not to be sent.
+ * @return array{groups: int[], map: array, via: string}|null Null when it is not to be sent.
  */
 function sella_at_route( $row ) {
 	$settings = sella_at_settings();
@@ -301,10 +420,11 @@ function sella_at_route( $row ) {
 		if ( ! empty( $routes[ $key ]['off'] ) ) {
 			return null;
 		}
-		if ( ! empty( $routes[ $key ]['groups'] ) || '' !== (string) $routes[ $key ]['fields'] ) {
+		$map = sella_at_route_map( $routes[ $key ] );
+		if ( ! empty( $routes[ $key ]['groups'] ) || $map ) {
 			return array(
 				'groups' => array_map( 'intval', (array) $routes[ $key ]['groups'] ),
-				'fields' => (string) $routes[ $key ]['fields'],
+				'map'    => $map,
 				'via'    => $key,
 			);
 		}
@@ -315,7 +435,7 @@ function sella_at_route( $row ) {
 	}
 	return array(
 		'groups' => array_map( 'intval', (array) $settings['default']['groups'] ),
-		'fields' => (string) ( $settings['default']['fields'] ?? '' ),
+		'map'    => sella_at_route_map( $settings['default'] ),
 		'via'    => 'default',
 	);
 }
@@ -327,7 +447,47 @@ function sella_at_route( $row ) {
  */
 
 /**
- * The placeholders a field template may use, for a lead.
+ * What the site knows about a lead, as the map's sources: token => label,
+ * in groups. The form's own fields come as {field:label}.
+ *
+ * @param string[] $form_fields Labels of the channel's own fields.
+ * @return array<string, array<string, string>> Group label => (token => label).
+ */
+function sella_at_sources( $form_fields = array() ) {
+	$sources = array(
+		'פרטי הפונה'   => array(
+			'{name}'       => 'שם מלא',
+			'{first_name}' => 'שם פרטי (המילה הראשונה)',
+			'{last_name}'  => 'שם משפחה (שאר השם)',
+			'{email}'      => 'אימייל',
+			'{phone}'      => 'נייד',
+		),
+		'מאיפה הגיע'   => array(
+			'{book}'     => 'שם הספר',
+			'{form}'     => 'שם הטופס',
+			'{page}'     => 'שם הדף',
+			'{page_url}' => 'כתובת הדף',
+			'{source}'   => 'המקור כמו ברשימה',
+			'{type}'     => 'סוג ההרשמה',
+			'{date}'     => 'תאריך',
+		),
+		'תוכן הפנייה'  => array(
+			'{message}' => 'ההודעה',
+			'{order}'   => 'מספר הזמנה',
+		),
+	);
+	if ( $form_fields ) {
+		$sources['שדות הטופס'] = array();
+		foreach ( $form_fields as $label ) {
+			$sources['שדות הטופס'][ '{field:' . $label . '}' ] = $label;
+		}
+	}
+	$sources['קבוע'] = array( 'text' => 'טקסט קבוע' );
+	return $sources;
+}
+
+/**
+ * The placeholders a map may use, for a lead.
  *
  * @param object $row Lead row.
  * @return array<string, string>
@@ -367,6 +527,26 @@ function sella_at_placeholders( $row ) {
 }
 
 /**
+ * One map entry's value for a lead.
+ *
+ * @param array  $entry  src, field, text.
+ * @param array  $values Placeholders.
+ * @param array  $fields The lead's own fields, label => value.
+ * @return string
+ */
+function sella_at_map_value( $entry, $values, $fields ) {
+	$src = (string) ( $entry['src'] ?? '' );
+	if ( 'text' === $src ) {
+		return trim( strtr( (string) ( $entry['text'] ?? '' ), $values ) );
+	}
+	if ( 0 === strpos( $src, '{field:' ) ) {
+		$label = substr( $src, 7, -1 );
+		return isset( $fields[ $label ] ) ? trim( (string) $fields[ $label ] ) : '';
+	}
+	return isset( $values[ $src ] ) ? trim( (string) $values[ $src ] ) : '';
+}
+
+/**
  * The body ActiveTrail gets for a lead.
  *
  * @param object $row   Lead row.
@@ -376,6 +556,8 @@ function sella_at_placeholders( $row ) {
 function sella_at_contact( $row, $route ) {
 	$settings = sella_at_settings();
 	$values   = sella_at_placeholders( $row );
+	$fields   = ! empty( $row->fields ) ? json_decode( (string) $row->fields, true ) : array();
+	$fields   = is_array( $fields ) ? $fields : array();
 	$contact  = array( 'email' => $values['{email}'] );
 
 	if ( '' !== $values['{first_name}'] ) {
@@ -395,13 +577,19 @@ function sella_at_contact( $row, $route ) {
 		}
 	}
 
-	$templates = array_merge( sella_at_parse_fields( $settings['fields'] ), sella_at_parse_fields( $route['fields'] ) );
-	foreach ( $templates as $field => $template ) {
-		$value = trim( strtr( $template, $values ) );
+	// The map of every contact first, the route's after it (it wins on the same field).
+	$entries = array_merge( sella_at_route_map( $settings['global'] ), (array) ( $route['map'] ?? array() ) );
+	$allowed = sella_at_target_fields();
+	foreach ( $entries as $entry ) {
+		$field = (string) ( $entry['field'] ?? '' );
+		if ( ! isset( $allowed[ $field ] ) ) {
+			continue;
+		}
+		$value = sella_at_map_value( $entry, $values, $fields );
 		if ( '' === $value ) {
 			continue;
 		}
-		$contact[ $field ] = 0 === strpos( $field, 'num' ) ? (int) $value : mb_substr( $value, 0, 250 );
+		$contact[ $field ] = 0 === strpos( $field, 'num' ) ? (int) preg_replace( '/[^\d\-]/', '', $value ) : mb_substr( $value, 0, 250 );
 	}
 
 	if ( '' !== $settings['status'] ) {
@@ -496,7 +684,8 @@ function sella_at_request( $method, $path, $body = null, $token = '' ) {
 }
 
 /**
- * The account's groups, id => name. Cached for an hour.
+ * The account's groups, id => name. Cached for an hour, with the account's
+ * field names.
  *
  * @param bool   $refresh Fetch again.
  * @param string $token   A token to try instead of the saved one.
@@ -532,6 +721,7 @@ function sella_at_groups( $refresh = false, $token = '' ) {
 	natcasesort( $groups );
 	if ( '' === $token ) {
 		set_transient( SELLA_AT_GROUPS_CACHE, $groups, HOUR_IN_SECONDS );
+		set_transient( SELLA_AT_FIELDS_CACHE, sella_at_fetch_fields(), HOUR_IN_SECONDS );
 	}
 	return $groups;
 }
@@ -712,17 +902,53 @@ function sella_at_admin_assets( $hook ) {
 	if ( false === strpos( $hook, SELLA_AT_SLUG ) ) {
 		return;
 	}
-	$file = get_stylesheet_directory() . '/assets/css/sella-leads-admin.css';
-	wp_enqueue_style( 'sella-leads-admin', get_stylesheet_directory_uri() . '/assets/css/sella-leads-admin.css', array(), (string) filemtime( $file ) );
+	$css = get_stylesheet_directory() . '/assets/css/sella-leads-admin.css';
+	$js  = get_stylesheet_directory() . '/assets/js/sella-activetrail-admin.js';
+	wp_enqueue_style( 'sella-leads-admin', get_stylesheet_directory_uri() . '/assets/css/sella-leads-admin.css', array(), (string) filemtime( $css ) );
+	wp_enqueue_script( 'sella-activetrail-admin', get_stylesheet_directory_uri() . '/assets/js/sella-activetrail-admin.js', array(), (string) filemtime( $js ), true );
 }
 add_action( 'admin_enqueue_scripts', 'sella_at_admin_assets' );
 
 /**
+ * A posted map: rows of src, field, text.
+ *
+ * @param mixed $posted Unslashed rows.
+ * @return array<int, array{src: string, field: string, text: string}>
+ */
+function sella_at_sanitize_map( $posted ) {
+	$map     = array();
+	$allowed = sella_at_target_fields();
+	foreach ( is_array( $posted ) ? $posted : array() as $entry ) {
+		if ( ! is_array( $entry ) ) {
+			continue;
+		}
+		$src   = isset( $entry['src'] ) ? trim( sanitize_text_field( $entry['src'] ) ) : '';
+		$field = isset( $entry['field'] ) ? sanitize_key( $entry['field'] ) : '';
+		$text  = isset( $entry['text'] ) ? trim( sanitize_text_field( $entry['text'] ) ) : '';
+		if ( ! isset( $allowed[ $field ] ) || '' === $src ) {
+			continue;
+		}
+		if ( 'text' !== $src && ! preg_match( '/^\{[a-z_]+\}$/', $src ) && ! preg_match( '/^\{field:.+\}$/u', $src ) ) {
+			continue;
+		}
+		if ( 'text' === $src && '' === $text ) {
+			continue;
+		}
+		$map[] = array(
+			'src'   => $src,
+			'field' => $field,
+			'text'  => 'text' === $src ? $text : '',
+		);
+	}
+	return $map;
+}
+
+/**
  * A posted route: the group select ('' inherit, 'off', or an ID), more IDs
- * and the fields.
+ * and the map.
  *
  * @param array $posted Unslashed.
- * @return array{groups: int[], fields: string, off: bool}
+ * @return array{groups: int[], map: array, off: bool}
  */
 function sella_at_sanitize_route( $posted ) {
 	$choice = isset( $posted['group'] ) ? sanitize_text_field( $posted['group'] ) : '';
@@ -737,7 +963,7 @@ function sella_at_sanitize_route( $posted ) {
 	}
 	return array(
 		'groups' => array_values( array_unique( $groups ) ),
-		'fields' => isset( $posted['fields'] ) ? trim( sanitize_textarea_field( $posted['fields'] ) ) : '',
+		'map'    => sella_at_sanitize_map( $posted['map'] ?? array() ),
 		'off'    => 'off' === $choice,
 	);
 }
@@ -769,7 +995,7 @@ function sella_at_handle_admin_actions() {
 				continue;
 			}
 			$route = sella_at_sanitize_route( $entry );
-			if ( $route['off'] || $route['groups'] || '' !== $route['fields'] ) {
+			if ( $route['off'] || $route['groups'] || $route['map'] ) {
 				$routes[ $channel ] = $route;
 			}
 		}
@@ -783,10 +1009,10 @@ function sella_at_handle_admin_actions() {
 				'enabled'  => ! empty( $posted['enabled'] ),
 				'status'   => '' !== $status ? $status : 'Subscribe',
 				'phone_to' => $phone_to,
-				'fields'   => isset( $posted['fields'] ) ? trim( sanitize_textarea_field( $posted['fields'] ) ) : '',
+				'global'   => array( 'map' => sella_at_sanitize_map( $posted['global']['map'] ?? array() ) ),
 				'default'  => array(
 					'groups' => $default['groups'],
-					'fields' => $default['fields'],
+					'map'    => $default['map'],
 				),
 				'routes'   => $routes,
 			),
@@ -794,10 +1020,12 @@ function sella_at_handle_admin_actions() {
 		);
 		if ( $token !== $current['token'] ) {
 			delete_transient( SELLA_AT_GROUPS_CACHE );
+			delete_transient( SELLA_AT_FIELDS_CACHE );
 		}
 		$notice = 'saved';
 	} elseif ( 'refresh' === $form ) {
 		delete_transient( SELLA_AT_GROUPS_CACHE );
+		delete_transient( SELLA_AT_FIELDS_CACHE );
 		$notice = 'refreshed';
 	} elseif ( 'test' === $form ) {
 		$email   = isset( $_POST['test_email'] ) ? sanitize_email( wp_unslash( $_POST['test_email'] ) ) : '';
@@ -834,28 +1062,141 @@ function sella_at_handle_admin_actions() {
 add_action( 'admin_init', 'sella_at_handle_admin_actions' );
 
 /**
- * The group select of a route.
+ * One row of a map.
  *
- * @param string              $name   Input name.
- * @param array               $route  Saved route, or empty.
- * @param array<int, string>  $groups Account groups.
- * @param string              $empty  Label of the empty choice.
+ * @param string $prefix  Input name prefix, up to [map].
+ * @param string $index   Row index.
+ * @param array  $entry   src, field, text (empty for a blank row).
+ * @param array  $sources Source groups.
+ * @param array  $targets ActiveTrail fields.
  */
-function sella_at_group_select( $name, $route, $groups, $empty ) {
-	$chosen = ! empty( $route['off'] ) ? 'off' : ( ! empty( $route['groups'] ) ? (string) $route['groups'][0] : '' );
+function sella_at_map_row( $prefix, $index, $entry, $sources, $targets ) {
+	$src   = (string) ( $entry['src'] ?? '' );
+	$field = (string) ( $entry['field'] ?? '' );
+	$text  = (string) ( $entry['text'] ?? '' );
+	$name  = $prefix . '[map][' . $index . ']';
+	$known = false;
+	foreach ( $sources as $group ) {
+		$known = $known || isset( $group[ $src ] );
+	}
 	?>
-	<select name="<?php echo esc_attr( $name ); ?>[group]" class="sella-at-group">
-		<option value=""><?php echo esc_html( $empty ); ?></option>
-		<?php if ( 'default' !== $name ) : ?>
-			<option value="off" <?php selected( $chosen, 'off' ); ?>>לא לשלוח</option>
-		<?php endif; ?>
-		<?php foreach ( $groups as $id => $label ) : ?>
-			<option value="<?php echo (int) $id; ?>" <?php selected( $chosen, (string) $id ); ?>><?php echo esc_html( $label . ' (' . $id . ')' ); ?></option>
-		<?php endforeach; ?>
-		<?php if ( ctype_digit( $chosen ) && ! isset( $groups[ (int) $chosen ] ) ) : ?>
-			<option value="<?php echo (int) $chosen; ?>" selected>קבוצה <?php echo (int) $chosen; ?></option>
-		<?php endif; ?>
-	</select>
+	<tr class="sella-at-map-row">
+		<td class="sella-at-map__src">
+			<select name="<?php echo esc_attr( $name ); ?>[src]" class="sella-at-src" aria-label="מה לשלוח">
+				<?php foreach ( $sources as $group_label => $group ) : ?>
+					<optgroup label="<?php echo esc_attr( $group_label ); ?>">
+						<?php foreach ( $group as $token => $label ) : ?>
+							<option value="<?php echo esc_attr( $token ); ?>" <?php selected( $src, $token ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</optgroup>
+				<?php endforeach; ?>
+				<?php if ( '' !== $src && ! $known ) : ?>
+					<option value="<?php echo esc_attr( $src ); ?>" selected><?php echo esc_html( 0 === strpos( $src, '{field:' ) ? substr( $src, 7, -1 ) : $src ); ?></option>
+				<?php endif; ?>
+			</select>
+			<input type="text" name="<?php echo esc_attr( $name ); ?>[text]" value="<?php echo esc_attr( $text ); ?>" class="sella-at-text" placeholder="הטקסט שיישלח" <?php echo 'text' === $src ? '' : 'hidden'; ?> />
+		</td>
+		<td class="sella-at-map__arrow" aria-hidden="true">←</td>
+		<td class="sella-at-map__field">
+			<select name="<?php echo esc_attr( $name ); ?>[field]" class="sella-at-field" aria-label="לאיזה שדה באקטיב טרייל">
+				<option value="">בחירת שדה באקטיב טרייל</option>
+				<?php foreach ( $targets as $key => $label ) : ?>
+					<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $field, $key ); ?>><?php echo esc_html( $label . ' (' . $key . ')' ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</td>
+		<td class="sella-at-map__remove"><button type="button" class="button-link sella-at-map-remove" aria-label="הסרת השורה">✕</button></td>
+	</tr>
+	<?php
+}
+
+/**
+ * A card: a channel, the default, or the fields of every contact.
+ *
+ * @param array $args name (input prefix), title, meta (HTML), route, groups,
+ *                    sources, targets, kind (CSS), with_group (bool),
+ *                    channel (hidden input value or ''), empty_label.
+ */
+function sella_at_card( $args ) {
+	$route   = $args['route'];
+	$map     = sella_at_route_map( $route );
+	$targets = $args['targets'];
+	$groups  = $args['groups'];
+	$name    = $args['name'];
+	$chosen  = ! empty( $route['off'] ) ? 'off' : ( ! empty( $route['groups'] ) ? (string) $route['groups'][0] : '' );
+	$more    = implode( ', ', array_slice( (array) ( $route['groups'] ?? array() ), 1 ) );
+	$active  = 'off' !== $chosen && ( '' !== $chosen || $map );
+
+	if ( ! $args['with_group'] ) {
+		$state = '';
+	} elseif ( 'off' === $chosen ) {
+		$state = 'לא לשלוח';
+	} elseif ( '' !== $chosen ) {
+		$state = isset( $groups[ (int) $chosen ] ) ? $groups[ (int) $chosen ] : 'קבוצה ' . $chosen;
+		if ( '' !== $more ) {
+			$state .= ' +';
+		}
+	} else {
+		$state = $args['empty_label'];
+	}
+	?>
+	<details class="sella-at-card sella-at-card--<?php echo esc_attr( $args['kind'] ); ?><?php echo $active ? ' is-active' : ''; ?><?php echo 'off' === $chosen ? ' is-off' : ''; ?>" <?php echo ! empty( $args['open'] ) ? 'open' : ''; ?>>
+		<summary>
+			<span class="sella-at-card__title"><?php echo esc_html( $args['title'] ); ?></span>
+			<span class="sella-at-card__meta"><?php echo wp_kses_post( $args['meta'] ); ?></span>
+			<span class="sella-at-card__state" data-empty="<?php echo esc_attr( $args['empty_label'] ); ?>"><?php echo esc_html( $state ); ?></span>
+			<span class="sella-at-card__fields"><?php echo $map ? (int) count( $map ) . ' שדות' : ''; ?></span>
+		</summary>
+		<div class="sella-at-card__body">
+			<?php if ( '' !== $args['channel'] ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $name ); ?>[channel]" value="<?php echo esc_attr( $args['channel'] ); ?>" />
+			<?php endif; ?>
+
+			<?php if ( $args['with_group'] ) : ?>
+				<div class="sella-at-card__group">
+					<label>
+						<span>קבוצה באקטיב טרייל</span>
+						<select name="<?php echo esc_attr( $name ); ?>[group]" class="sella-at-group">
+							<option value=""><?php echo esc_html( $args['empty_label'] ); ?></option>
+							<?php if ( 'default' !== $name ) : ?>
+								<option value="off" <?php selected( $chosen, 'off' ); ?>>לא לשלוח</option>
+							<?php endif; ?>
+							<?php foreach ( $groups as $id => $label ) : ?>
+								<option value="<?php echo (int) $id; ?>" <?php selected( $chosen, (string) $id ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+							<?php if ( ctype_digit( $chosen ) && ! isset( $groups[ (int) $chosen ] ) ) : ?>
+								<option value="<?php echo (int) $chosen; ?>" selected>קבוצה <?php echo (int) $chosen; ?></option>
+							<?php endif; ?>
+						</select>
+					</label>
+					<label>
+						<span>קבוצות נוספות (מזהים, בפסיק)</span>
+						<input type="text" name="<?php echo esc_attr( $name ); ?>[more]" value="<?php echo esc_attr( $more ); ?>" class="sella-at-more" dir="ltr" placeholder="123, 456" />
+					</label>
+				</div>
+			<?php endif; ?>
+
+			<div class="sella-at-map" data-prefix="<?php echo esc_attr( $name ); ?>">
+				<p class="sella-at-map__lead">
+					<?php echo $args['with_group'] ? 'השם, המייל והנייד נשלחים תמיד. כאן מוסיפים מה עוד ייכנס לרשומה של איש הקשר:' : 'נשלחים עם כל איש קשר, מכל הערוצים:'; ?>
+				</p>
+				<table class="sella-at-map__table">
+					<thead>
+						<tr><th>מה לשלוח</th><th></th><th>לאיזה שדה באקטיב טרייל</th><th></th></tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $map as $index => $entry ) : ?>
+							<?php sella_at_map_row( $name, (string) $index, $entry, $args['sources'], $targets ); ?>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<template class="sella-at-map__template">
+					<table><tbody><?php sella_at_map_row( $name, '__i__', array(), $args['sources'], $targets ); ?></tbody></table>
+				</template>
+				<button type="button" class="button sella-at-map-add">+ הוספת שדה</button>
+			</div>
+		</div>
+	</details>
 	<?php
 }
 
@@ -873,12 +1214,13 @@ function sella_at_render_admin_page() {
 	$groups   = '' !== $settings['token'] ? sella_at_groups() : array();
 	$error    = is_wp_error( $groups ) ? $groups->get_error_message() : '';
 	$groups   = is_wp_error( $groups ) ? array() : $groups;
+	$targets  = sella_at_target_fields();
 	$leads    = admin_url( 'admin.php?page=' . ( defined( 'SELLA_LEADS_SLUG' ) ? SELLA_LEADS_SLUG : '' ) );
 
 	$notice  = isset( $_GET['notice'] ) ? sanitize_key( wp_unslash( $_GET['notice'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$notices = array(
 		'saved'      => 'ההגדרות נשמרו.',
-		'refreshed'  => 'רשימת הקבוצות נטענה מחדש.',
+		'refreshed'  => 'הקבוצות והשדות נטענו מחדש מאקטיב טרייל.',
 		'test_email' => 'כתובת המייל לבדיקה לא תקינה.',
 	);
 	$test    = 'tested' === $notice ? (string) get_transient( 'sella_at_test_' . get_current_user_id() ) : '';
@@ -886,8 +1228,14 @@ function sella_at_render_admin_page() {
 		delete_transient( 'sella_at_test_' . get_current_user_id() );
 	}
 
-	// Rows grouped by kind, the fixed four first.
-	$order = array( 'contact', 'newsletter', 'checkout_email', 'back_in_stock', 'form', 'first_chapter' );
+	$sections = array(
+		'contact'        => 'צור קשר',
+		'newsletter'     => 'ניוזלטר',
+		'checkout_email' => 'מייל לפני תשלום',
+		'back_in_stock'  => 'חזרה למלאי',
+		'form'           => 'טפסי Elementor',
+		'first_chapter'  => 'פרק ראשון, לפי הדף שממנו נשלחה הבקשה',
+	);
 	?>
 	<div class="wrap sella-leads-admin sella-at-admin" dir="rtl">
 		<h1 class="wp-heading-inline">אקטיב טרייל</h1>
@@ -907,127 +1255,147 @@ function sella_at_render_admin_page() {
 		<?php endif; ?>
 
 		<p class="sella-leads-lead">
-			כל הרשמה ופנייה שנרשמת ב"פניות ולידים" נשלחת גם לאקטיב טרייל, לקבוצה שבוחרים כאן לפי הטופס שממנו הגיעה.
-			בקשה לפרק ראשון מנותבת לפי הדף שממנו נשלחה. ערוץ בלי בחירה משלו הולך לשורה של הסוג שלו ("פרק ראשון: כל שאר הבקשות"), ואם גם שם אין, לברירת המחדל.
-			התוצאה של כל שליחה מופיעה בעמודת "אקטיב טרייל" ברשימה, ומשם אפשר גם לשלוח שוב.
+			כל הרשמה ופנייה שנרשמת ב"פניות ולידים" נשלחת גם לאקטיב טרייל. לכל טופס כרטיס: פותחים אותו, בוחרים את הקבוצה שאיש הקשר נכנס אליה,
+			ומנתבים מה שהאתר יודע עליו (שם, ספר, דף, שדות הטופס) לשדות של אקטיב טרייל. בקשה לפרק ראשון מנותבת לפי הדף שממנו נשלחה.
+			טופס בלי בחירה משלו הולך לכרטיס של הסוג שלו, ואם גם שם אין, לברירת המחדל. התוצאה של כל שליחה מופיעה ברשימה בעמודת "אקטיב טרייל".
 		</p>
 
-		<form method="post" class="sella-leads-settings sella-at-settings">
+		<form method="post" class="sella-at-settings">
 			<?php wp_nonce_field( 'sella_at_manage' ); ?>
 			<input type="hidden" name="sella_at_form" value="settings" />
 
-			<h2>חיבור</h2>
-			<p>
-				<label for="sella_at_token">טוקן API</label><br />
-				<input type="text" id="sella_at_token" name="token" value="<?php echo esc_attr( $settings['token'] ); ?>" class="large-text code" dir="ltr" autocomplete="off" spellcheck="false" />
-				<span class="description">מאקטיב טרייל: הגדרות → API. אחרי שמירה הקבוצות של החשבון נטענות לרשימות שלמטה.</span>
-			</p>
-			<p>
-				<label><input type="checkbox" name="enabled" value="1" <?php checked( $settings['enabled'] ); ?> /> לשלוח כל הרשמה ופנייה חדשה לאקטיב טרייל</label>
-				<?php if ( $groups ) : ?>
-					<span class="sella-at-ok">מחובר: <?php echo count( $groups ); ?> קבוצות בחשבון</span>
-				<?php endif; ?>
-			</p>
-			<p class="sella-at-inline">
-				<label for="sella_at_status">סטטוס איש הקשר</label>
-				<select id="sella_at_status" name="status">
-					<?php foreach ( array( 'Subscribe' => 'רשום (Subscribe)', 'None' => 'כפי שאקטיב טרייל קובע (None)' ) as $value => $label ) : ?>
-						<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['status'], $value ); ?>><?php echo esc_html( $label ); ?></option>
-					<?php endforeach; ?>
-					<?php if ( ! in_array( $settings['status'], array( 'Subscribe', 'None' ), true ) ) : ?>
-						<option value="<?php echo esc_attr( $settings['status'] ); ?>" selected><?php echo esc_html( $settings['status'] ); ?></option>
+			<div class="sella-at-box sella-at-connection">
+				<h2>חיבור</h2>
+				<div class="sella-at-connection__grid">
+					<label class="sella-at-connection__token">
+						<span>טוקן API</span>
+						<input type="text" name="token" value="<?php echo esc_attr( $settings['token'] ); ?>" class="large-text code" dir="ltr" autocomplete="off" spellcheck="false" />
+						<span class="description">באקטיב טרייל: הגדרות → API apps. אחרי שמירה הקבוצות והשדות של החשבון נטענים לכאן.</span>
+					</label>
+					<label>
+						<span>סטטוס איש הקשר</span>
+						<select name="status">
+							<?php foreach ( array( 'Subscribe' => 'רשום (Subscribe)', 'None' => 'כפי שאקטיב טרייל קובע (None)' ) as $value => $label ) : ?>
+								<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['status'], $value ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+							<?php if ( ! in_array( $settings['status'], array( 'Subscribe', 'None' ), true ) ) : ?>
+								<option value="<?php echo esc_attr( $settings['status'] ); ?>" selected><?php echo esc_html( $settings['status'] ); ?></option>
+							<?php endif; ?>
+						</select>
+					</label>
+					<label>
+						<span>מספר הנייד נכנס ל</span>
+						<select name="phone_to">
+							<option value="both" <?php selected( $settings['phone_to'], 'both' ); ?>>SMS וגם טלפון</option>
+							<option value="sms" <?php selected( $settings['phone_to'], 'sms' ); ?>>SMS בלבד</option>
+							<option value="phone1" <?php selected( $settings['phone_to'], 'phone1' ); ?>>טלפון בלבד</option>
+						</select>
+					</label>
+				</div>
+				<p class="sella-at-connection__toggle">
+					<label><input type="checkbox" name="enabled" value="1" <?php checked( $settings['enabled'] ); ?> /> <strong>לשלוח כל הרשמה ופנייה חדשה לאקטיב טרייל</strong></label>
+					<?php if ( $groups ) : ?>
+						<span class="sella-at-ok">מחובר · <?php echo count( $groups ); ?> קבוצות בחשבון</span>
+					<?php elseif ( '' === $settings['token'] ) : ?>
+						<span class="description">מדביקים את הטוקן ושומרים כדי לראות את הקבוצות.</span>
 					<?php endif; ?>
-				</select>
-				<label for="sella_at_phone_to">מספר הנייד נכנס ל</label>
-				<select id="sella_at_phone_to" name="phone_to">
-					<option value="both" <?php selected( $settings['phone_to'], 'both' ); ?>>SMS וגם טלפון</option>
-					<option value="sms" <?php selected( $settings['phone_to'], 'sms' ); ?>>SMS בלבד</option>
-					<option value="phone1" <?php selected( $settings['phone_to'], 'phone1' ); ?>>טלפון בלבד</option>
-				</select>
-			</p>
+				</p>
+			</div>
 
-			<h2>ניתוב</h2>
-			<p class="description">
-				לכל ערוץ: הקבוצה שאיש הקשר נכנס אליה, קבוצות נוספות (מזהים מופרדים בפסיק), ושדות שממולאים ברשומה שלו.
-				שדות כותבים שורה לכל שדה, למשל <code>ext1={book}</code> או <code>ext2=פרק ראשון</code>. השם, המייל והנייד נשלחים תמיד.
-			</p>
-			<p class="description sella-at-placeholders">
-				ערכים שאפשר להכניס לשדות:
-				<code>{name}</code> שם מלא · <code>{first_name}</code> · <code>{last_name}</code> · <code>{email}</code> · <code>{phone}</code> ·
-				<code>{book}</code> שם הספר (פרק ראשון, חזרה למלאי) · <code>{form}</code> שם הטופס · <code>{page}</code> שם הדף · <code>{page_url}</code> כתובת הדף ·
-				<code>{source}</code> המקור כמו ברשימה · <code>{type}</code> הסוג · <code>{date}</code> תאריך · <code>{message}</code> ההודעה · <code>{order}</code> מספר הזמנה
-			</p>
+			<div class="sella-at-toolbar">
+				<h2>ניתוב לפי טופס</h2>
+				<span class="sella-at-toolbar__actions">
+					<button type="button" class="button-link" data-sella-at="open">פתיחת הכול</button>
+					<button type="button" class="button-link" data-sella-at="close">סגירת הכול</button>
+				</span>
+				<?php submit_button( 'שמירת ההגדרות', 'primary', 'submit', false ); ?>
+			</div>
 
-			<table class="widefat striped sella-leads-forms sella-at-routes">
-				<thead>
-					<tr>
-						<th>ערוץ</th>
-						<th>דף</th>
-						<th>קבוצה</th>
-						<th>קבוצות נוספות</th>
-						<th>שדות</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr class="sella-at-default">
-						<td><strong>ברירת מחדל</strong><span class="sella-leads-forms__note">כל הרשמה שאין לה ניתוב משלה</span></td>
-						<td></td>
-						<td><?php sella_at_group_select( 'default', $settings['default'], $groups, 'לא לשלוח' ); ?></td>
-						<td><input type="text" name="default[more]" value="<?php echo esc_attr( implode( ', ', array_slice( (array) ( $settings['default']['groups'] ?? array() ), 1 ) ) ); ?>" class="sella-at-more" dir="ltr" /></td>
-						<td><textarea name="default[fields]" rows="1" class="sella-at-fields" dir="ltr"><?php echo esc_textarea( (string) ( $settings['default']['fields'] ?? '' ) ); ?></textarea></td>
-					</tr>
-					<?php foreach ( $order as $kind ) : ?>
-						<?php
-						$rows = array_filter(
-							$channels,
-							function ( $channel ) use ( $kind, $order ) {
-								return $channel['kind'] === $kind || ( 'form' === $kind && ! in_array( $channel['kind'], $order, true ) );
-							}
-						);
-						if ( ! $rows ) {
-							continue;
-						}
-						?>
-						<tr class="sella-at-kind"><th colspan="5"><?php echo esc_html( 'form' === $kind ? 'טפסי Elementor' : ( $types[ $kind ] ?? $kind ) ); ?></th></tr>
-						<?php foreach ( $rows as $key => $channel ) : ?>
-							<?php
-							$id    = 'r' . md5( $key );
-							$route = $settings['routes'][ $key ] ?? array();
-							$more  = implode( ', ', array_slice( (array) ( $route['groups'] ?? array() ), 1 ) );
-							?>
-							<tr>
-								<td>
-									<input type="hidden" name="routes[<?php echo esc_attr( $id ); ?>][channel]" value="<?php echo esc_attr( $key ); ?>" />
-									<?php echo esc_html( $channel['label'] ); ?>
-									<?php if ( '' !== $channel['note'] ) : ?><span class="sella-leads-forms__note"><?php echo esc_html( $channel['note'] ); ?></span><?php endif; ?>
-								</td>
-								<td class="sella-leads-forms__fields">
-									<?php if ( '' !== $channel['page'] ) : ?>
-										<a href="<?php echo esc_url( $channel['page'] ); ?>" target="_blank" rel="noopener" dir="ltr"><?php echo esc_html( sella_at_path( $channel['page'] ) ); ?></a>
-									<?php endif; ?>
-								</td>
-								<td><?php sella_at_group_select( 'routes[' . $id . ']', $route, $groups, in_array( $key, array_keys( $types ), true ) ? 'לפי ברירת המחדל' : 'לפי הסוג / ברירת המחדל' ); ?></td>
-								<td><input type="text" name="routes[<?php echo esc_attr( $id ); ?>][more]" value="<?php echo esc_attr( $more ); ?>" class="sella-at-more" dir="ltr" placeholder="123, 456" /></td>
-								<td><textarea name="routes[<?php echo esc_attr( $id ); ?>][fields]" rows="1" class="sella-at-fields" dir="ltr" placeholder="ext1={book}"><?php echo esc_textarea( (string) ( $route['fields'] ?? '' ) ); ?></textarea></td>
-							</tr>
-						<?php endforeach; ?>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+			<?php
+			sella_at_card(
+				array(
+					'name'        => 'default',
+					'title'       => 'ברירת מחדל',
+					'meta'        => 'כל הרשמה שאין לה ניתוב משלה',
+					'route'       => $settings['default'],
+					'groups'      => $groups,
+					'sources'     => sella_at_sources(),
+					'targets'     => $targets,
+					'kind'        => 'default',
+					'with_group'  => true,
+					'channel'     => '',
+					'empty_label' => 'לא לשלוח',
+					'open'        => empty( $settings['default']['groups'] ) && ! $settings['routes'],
+				)
+			);
+			sella_at_card(
+				array(
+					'name'        => 'global',
+					'title'       => 'שדות לכל איש קשר',
+					'meta'        => 'נוספים לכל שליחה, לפני השדות של הטופס (הטופס גובר באותו שדה)',
+					'route'       => $settings['global'],
+					'groups'      => $groups,
+					'sources'     => sella_at_sources(),
+					'targets'     => $targets,
+					'kind'        => 'global',
+					'with_group'  => false,
+					'channel'     => '',
+					'empty_label' => '',
+				)
+			);
 
-			<h3>שדות לכל איש קשר</h3>
-			<p class="description">נוספים לכל שליחה, לפני השדות של הערוץ (הערוץ גובר כשיש אותו שדה בשניהם). למשל <code>ext3={type}</code> ו-<code>ext4={page}</code>.</p>
-			<textarea name="fields" rows="3" class="large-text code sella-at-fields" dir="ltr"><?php echo esc_textarea( $settings['fields'] ); ?></textarea>
+			foreach ( $sections as $kind => $heading ) :
+				$rows = array_filter(
+					$channels,
+					function ( $channel ) use ( $kind, $sections ) {
+						return $channel['kind'] === $kind || ( 'form' === $kind && ! isset( $sections[ $channel['kind'] ] ) );
+					}
+				);
+				if ( ! $rows ) {
+					continue;
+				}
+				?>
+				<h3 class="sella-at-section"><?php echo esc_html( $heading ); ?> <span>(<?php echo count( $rows ); ?>)</span></h3>
+				<?php
+				foreach ( $rows as $key => $channel ) {
+					$meta = '';
+					if ( '' !== $channel['page'] ) {
+						$meta .= '<a href="' . esc_url( $channel['page'] ) . '" target="_blank" rel="noopener" dir="ltr">' . esc_html( sella_at_path( $channel['page'] ) ) . '</a> ';
+					}
+					if ( '' !== $channel['note'] ) {
+						$meta .= '<span>' . esc_html( $channel['note'] ) . '</span>';
+					}
+					$fallback = isset( $types[ $key ] ) ? 'לפי ברירת המחדל' : ( 'first_chapter' === $channel['kind'] ? 'כמו "כל שאר הבקשות לפרק ראשון"' : 'לפי ברירת המחדל' );
+					sella_at_card(
+						array(
+							'name'        => 'routes[r' . md5( $key ) . ']',
+							'title'       => $channel['label'],
+							'meta'        => $meta,
+							'route'       => $settings['routes'][ $key ] ?? array(),
+							'groups'      => $groups,
+							'sources'     => sella_at_sources( $channel['fields'] ),
+							'targets'     => $targets,
+							'kind'        => $channel['kind'],
+							'with_group'  => true,
+							'channel'     => $key,
+							'empty_label' => $fallback,
+						)
+					);
+				}
+			endforeach;
+			?>
 
-			<?php submit_button( 'שמירה', 'primary', 'submit', false ); ?>
+			<div class="sella-at-toolbar sella-at-toolbar--bottom">
+				<?php submit_button( 'שמירת ההגדרות', 'primary', 'submit', false ); ?>
+			</div>
 		</form>
 
 		<div class="sella-at-side">
-			<form method="post" class="sella-leads-settings">
+			<form method="post" class="sella-at-box">
 				<?php wp_nonce_field( 'sella_at_manage' ); ?>
 				<input type="hidden" name="sella_at_form" value="test" />
 				<h2>שליחת בדיקה</h2>
-				<p class="description">שולח איש קשר בשם "בדיקה מהמסך" לקבוצה של הערוץ שבוחרים, לפי מה ששמור. כך רואים שהטוקן, הקבוצה והשדות נכונים.</p>
+				<p class="description">שולח איש קשר בשם "בדיקה מהמסך" לפי מה ששמור לטופס שבוחרים. כך רואים שהטוקן, הקבוצה והשדות נכונים.</p>
 				<p class="sella-at-inline">
 					<input type="email" name="test_email" value="<?php echo esc_attr( wp_get_current_user()->user_email ); ?>" class="regular-text" dir="ltr" placeholder="מייל לבדיקה" />
 					<select name="test_channel">
@@ -1039,12 +1407,12 @@ function sella_at_render_admin_page() {
 				</p>
 			</form>
 
-			<form method="post" class="sella-leads-settings">
+			<form method="post" class="sella-at-box">
 				<?php wp_nonce_field( 'sella_at_manage' ); ?>
 				<input type="hidden" name="sella_at_form" value="refresh" />
-				<h2>הקבוצות</h2>
-				<p class="description">רשימת הקבוצות נשמרת לשעה. אחרי שפותחים קבוצה חדשה באקטיב טרייל, טוענים מחדש.</p>
-				<button type="submit" class="button">טעינת הקבוצות מחדש</button>
+				<h2>הקבוצות והשדות</h2>
+				<p class="description">נשמרים לשעה. אחרי שפותחים קבוצה חדשה או משנים שם של שדה באקטיב טרייל, טוענים מחדש.</p>
+				<button type="submit" class="button">טעינה מחדש מאקטיב טרייל</button>
 			</form>
 		</div>
 	</div>
