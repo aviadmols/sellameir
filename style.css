@@ -706,6 +706,21 @@ html:not([dir="rtl"]) .woocommerce-checkout form.checkout #customer_details .for
   white-space: nowrap;
 }
 
+/* A book in a split deal (Smart Cart): its price before the deal, struck out
+   and small above the share it costs in the set. */
+.woocommerce-checkout #order_review .woocommerce-checkout-review-order-table td.product-total del {
+  display: block;
+  color: #9a9a9a;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.woocommerce-checkout #order_review .woocommerce-checkout-review-order-table td.product-total ins {
+  background: none;
+  text-decoration: none;
+}
+
 /* The quantity rides on the cover as a badge instead of sitting under the name. */
 .woocommerce-checkout .woocommerce-checkout-review-order-table .product-quantity {
   display: none;
