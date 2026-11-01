@@ -1,283 +1,170 @@
-/* The manuscript submission page (inc/sella-manuscripts.php). The type carries
-   the page: large display in two weights, the address and the letters as anchors.
-   assets/js/sella-font-scale.js takes 2px off the sizes here, so each shows 2px
-   under what it says. "body .sella-ms" outranks the Elementor kit's own rules. */
+/* The manuscript submission page (inc/sella-manuscripts.php), in the look of
+   the about page: a centred column, the title with its purple line, plain text
+   and the yellow button. assets/js/sella-font-scale.js takes 2px off the sizes
+   here, so each shows 2px under what it says.
+   "body .sella-ms" outranks the Elementor kit's own rules. */
 .sella-ms {
-  --sella-ms-ink: #000;
-  --sella-ms-paper: #fff;
-  --sella-ms-muted: #565a66;
-  --sella-ms-rule: #bcbcbc;
-  --sella-ms-accent: #746fed;
-
   width: 100%;
-  max-width: 1140px;
+  max-width: 780px;
   margin-inline: auto;
-  padding-inline: 16px;
+  padding: 40px 16px 56px;
   box-sizing: border-box;
-  color: var(--sella-ms-ink);
+  color: #000;
+  font-size: 20px;
+  line-height: 1.5;
   direction: rtl;
   text-align: start;
-  container-type: inline-size;
 }
 
 body .sella-ms p,
-body .sella-ms h1,
-body .sella-ms h2,
 body .sella-ms ol {
-  margin: 0;
+  margin: 0 0 14.4px;
   color: inherit;
-}
-
-/* Heading and what it is for. */
-.sella-ms__hero {
-  padding-block: 56px 48px;
-}
-
-body .sella-ms .sella-ms__title {
-  font-size: clamp(66px, 13vw, 138px);
-  font-weight: 400;
-  line-height: 0.95;
-  letter-spacing: 1px;
-}
-
-body .sella-ms .sella-ms__title strong {
-  font-weight: 700;
-}
-
-body .sella-ms .sella-ms__lead {
-  max-width: 24em;
-  margin-block-start: 32px;
-  font-size: clamp(24px, 3vw, 36px);
-  font-weight: 400;
-  line-height: 1.3;
-}
-
-/* What the house publishes, and how a manuscript is read. */
-.sella-ms__about {
-  display: grid;
-  gap: 24px;
-  padding-block: 32px;
-  border-block-start: 1px solid var(--sella-ms-ink);
-}
-
-body .sella-ms .sella-ms__note {
-  font-size: 20px;
-  line-height: 1.55;
-}
-
-/* The first step. */
-.sella-ms__steps {
-  padding-block: 72px 56px;
-}
-
-body .sella-ms .sella-ms__intro {
-  margin-block-end: 20px;
-  color: var(--sella-ms-muted);
   font-size: 20px;
   line-height: 1.5;
 }
 
+/* The title on one line, the purple line between its two words. */
+body .sella-ms .sella-ms__title {
+  margin: 0 0 20px;
+  color: #000;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.sella-ms__title br {
+  display: none;
+}
+
+body .sella-ms .sella-ms__title strong {
+  font-weight: 600;
+}
+
+.sella-ms__title strong::before {
+  content: "";
+  display: inline-block;
+  width: 40px;
+  height: 6px;
+  margin-inline: 8px;
+  background: #746fed;
+  vertical-align: middle;
+}
+
+/* What the house publishes: set apart, in the lavender of the top bar. */
+body .sella-ms .sella-ms__note:first-child {
+  margin-block: 6px 20px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #e8e8fd;
+}
+
+body .sella-ms .sella-ms__intro {
+  margin-block-start: 24px;
+}
+
 body .sella-ms .sella-ms__step {
-  margin-block-end: 44px;
-  font-size: clamp(38px, 6vw, 66px);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: 0.5px;
+  margin: 24px 0 10px;
+  color: #000;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-body .sella-ms .sella-ms__to {
-  font-size: 22px;
-  line-height: 1.4;
-}
-
+/* The sentence with the address runs on one line, as it was written. */
+body .sella-ms .sella-ms__to,
 body .sella-ms .sella-ms__email {
-  margin-block: 10px 28px;
-  font-size: 30px;
-  font-size: clamp(24px, 9.8cqw, 86px); /* By the column: the theme keeps it narrow on tablets. */
-  font-weight: 700;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  display: inline;
+  margin: 0;
+}
+
+.sella-ms__email::after {
+  content: ",";
 }
 
 body .sella-ms .sella-ms__email a {
-  display: inline-block;
-  border-block-end: 2px solid var(--sella-ms-accent);
-  color: var(--sella-ms-ink);
-  text-decoration: none;
-  transition: color 0.5s ease;
+  color: #746fed;
+  font-weight: 600;
+  text-decoration: underline;
+  transition: color 0.3s;
 }
 
 body .sella-ms .sella-ms__email a:hover,
 body .sella-ms .sella-ms__email a:focus-visible {
-  color: var(--sella-ms-accent);
+  color: #5d57d8;
 }
 
-/* א, ב, ג: the list's own count, so an added line gets the next letter. */
 body .sella-ms .sella-ms__items {
-  margin-block-start: 20px;
-  padding: 0;
-  list-style: none;
-  counter-reset: sella-ms-item;
+  margin-block: 12px 14.4px;
+  padding-inline-start: 1.6em;
+  list-style: hebrew;
 }
 
 .sella-ms__items li {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  padding-block: 22px;
-  border-block-start: 1px solid var(--sella-ms-rule);
-  font-size: 22px;
-  line-height: 1.4;
-  counter-increment: sella-ms-item;
+  margin-block-end: 6px;
 }
 
-.sella-ms__items li:last-child {
-  border-block-end: 1px solid var(--sella-ms-rule);
-}
-
-.sella-ms__items li::before {
-  content: counter(sella-ms-item, hebrew);
-  color: var(--sella-ms-accent);
-  font-size: 66px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-body .sella-ms .sella-ms__full {
-  margin-block-start: 20px;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-/* What can come along. */
-.sella-ms__more {
-  display: grid;
-  gap: 20px;
-  padding-block-end: 72px;
-}
-
-body .sella-ms .sella-ms__extra {
-  color: var(--sella-ms-muted);
-  font-size: 18px;
-  line-height: 1.6;
-}
-
-/* From here on, the black of the site's header. */
-.sella-ms__end {
-  margin-block-end: 56px;
-  padding: 48px 24px;
-  border-radius: 16px;
-  background: var(--sella-ms-ink);
-  color: var(--sella-ms-paper);
-}
-
-body .sella-ms .sella-ms__next {
-  font-size: clamp(24px, 3vw, 36px);
-  line-height: 1.3;
+.sella-ms__items li::marker {
+  color: #746fed;
+  font-weight: 600;
 }
 
 body .sella-ms .sella-ms__luck {
-  margin-block: 16px 36px;
-  font-size: clamp(44px, 16.5vw, 66px);
-  font-weight: 700;
-  line-height: 0.95;
-  letter-spacing: 1px;
+  font-weight: 600;
 }
 
 body .sella-ms .sella-ms__action {
-  line-height: 1;
+  margin: 32px 0 0;
+  text-align: center;
 }
 
+/* The about page's button. */
 body .sella-ms .sella-ms__action .sella-ms__button {
-  display: block;
-  padding: 18px 12px;
-  border: 1px solid var(--sella-ms-paper);
-  border-radius: 0;
-  background: transparent;
-  color: var(--sella-ms-paper);
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 15px 35px;
+  border: 0;
+  border-radius: 100px;
+  background: #f2e936;
+  color: #000;
   font-size: 20px;
-  font-weight: 500;
-  line-height: 1.2;
-  text-align: center;
+  font-weight: 600;
+  line-height: 1;
   text-decoration: none;
-  transition: all 0.5s ease;
+  transition: background-color 0.3s;
+}
+
+.sella-ms__button::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 18l-6-6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 body .sella-ms .sella-ms__action .sella-ms__button:hover,
 body .sella-ms .sella-ms__action .sella-ms__button:focus-visible {
-  background: var(--sella-ms-paper);
-  color: var(--sella-ms-ink);
+  background: #e5dc24;
+  color: #000;
 }
 
 .sella-ms a:focus-visible {
-  outline: 2px solid var(--sella-ms-accent);
+  outline: 2px solid #746fed;
   outline-offset: 3px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body .sella-ms .sella-ms__email a,
-  body .sella-ms .sella-ms__action .sella-ms__button {
-    transition: none;
-  }
-}
-
 @media (min-width: 768px) {
-  .sella-ms__hero {
-    padding-block: 88px 72px;
+  .sella-ms {
+    padding-block: 64px 72px;
   }
 
-  .sella-ms__about {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 56px;
-    padding-block: 40px;
+  body .sella-ms .sella-ms__title {
+    font-size: 55px;
   }
 
-  body .sella-ms .sella-ms__note {
-    font-size: 22px;
-  }
-
-  .sella-ms__steps {
-    padding-block: 104px 64px;
-  }
-
-  .sella-ms__items li {
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 24px;
-    padding-block: 26px;
-    font-size: 26px;
-  }
-
-  .sella-ms__items li::before {
-    font-size: 98px;
-  }
-
-  body .sella-ms .sella-ms__full {
-    font-size: 26px;
-  }
-
-  .sella-ms__more {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 56px;
-    padding-block-end: 104px;
-  }
-
-  body .sella-ms .sella-ms__extra {
-    font-size: 20px;
-  }
-
-  body .sella-ms .sella-ms__luck {
-    font-size: clamp(96px, 12vw, 130px);
-  }
-
-  body .sella-ms .sella-ms__action .sella-ms__button {
-    display: inline-block;
-    padding-inline: 40px;
-  }
-
-  .sella-ms__end {
-    margin-block-end: 88px;
-    padding: 72px 64px;
+  .sella-ms__title strong::before {
+    width: 80px;
+    margin-inline: 15px;
   }
 }
