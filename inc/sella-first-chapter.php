@@ -373,12 +373,50 @@ function sella_fc_link( $token ) {
 }
 
 /**
+ * The chapter a lead asked for: the link in its email and the file behind it.
+ * The newest send of that book to that address. A lead with a chapter_id of
+ * its own (the test on the ActiveTrail screen) has no send, so both are the file.
+ *
+ * @param object $row Lead row: email and source (the book), or chapter_id.
+ * @return array{link: string, file: string}
+ */
+function sella_fc_lead_chapter( $row ) {
+	global $wpdb;
+
+	if ( ! empty( $row->chapter_id ) ) {
+		$file = sella_fc_file_url( (int) $row->chapter_id );
+		return array(
+			'link' => $file,
+			'file' => $file,
+		);
+	}
+
+	$table = sella_fc_table();
+	$sends = $wpdb->get_results( $wpdb->prepare( "SELECT chapter_id, token FROM {$table} WHERE email = %s ORDER BY id DESC LIMIT 20", (string) ( $row->email ?? '' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	foreach ( (array) $sends as $send ) {
+		// The lead keeps the book's name cleaned and cut, as sella_fc_deliver gave it.
+		if ( mb_substr( sanitize_text_field( sella_fc_book( (int) $send->chapter_id ) ), 0, 190 ) === (string) ( $row->source ?? '' ) ) {
+			return array(
+				'link' => sella_fc_link( $send->token ),
+				'file' => sella_fc_file_url( (int) $send->chapter_id ),
+			);
+		}
+	}
+
+	return array(
+		'link' => '',
+		'file' => '',
+	);
+}
+
+/**
  * Send a chapter and record it: in the leads list, in the sent log, by email
  * and to the webhook.
  *
  * @param array $request chapter_id, email, and any of product_id, name, phone,
  *                       source (shortcode|elementor), form_name, page_url,
- *                       fields (label => value).
+ *                       fields (label => value), lead_fields (what the lead
+ *                       keeps instead of fields: every field of the form).
  * @return int|false The log row, or false when nothing was sent.
  */
 function sella_fc_deliver( $request ) {
@@ -420,7 +458,7 @@ function sella_fc_deliver( $request ) {
 				'phone'    => $phone,
 				'source'   => $book,
 				'page_url' => $page_url,
-				'fields'   => array_merge( '' !== $form_name ? array( 'טופס' => $form_name ) : array(), $fields ),
+				'fields'   => array_merge( '' !== $form_name ? array( 'טופס' => $form_name ) : array(), $request['lead_fields'] ?? $fields ),
 			)
 		);
 	}
@@ -963,9 +1001,11 @@ add_action( 'wp_ajax_nopriv_sella_first_chapter', 'sella_fc_ajax_request' );
 
 /**
  * Every Elementor Pro form on the site, with its fields, for the settings
- * screen. Read from each page's and template's _elementor_data.
+ * screen. Read from each page's and template's _elementor_data. A copied page
+ * holds its forms under the same IDs: a form is described by its published
+ * copy, on a page before a template, and posts lists all of them.
  *
- * @return array[] id, name, post_id, post_title, fields [{id, label, type, options [{label, value}]}].
+ * @return array[] id, name, post_id, post_title, posts, fields [{id, label, type, options [{label, value}]}].
  */
 function sella_fc_elementor_forms() {
 	global $wpdb;
@@ -976,7 +1016,7 @@ function sella_fc_elementor_forms() {
 			INNER JOIN {$wpdb->posts} p ON p.ID = m.post_id
 			WHERE m.meta_key = '_elementor_data' AND m.meta_value LIKE %s
 			AND p.post_type <> 'revision' AND p.post_status IN ('publish', 'private', 'draft', 'pending', 'future')
-			ORDER BY p.post_title",
+			ORDER BY p.post_status = 'publish' DESC, p.post_type = 'elementor_library', p.post_title",
 			'%' . $wpdb->esc_like( '"widgetType":"form"' ) . '%'
 		)
 	);
@@ -1042,8 +1082,11 @@ function sella_fc_collect_forms( $elements, $post, &$forms ) {
 				'name'       => (string) ( $settings['form_name'] ?? '' ),
 				'post_id'    => (int) $post->ID,
 				'post_title' => (string) $post->post_title,
+				'posts'      => array( (int) $post->ID ),
 				'fields'     => $fields,
 			);
+		} elseif ( 'form' === ( $element['widgetType'] ?? '' ) && ! empty( $element['id'] ) ) {
+			$forms[ $element['id'] ]['posts'][] = (int) $post->ID;
 		}
 
 		if ( ! empty( $element['elements'] ) && is_array( $element['elements'] ) ) {
@@ -1146,17 +1189,25 @@ function sella_fc_from_elementor_form( $record ) {
 		return;
 	}
 
-	// Whatever else the form asked, for the log and the webhook.
+	// Whatever else the form asked, for the log and the webhook; the lead keeps
+	// every field, under the label the ActiveTrail screen maps it by.
 	$extra  = array();
+	$all    = array();
 	$mapped = array( $connection['name'], $connection['email'], $connection['phone'] );
 	foreach ( $fields as $id => $field ) {
 		$type = $field['type'] ?? '';
-		if ( in_array( (string) $id, $mapped, true ) || in_array( $type, array( 'honeypot', 'recaptcha', 'recaptcha_v3', 'html', 'step' ), true ) ) {
+		if ( in_array( $type, array( 'honeypot', 'recaptcha', 'recaptcha_v3', 'html', 'step' ), true ) ) {
 			continue;
 		}
 		$text = $value( (string) $id );
-		if ( '' !== $text ) {
-			$extra[ '' !== ( $field['title'] ?? '' ) ? $field['title'] : $id ] = $text;
+		if ( '' === $text ) {
+			continue;
+		}
+		$title         = trim( wp_strip_all_tags( (string) ( $field['title'] ?? '' ) ) );
+		$title         = '' !== $title ? $title : (string) $id;
+		$all[ $title ] = $text;
+		if ( ! in_array( (string) $id, $mapped, true ) ) {
+			$extra[ $title ] = $text;
 		}
 	}
 
@@ -1164,15 +1215,16 @@ function sella_fc_from_elementor_form( $record ) {
 
 	sella_fc_deliver(
 		array(
-			'chapter_id' => $chapter_id,
-			'product_id' => $product_id,
-			'name'       => $value( $connection['name'] ),
-			'email'      => $email,
-			'phone'      => $value( $connection['phone'] ),
-			'source'     => 'elementor',
-			'form_name'  => '' !== $form_name ? $form_name : $connection['label'],
-			'page_url'   => sella_leads_page_url( $referrer ),
-			'fields'     => $extra,
+			'chapter_id'  => $chapter_id,
+			'product_id'  => $product_id,
+			'name'        => $value( $connection['name'] ),
+			'email'       => $email,
+			'phone'       => $value( $connection['phone'] ),
+			'source'      => 'elementor',
+			'form_name'   => '' !== $form_name ? $form_name : $connection['label'],
+			'page_url'    => sella_leads_page_url( $referrer ),
+			'fields'      => $extra,
+			'lead_fields' => $all,
 		)
 	);
 }

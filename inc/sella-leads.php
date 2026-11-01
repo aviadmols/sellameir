@@ -622,13 +622,19 @@ function sella_leads_from_elementor_form( $record ) {
 	foreach ( (array) $record->get( 'fields' ) as $id => $field ) {
 		$type  = $field['type'] ?? '';
 		$value = is_array( $field['value'] ?? '' ) ? implode( ', ', $field['value'] ) : (string) ( $field['value'] ?? '' );
-		$title = '' !== ( $field['title'] ?? '' ) ? $field['title'] : $id;
+		$title = trim( wp_strip_all_tags( (string) ( $field['title'] ?? '' ) ) );
+		$title = '' !== $title ? $title : $id;
 
-		if ( in_array( $type, array( 'hidden', 'honeypot', 'recaptcha', 'recaptcha_v3', 'html', 'step' ), true ) || '' === $value ) {
+		if ( in_array( $type, array( 'honeypot', 'recaptcha', 'recaptcha_v3', 'html', 'step' ), true ) || '' === $value ) {
 			continue;
 		}
 
 		$lead['fields'][ $title ] = $value;
+
+		// Kept for the ActiveTrail map; it says nothing about what the visitor was asked.
+		if ( 'hidden' === $type ) {
+			continue;
+		}
 
 		if ( 'email' === $type && empty( $lead['email'] ) ) {
 			$lead['email'] = $value;
