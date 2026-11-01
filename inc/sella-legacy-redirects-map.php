@@ -258,7 +258,7 @@ return array(
 	'/pages/a-z-list-of-brands' => array( '/shop/', false ),
 	'/pages/הסופרים-שלנו' => array( '/shop/', true ),
 	'/pages/תקנון' => array( '/terms/', false ),
-	'/pages/הגשת-כתבי-יד' => array( '/about/', true ),
+	'/pages/הגשת-כתבי-יד' => array( '/הגשת-כתבי-יד/', false ),
 	'/pages/אמת-או-ערב-הסעודית' => array( '/product/ערב-הסעודית/', false ),
 	'/pages/מדיניות-משלוחים-והחזרות' => array( '/terms/', false ),
 	'/policies/terms-of-service' => array( '/terms/', false ),

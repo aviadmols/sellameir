@@ -25,6 +25,7 @@ require_once get_stylesheet_directory() . '/inc/sella-typography.php';
 require_once get_stylesheet_directory() . '/inc/sella-legacy-redirects.php';
 require_once get_stylesheet_directory() . '/inc/sella-footer-links.php';
 require_once get_stylesheet_directory() . '/inc/sella-legal-pages.php';
+require_once get_stylesheet_directory() . '/inc/sella-manuscripts.php';
 
 /**
  * WooCommerce product modules.
