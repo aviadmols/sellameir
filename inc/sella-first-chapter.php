@@ -400,7 +400,7 @@ function sella_fc_product_name( $chapter_id, $product_id = 0 ) {
  * both links are the file.
  *
  * @param object $row Lead row: email and source (the book), or chapter_id.
- * @return array{book: string, link: string, file: string}
+ * @return array{id: int, book: string, link: string, file: string}
  */
 function sella_fc_lead_chapter( $row ) {
 	global $wpdb;
@@ -408,6 +408,7 @@ function sella_fc_lead_chapter( $row ) {
 	if ( ! empty( $row->chapter_id ) ) {
 		$file = sella_fc_file_url( (int) $row->chapter_id );
 		return array(
+			'id'   => (int) $row->chapter_id,
 			'book' => sella_fc_product_name( (int) $row->chapter_id ),
 			'link' => $file,
 			'file' => $file,
@@ -420,6 +421,7 @@ function sella_fc_lead_chapter( $row ) {
 		// The lead keeps the book's name cleaned and cut, as sella_fc_deliver gave it.
 		if ( mb_substr( sanitize_text_field( sella_fc_book( (int) $send->chapter_id ) ), 0, 190 ) === (string) ( $row->source ?? '' ) ) {
 			return array(
+				'id'   => (int) $send->chapter_id,
 				'book' => sella_fc_product_name( (int) $send->chapter_id, (int) $send->product_id ),
 				'link' => sella_fc_link( $send->token ),
 				'file' => sella_fc_file_url( (int) $send->chapter_id ),
@@ -428,6 +430,7 @@ function sella_fc_lead_chapter( $row ) {
 	}
 
 	return array(
+		'id'   => 0,
 		'book' => '',
 		'link' => '',
 		'file' => '',

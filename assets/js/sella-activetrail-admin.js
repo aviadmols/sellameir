@@ -41,11 +41,28 @@
     return count;
   }
 
+  // The books on the first-chapter card that have a group of their own.
+  function bookGroups(card) {
+    var selects = card.querySelectorAll('.sella-at-book-group');
+    var count = 0;
+    for (var i = 0; i < selects.length; i++) {
+      if (selects[i].value !== '') {
+        count++;
+      }
+    }
+    return count;
+  }
+
   function updateSummary(card) {
     var group = card.querySelector('.sella-at-group');
     var state = card.querySelector('.sella-at-card__state');
     var fields = card.querySelector('.sella-at-card__fields');
     var rows = mappedRows(card);
+    var books = bookGroups(card);
+    var byBook = '';
+    if (books) {
+      byBook = books === 1 ? 'ספר אחד עם קבוצה משלו' : books + ' ספרים עם קבוצה משלהם';
+    }
 
     if (fields) {
       fields.textContent = rows ? rows + ' שדות' : '';
@@ -57,12 +74,14 @@
     var option = group.options[group.selectedIndex];
     var more = card.querySelector('.sella-at-more');
     card.classList.toggle('is-off', group.value === 'off');
-    card.classList.toggle('is-active', group.value !== 'off' && (group.value !== '' || rows > 0));
+    card.classList.toggle('is-active', group.value !== 'off' && (group.value !== '' || rows > 0 || books > 0));
 
     if (group.value === '') {
-      state.textContent = state.getAttribute('data-empty') || '';
+      state.textContent = byBook || state.getAttribute('data-empty') || '';
+    } else if (group.value === 'off') {
+      state.textContent = option.textContent;
     } else {
-      state.textContent = option.textContent + (more && more.value.trim() !== '' ? ' +' : '');
+      state.textContent = option.textContent + (more && more.value.trim() !== '' ? ' +' : '') + (byBook ? ' · ' + byBook : '');
     }
   }
 
@@ -119,7 +138,7 @@
     for (var i = 0; i < cards.length; i++) {
       var group = cards[i].querySelector('.sella-at-group');
       var more = cards[i].querySelector('.sella-at-more');
-      var empty = mappedRows(cards[i]) === 0 && (!group || group.value === '') && (!more || more.value.trim() === '');
+      var empty = mappedRows(cards[i]) === 0 && bookGroups(cards[i]) === 0 && (!group || group.value === '') && (!more || more.value.trim() === '');
       var controls = cards[i].querySelectorAll(empty ? 'input, select' : '.sella-at-map-row input, .sella-at-map-row select');
       for (var c = 0; c < controls.length; c++) {
         var row = controls[c].closest('.sella-at-map-row');
@@ -175,7 +194,7 @@
       if (event.target.classList.contains('sella-at-src')) {
         toggleText(event.target);
       }
-      if (event.target.classList.contains('sella-at-group') || event.target.classList.contains('sella-at-more') || event.target.classList.contains('sella-at-field')) {
+      if (event.target.classList.contains('sella-at-group') || event.target.classList.contains('sella-at-more') || event.target.classList.contains('sella-at-field') || event.target.classList.contains('sella-at-book-group')) {
         updateSummary(event.target.closest('.sella-at-card'));
       }
       if (event.target.closest('.sella-at-filter')) {

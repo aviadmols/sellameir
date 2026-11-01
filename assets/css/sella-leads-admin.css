@@ -481,12 +481,15 @@
   width: 100%;
 }
 
-.sella-at-card__hint {
-  margin: 0 0 14px;
-  padding: 8px 12px;
-  border-inline-start: 3px solid #dba617;
-  background: #fcf9e8;
-  font-size: 12px;
+.sella-at-books {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.sella-at-book-group {
+  width: 100%;
+  max-width: 100%;
 }
 
 .sella-at-map__lead {
