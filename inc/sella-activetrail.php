@@ -10,7 +10,10 @@
  * contact joins and a field map: what the site knows about the lead (name,
  * book, page, the form's own fields, fixed text) into which ActiveTrail
  * field (first name, SMS, ext1…). A channel without its own card falls
- * back to its kind (all first-chapter requests) and then to the default.
+ * back to its kind and then to the default.
+ *
+ * First chapters are one card, for every book and form: it is mapped once,
+ * and the book's name and the chapter's link follow what each request got.
  *
  * Each card knows where its form is shown: a published page or product, or
  * through a template, by its display conditions or the pages that embed it.
@@ -446,16 +449,17 @@ function sella_at_lead_channel( $type, $page_url ) {
 
 /**
  * The channels the screen lists, in order: the fixed ones, the Elementor
- * forms, the first-chapter pages, then anything else that has reached the
- * list. Each:
+ * forms, anything else that has reached the list, then the one card of all
+ * first chapters. Each:
  * - label, kind (a lead type), page (URL or ''), note;
  * - fields: labels of the form's own fields, when known;
  * - own: what else the form asks or holds, as sources (see sella_at_sources);
  * - person: whether the name and phone may be known, beyond the address;
  * - places: where it is shown; used: false when it is not in use;
- * - chapter: the chapter it sends, for the screen's test.
+ * - choosing: the label of a field whose answer could pick a chapter, on a
+ *   form that sends none.
  *
- * @return array<string, array{label: string, kind: string, page: string, note: string, fields: string[], own: string[], person: bool, places: string[], used: bool, chapter: int}>
+ * @return array<string, array{label: string, kind: string, page: string, note: string, fields: string[], own: string[], person: bool, places: string[], used: bool, choosing: string}>
  */
 function sella_at_channels() {
 	global $wpdb;
@@ -463,16 +467,16 @@ function sella_at_channels() {
 	$channel = function ( $values ) {
 		return array_merge(
 			array(
-				'label'   => '',
-				'kind'    => 'form',
-				'page'    => '',
-				'note'    => '',
-				'fields'  => array(),
-				'own'     => array(),
-				'person'  => true,
-				'places'  => array( 'site' ),
-				'used'    => true,
-				'chapter' => 0,
+				'label'    => '',
+				'kind'     => 'form',
+				'page'     => '',
+				'note'     => '',
+				'fields'   => array(),
+				'own'      => array(),
+				'person'   => true,
+				'places'   => array( 'site' ),
+				'used'     => true,
+				'choosing' => '',
 			),
 			$values
 		);
@@ -482,7 +486,6 @@ function sella_at_channels() {
 	$checkout = function_exists( 'wc_get_page_id' ) ? (int) wc_get_page_id( 'checkout' ) : 0;
 	$contact  = sella_at_shortcode_places( 'sella_contact_form' );
 	$reader   = array( '{name}', '{email}', '{phone}' );
-	$sent     = array( '{book}', '{chapter_link}' );
 
 	$channels = array(
 		'contact'        => $channel(
@@ -550,6 +553,21 @@ function sella_at_channels() {
 		return 'טופס Elementor' . ( 'elementor_library' === get_post_type( (int) $form['post_id'] ) && '' !== $form['post_title'] ? ' דרך התבנית ' . $form['post_title'] : '' );
 	};
 
+	// What a first-chapter form asks beyond the name, address and phone, which
+	// the card has rows for: they hold on every request, whichever form sent it.
+	$chapter_fields = function ( $form, $reader_ids ) use ( $form_fields ) {
+		$form['fields'] = array_filter(
+			(array) ( $form['fields'] ?? array() ),
+			function ( $field ) use ( $reader_ids ) {
+				return ! in_array( $field['id'] ?? '', $reader_ids, true ) && ! in_array( $field['type'] ?? '', array( 'email', 'tel' ), true );
+			}
+		);
+		return $form_fields( $form );
+	};
+
+	$book_fields = array();
+	$book_places = array();
+
 	// Elementor forms that are not connected to a first chapter.
 	foreach ( $forms as $form ) {
 		if ( function_exists( 'sella_fc_connection' ) && null !== sella_fc_connection( $form['id'] ) ) {
@@ -563,114 +581,78 @@ function sella_at_channels() {
 		if ( ! $places && isset( $recent[ 'form:' . $form['id'] ] ) ) {
 			$places = sella_at_url_places( $recent[ 'form:' . $form['id'] ] );
 		}
+
+		// Set to the first-chapter list on the leads screen: it goes through that card.
+		if ( 'first_chapter' === $list ) {
+			$name_field = array();
+			foreach ( (array) $form['fields'] as $field ) {
+				if ( 'text' === $field['type'] && ( 'name' === $field['id'] || false !== mb_strpos( $field['label'], 'שם' ) ) ) {
+					$name_field[] = $field['id'];
+					break;
+				}
+			}
+			$book_fields = array_merge( $book_fields, $chapter_fields( $form, $name_field ) );
+			$book_places = array_merge( $book_places, $places );
+			continue;
+		}
+
+		$choosing = '';
+		foreach ( (array) $form['fields'] as $field ) {
+			if ( ! empty( $field['options'] ) ) {
+				$choosing = (string) $field['label'];
+				break;
+			}
+		}
+
 		$channels[ 'form:' . $form['id'] ] = $channel(
 			array(
-				'label'  => '' !== $form['name'] ? $form['name'] : 'טופס Elementor ללא שם',
-				'kind'   => isset( $types[ $list ] ) ? $list : 'form',
-				'note'   => $form_note( $form, $places ),
-				'fields' => $form_fields( $form ),
-				'places' => $places,
-				'used'   => (bool) $places,
+				'label'    => '' !== $form['name'] ? $form['name'] : 'טופס Elementor ללא שם',
+				'kind'     => isset( $types[ $list ] ) ? $list : 'form',
+				'note'     => $form_note( $form, $places ),
+				'fields'   => $form_fields( $form ),
+				'places'   => $places,
+				'used'     => (bool) $places,
+				'choosing' => $choosing,
 			)
 		);
 	}
 
-	// First chapter: the product pages with a chapter, and the pages with a connected form.
-	$anywhere = array();
+	// First chapters: the product pages with a chapter, and the connected forms.
 	if ( function_exists( 'sella_fc_settings' ) ) {
-		$fc = sella_fc_settings();
-		foreach ( (array) $fc['products'] as $row ) {
+		foreach ( (array) sella_fc_settings()['products'] as $row ) {
 			$product = ! empty( $row['product'] ) && function_exists( 'wc_get_product' ) ? wc_get_product( (int) $row['product'] ) : null;
-			if ( ! $product ) {
-				continue;
+			if ( $product && 'publish' === $product->get_status() && sella_fc_chapter_ok( $row['chapter'] ) ) {
+				$book_places[] = 'post:' . $product->get_id();
 			}
-			$live = 'publish' === $product->get_status() && sella_fc_chapter_ok( $row['chapter'] );
-
-			$channels[ 'first_chapter:' . sella_at_path( $product->get_permalink() ) ] = $channel(
-				array(
-					'label'   => wp_strip_all_tags( $product->get_name() ),
-					'kind'    => 'first_chapter',
-					'note'    => $live ? 'טופס הפרק הראשון בדף הספר' : 'הספר לא מפורסם או שאין לו פרק שאפשר לשלוח',
-					'own'     => array_merge( array( '{name}', '{email}' ), $sent ),
-					'places'  => $live ? array( 'post:' . $product->get_id() ) : array(),
-					'used'    => $live,
-					'chapter' => (int) $row['chapter'],
-				)
-			);
 		}
 		foreach ( $forms as $form ) {
 			$connection = function_exists( 'sella_fc_connection' ) ? sella_fc_connection( $form['id'] ) : null;
-			if ( ! $connection ) {
-				continue;
-			}
-			$places  = sella_at_form_places( $form );
-			$chapter = ctype_digit( (string) $connection['fallback'] ) ? (int) $connection['fallback'] : 0;
-
-			// A request is routed by the page it came from, so a card for each page.
-			foreach ( $places as $place ) {
-				if ( 0 !== strpos( $place, 'post:' ) ) {
-					$anywhere = array_merge( $anywhere, $form_fields( $form ) );
-					continue;
-				}
-				$post_id = (int) substr( $place, 5 );
-				$key     = 'first_chapter:' . sella_at_path( (string) get_permalink( $post_id ) );
-				if ( isset( $channels[ $key ] ) ) {
-					$channels[ $key ]['fields'] = array_values( array_unique( array_merge( $channels[ $key ]['fields'], $form_fields( $form ) ) ) );
-					continue;
-				}
-				$channels[ $key ] = $channel(
-					array(
-						'label'   => sella_at_place_label( $place ),
-						'kind'    => 'first_chapter',
-						'note'    => $form_note( $form, $places ) . ( '' !== $form['name'] ? ': ' . $form['name'] : '' ),
-						'fields'  => $form_fields( $form ),
-						'own'     => $sent,
-						'places'  => array( $place ),
-						'chapter' => $chapter ? $chapter : sella_fc_product_chapter( $post_id ),
-					)
-				);
-			}
-			if ( ! $places ) {
-				$channels[ 'form:' . $form['id'] ] = $channel(
-					array(
-						'label'  => '' !== $form['name'] ? $form['name'] : $connection['label'],
-						'kind'   => 'first_chapter',
-						'note'   => $form_note( $form, $places ),
-						'fields' => $form_fields( $form ),
-						'own'    => $sent,
-						'places' => array(),
-						'used'   => false,
-					)
-				);
+			if ( $connection ) {
+				$book_fields = array_merge( $book_fields, $chapter_fields( $form, array( $connection['name'], $connection['email'], $connection['phone'] ) ) );
+				$book_places = array_merge( $book_places, sella_at_form_places( $form ) );
 			}
 		}
 	}
+	foreach ( $recent as $key => $urls ) {
+		if ( 0 === strpos( $key, 'first_chapter:' ) ) {
+			$book_places = array_merge( $book_places, array_diff( sella_at_url_places( $urls ), array( 'site' ) ) );
+		}
+	}
 
-	// Channels that reached the list and are not above: pages that are gone, forms that were deleted.
+	// Channels that reached the list and are not above: forms that were deleted.
 	if ( function_exists( 'sella_leads_table' ) && get_option( 'sella_leads_db_version' ) ) {
 		$table = sella_leads_table();
 		$seen  = $wpdb->get_results( "SELECT channel, type, MAX(page_url) AS page_url, COUNT(*) AS total FROM {$table} WHERE channel <> '' GROUP BY channel, type ORDER BY total DESC LIMIT 200" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		foreach ( (array) $seen as $row ) {
-			if ( isset( $channels[ $row->channel ] ) || isset( $types[ $row->channel ] ) ) {
+			if ( isset( $channels[ $row->channel ] ) || isset( $types[ $row->channel ] ) || 'first_chapter' === $row->type ) {
 				continue;
-			}
-			$kind      = isset( $types[ $row->type ] ) ? $row->type : 'form';
-			$from_page = 0 === strpos( $row->channel, 'first_chapter:' );
-			if ( $from_page ) {
-				$post_id = url_to_postid( (string) $row->page_url );
-				$label   = $post_id ? sella_at_place_label( 'post:' . $post_id ) : substr( $row->channel, strlen( 'first_chapter:' ) );
-			} elseif ( 0 === strpos( $row->channel, 'form:' ) ) {
-				$label = 'טופס Elementor שכבר לא באתר';
-			} else {
-				$label = $row->channel;
 			}
 			$channels[ $row->channel ] = $channel(
 				array(
-					'label'  => $label,
-					'kind'   => $kind,
+					'label'  => 0 === strpos( $row->channel, 'form:' ) ? 'טופס Elementor שכבר לא באתר' : $row->channel,
+					'kind'   => isset( $types[ $row->type ] ) ? $row->type : 'form',
 					'page'   => (string) $row->page_url,
 					'note'   => (int) $row->total . ' רשומות ברשימה',
-					'own'    => $from_page ? array_merge( $reader, $sent ) : array(),
 					'places' => isset( $recent[ $row->channel ] ) ? sella_at_url_places( $recent[ $row->channel ] ) : array(),
 					'used'   => isset( $recent[ $row->channel ] ),
 				)
@@ -678,13 +660,16 @@ function sella_at_channels() {
 		}
 	}
 
+	$book_places = array_values( array_unique( $book_places ) );
+
 	$channels['first_chapter'] = $channel(
 		array(
-			'label'  => 'כל שאר הבקשות לפרק ראשון',
+			'label'  => 'פרק ראשון: כל הספרים',
 			'kind'   => 'first_chapter',
-			'note'   => 'בקשה מדף שאין לו כרטיס משלו',
-			'fields' => array_values( array_unique( $anywhere ) ),
-			'own'    => array_merge( $reader, $sent ),
+			'note'   => 'כל בקשה לפרק ראשון, מכל ספר ומכל טופס, עוברת כאן',
+			'fields' => array_values( array_unique( $book_fields ) ),
+			'own'    => array_merge( $reader, array( '{book}', '{chapter_link}' ) ),
+			'places' => $book_places ? $book_places : array( 'site' ),
 		)
 	);
 
@@ -692,6 +677,9 @@ function sella_at_channels() {
 	if ( function_exists( 'sella_leads_table' ) && get_option( 'sella_leads_db_version' ) ) {
 		$table = sella_leads_table();
 		foreach ( $channels as $key => &$entry ) {
+			if ( 'first_chapter' === $key ) {
+				continue;
+			}
 			$rows = $wpdb->get_col( $wpdb->prepare( "SELECT fields FROM {$table} WHERE channel = %s AND fields IS NOT NULL ORDER BY id DESC LIMIT 20", $key ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			foreach ( (array) $rows as $json ) {
 				$fields = json_decode( (string) $json, true );
@@ -707,9 +695,9 @@ function sella_at_channels() {
 		unset( $entry );
 	}
 
-	foreach ( $channels as &$entry ) {
+	foreach ( $channels as $key => &$entry ) {
 		// A form with fields of its own lists its name, address and phone among them.
-		if ( $entry['fields'] ) {
+		if ( $entry['fields'] && 'first_chapter' !== $key ) {
 			$entry['own'] = array_values( array_diff( $entry['own'], $reader ) );
 		}
 		if ( '' === $entry['page'] ) {
@@ -727,7 +715,9 @@ function sella_at_channels() {
 }
 
 /**
- * The route of a lead: its channel's, else its kind's, else the default.
+ * The route of a lead: its channel's, else its kind's, else the default. A
+ * first chapter goes by the card of all first chapters first; a route saved
+ * for one of its pages, from before that card, counts only until it is set.
  *
  * @param object $row Lead row (channel, type).
  * @return array{groups: int[], map: array, via: string}|null Null when it is not to be sent.
@@ -738,7 +728,7 @@ function sella_at_route( $row ) {
 	$channel  = (string) ( $row->channel ?? '' );
 	$kind     = (string) ( $row->type ?? '' );
 
-	foreach ( array_unique( array_filter( array( $channel, $kind ) ) ) as $key ) {
+	foreach ( array_unique( array_filter( 'first_chapter' === $kind ? array( $kind, $channel ) : array( $channel, $kind ) ) ) as $key ) {
 		if ( ! isset( $routes[ $key ] ) ) {
 			continue;
 		}
@@ -786,7 +776,7 @@ function sella_at_all_sources() {
 			'{phone}'      => 'נייד',
 		),
 		'הספר והפרק'  => array(
-			'{book}'         => 'שם הספר',
+			'{book}'         => 'שם הספר (שם המוצר)',
 			'{chapter_link}' => 'קישור לפרק הראשון',
 			'{chapter_file}' => 'קישור ישיר לקובץ הפרק (בלי ספירת קליקים)',
 		),
@@ -822,11 +812,15 @@ function sella_at_sources( $channel = null ) {
 	}
 
 	$labels = array_merge( ...array_values( $all ) );
+	$reader = array_intersect( $channel['own'], array( '{name}', '{email}', '{phone}' ) );
 	$own    = array();
+	foreach ( $reader as $token ) {
+		$own[ $token ] = $labels[ $token ];
+	}
 	foreach ( $channel['fields'] as $label ) {
 		$own[ '{field:' . $label . '}' ] = $label;
 	}
-	foreach ( $channel['own'] as $token ) {
+	foreach ( array_diff( $channel['own'], $reader ) as $token ) {
 		$own[ $token ] = $labels[ $token ];
 	}
 
@@ -873,7 +867,7 @@ function sella_at_placeholders( $row ) {
 		'{email}'        => (string) ( $row->email ?? '' ),
 		'{phone}'        => (string) ( $row->phone ?? '' ),
 		'{source}'       => $source,
-		'{book}'         => in_array( $kind, array( 'first_chapter', 'back_in_stock' ), true ) ? $source : '',
+		'{book}'         => 'first_chapter' === $kind ? ( $chapter['book'] ?? $source ) : ( 'back_in_stock' === $kind ? $source : '' ),
 		'{chapter_link}' => $chapter['link'] ?? '',
 		'{chapter_file}' => $chapter['file'] ?? '',
 		'{form}'         => is_array( $fields ) && isset( $fields['טופס'] ) ? (string) $fields['טופס'] : ( 'form' === substr( (string) ( $row->channel ?? '' ), 0, 4 ) ? $source : '' ),
@@ -1423,10 +1417,9 @@ function sella_at_handle_admin_actions() {
 				'created_at' => current_time( 'mysql' ),
 			);
 			// A test sends no chapter, but a card that maps the link should show one.
-			if ( isset( $channels[ $channel ] ) && in_array( '{chapter_link}', $channels[ $channel ]['own'], true ) ) {
+			if ( 'first_chapter' === $kind && defined( 'SELLA_FC_CPT' ) ) {
 				$any             = get_posts( array( 'post_type' => SELLA_FC_CPT, 'numberposts' => 1, 'fields' => 'ids' ) );
-				$row->chapter_id = $channels[ $channel ]['chapter'] ? $channels[ $channel ]['chapter'] : (int) ( $any[0] ?? 0 );
-				$row->source     = $row->chapter_id ? sella_fc_book( $row->chapter_id ) : $row->source;
+				$row->chapter_id = (int) ( $any[0] ?? 0 );
 			}
 			$result   = sella_at_send_lead( $row, true );
 			set_transient( 'sella_at_test_' . get_current_user_id(), $result['note'], 5 * MINUTE_IN_SECONDS );
@@ -1534,7 +1527,7 @@ function sella_at_map_row( $prefix, $index, $entry, $sources, $targets ) {
  *                    sources, targets, kind (CSS), with_group (bool),
  *                    channel (hidden input value or ''), empty_label,
  *                    fixed (token => label, a row each), places (for the
- *                    filter), unused (bool).
+ *                    filter), unused (bool), hint (HTML above the map).
  */
 function sella_at_card( $args ) {
 	$route   = $args['route'];
@@ -1593,6 +1586,10 @@ function sella_at_card( $args ) {
 						<input type="text" name="<?php echo esc_attr( $name ); ?>[more]" value="<?php echo esc_attr( $more ); ?>" class="sella-at-more" dir="ltr" placeholder="123, 456" />
 					</label>
 				</div>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $args['hint'] ) ) : ?>
+				<p class="sella-at-card__hint"><?php echo wp_kses_post( $args['hint'] ); ?></p>
 			<?php endif; ?>
 
 			<div class="sella-at-map" data-prefix="<?php echo esc_attr( $name ); ?>">
@@ -1676,7 +1673,7 @@ function sella_at_render_admin_page() {
 		'checkout_email' => 'מייל לפני תשלום',
 		'back_in_stock'  => 'חזרה למלאי',
 		'form'           => 'טפסי Elementor',
-		'first_chapter'  => 'פרק ראשון, לפי הדף שממנו נשלחה הבקשה',
+		'first_chapter'  => 'פרק ראשון',
 	);
 
 	// The filter offers only the places that have a form in use.
@@ -1727,7 +1724,7 @@ function sella_at_render_admin_page() {
 
 		<p class="sella-leads-lead">
 			כל הרשמה ופנייה שנרשמת ב"פניות ולידים" נשלחת גם לאקטיב טרייל. לכל טופס כרטיס: פותחים אותו, בוחרים את הקבוצה שאיש הקשר נכנס אליה,
-			ומנתבים מה שהאתר יודע עליו (שם, ספר, דף, שדות הטופס) לשדות של אקטיב טרייל. בקשה לפרק ראשון מנותבת לפי הדף שממנו נשלחה.
+			ומנתבים מה שהאתר יודע עליו (שם, ספר, דף, שדות הטופס) לשדות של אקטיב טרייל. כל הבקשות לפרק ראשון, מכל ספר ומכל טופס, עוברות בכרטיס אחד שממפים פעם אחת.
 			טופס בלי בחירה משלו הולך לכרטיס של הסוג שלו, ואם גם שם אין, לברירת המחדל. התוצאה של כל שליחה מופיעה ברשימה בעמודת "אקטיב טרייל".
 			מוצגים רק טפסים שבשימוש: בדף או מוצר מפורסמים, בתבנית שמוצגת באתר, או כאלה ששלחו פנייה ב-<?php echo (int) SELLA_AT_RECENT_DAYS; ?> הימים האחרונים.
 		</p>
@@ -1865,8 +1862,11 @@ function sella_at_render_admin_page() {
 					if ( '' !== $channel['note'] ) {
 						$meta .= '<span>' . esc_html( $channel['note'] ) . '</span>';
 					}
-					$fallback = isset( $types[ $key ] ) ? 'לפי ברירת המחדל' : ( 'first_chapter' === $channel['kind'] ? 'כמו "כל שאר הבקשות לפרק ראשון"' : 'לפי ברירת המחדל' );
-					$sources  = sella_at_sources( $channel );
+					$sources = sella_at_sources( $channel );
+					$hint    = '';
+					if ( '' !== $channel['choosing'] && defined( 'SELLA_FC_SETTINGS_SLUG' ) ) {
+						$hint = 'הטופס הזה לא שולח פרק ראשון, אז אין לו שם ספר וקישור לפרק. כדי שהפרק יישלח לפי השדה "' . esc_html( $channel['choosing'] ) . '": <a href="' . esc_url( admin_url( 'admin.php?page=' . SELLA_FC_SETTINGS_SLUG ) ) . '">מחברים אותו בהגדרות פרק ראשון</a> ובוחרים פרק לכל תשובה. אחרי זה הוא עובר לכרטיס של הפרק הראשון.';
+					}
 					sella_at_card(
 						array(
 							'name'        => 'routes[r' . md5( $key ) . ']',
@@ -1880,9 +1880,10 @@ function sella_at_render_admin_page() {
 							'kind'        => $channel['kind'],
 							'with_group'  => true,
 							'channel'     => $key,
-							'empty_label' => $fallback,
+							'empty_label' => 'לפי ברירת המחדל',
 							'places'      => $channel['used'] ? $channel['places'] : array(),
 							'unused'      => ! $channel['used'],
+							'hint'        => $hint,
 						)
 					);
 				}

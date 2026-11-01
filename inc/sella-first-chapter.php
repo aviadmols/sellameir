@@ -373,12 +373,34 @@ function sella_fc_link( $token ) {
 }
 
 /**
- * The chapter a lead asked for: the link in its email and the file behind it.
- * The newest send of that book to that address. A lead with a chapter_id of
- * its own (the test on the ActiveTrail screen) has no send, so both are the file.
+ * The product's name for a chapter: the product the request came from, else
+ * the one given that chapter on the settings screen, else the chapter's title.
+ *
+ * @param int $chapter_id Chapter.
+ * @param int $product_id Product the request came from, or 0.
+ * @return string
+ */
+function sella_fc_product_name( $chapter_id, $product_id = 0 ) {
+	if ( ! $product_id ) {
+		foreach ( sella_fc_settings()['products'] as $row ) {
+			if ( (int) $row['chapter'] === (int) $chapter_id ) {
+				$product_id = (int) $row['product'];
+				break;
+			}
+		}
+	}
+	$product = $product_id && function_exists( 'wc_get_product' ) ? wc_get_product( (int) $product_id ) : null;
+	return $product ? wp_strip_all_tags( $product->get_name() ) : sella_fc_book( $chapter_id );
+}
+
+/**
+ * The chapter a lead asked for: the book's name, the link in its email and the
+ * file behind it. The newest send of that book to that address. A lead with a
+ * chapter_id of its own (the test on the ActiveTrail screen) has no send, so
+ * both links are the file.
  *
  * @param object $row Lead row: email and source (the book), or chapter_id.
- * @return array{link: string, file: string}
+ * @return array{book: string, link: string, file: string}
  */
 function sella_fc_lead_chapter( $row ) {
 	global $wpdb;
@@ -386,17 +408,19 @@ function sella_fc_lead_chapter( $row ) {
 	if ( ! empty( $row->chapter_id ) ) {
 		$file = sella_fc_file_url( (int) $row->chapter_id );
 		return array(
+			'book' => sella_fc_product_name( (int) $row->chapter_id ),
 			'link' => $file,
 			'file' => $file,
 		);
 	}
 
 	$table = sella_fc_table();
-	$sends = $wpdb->get_results( $wpdb->prepare( "SELECT chapter_id, token FROM {$table} WHERE email = %s ORDER BY id DESC LIMIT 20", (string) ( $row->email ?? '' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$sends = $wpdb->get_results( $wpdb->prepare( "SELECT chapter_id, product_id, token FROM {$table} WHERE email = %s ORDER BY id DESC LIMIT 20", (string) ( $row->email ?? '' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	foreach ( (array) $sends as $send ) {
 		// The lead keeps the book's name cleaned and cut, as sella_fc_deliver gave it.
 		if ( mb_substr( sanitize_text_field( sella_fc_book( (int) $send->chapter_id ) ), 0, 190 ) === (string) ( $row->source ?? '' ) ) {
 			return array(
+				'book' => sella_fc_product_name( (int) $send->chapter_id, (int) $send->product_id ),
 				'link' => sella_fc_link( $send->token ),
 				'file' => sella_fc_file_url( (int) $send->chapter_id ),
 			);
@@ -404,6 +428,7 @@ function sella_fc_lead_chapter( $row ) {
 	}
 
 	return array(
+		'book' => '',
 		'link' => '',
 		'file' => '',
 	);
@@ -1185,9 +1210,6 @@ function sella_fc_from_elementor_form( $record ) {
 	$product_id = $queried && 'product' === get_post_type( $queried ) ? $queried : 0;
 
 	$chapter_id = sella_fc_connection_chapter( $connection, $fields, $product_id );
-	if ( ! $chapter_id ) {
-		return;
-	}
 
 	// Whatever else the form asked, for the log and the webhook; the lead keeps
 	// every field, under the label the ActiveTrail screen maps it by.
@@ -1212,6 +1234,26 @@ function sella_fc_from_elementor_form( $record ) {
 	}
 
 	$form_name = (string) $record->get_form_settings( 'form_name' );
+
+	// No chapter for that answer: nothing to send, but they did ask, and
+	// sella-leads.php leaves a connected form to this function.
+	if ( ! $chapter_id ) {
+		if ( function_exists( 'sella_leads_add' ) ) {
+			$label = '' !== $form_name ? $form_name : $connection['label'];
+			sella_leads_add(
+				array(
+					'type'     => 'first_chapter',
+					'name'     => $value( $connection['name'] ),
+					'email'    => $email,
+					'phone'    => $value( $connection['phone'] ),
+					'source'   => $label,
+					'page_url' => sella_leads_page_url( $referrer ),
+					'fields'   => array_merge( '' !== $label ? array( 'טופס' => $label ) : array(), $all ),
+				)
+			);
+		}
+		return;
+	}
 
 	sella_fc_deliver(
 		array(
