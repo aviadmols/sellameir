@@ -1059,11 +1059,33 @@ function sella_at_external_error( $result, $count ) {
 }
 
 /**
+ * The number that stands for a person on ActiveTrail, whose external ID ties
+ * one of our people to one of theirs: the first lead of the address, so that
+ * all of a person's leads share it.
+ *
+ * @param object $row Lead row; a test has no ID and may have no lead.
+ * @return string
+ */
+function sella_at_person_id( $row ) {
+	global $wpdb;
+
+	$first = 0;
+	if ( function_exists( 'sella_leads_table' ) ) {
+		$table = sella_leads_table();
+		$first = (int) $wpdb->get_var( $wpdb->prepare( "SELECT MIN(id) FROM {$table} WHERE email = %s", strtolower( (string) ( $row->email ?? '' ) ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+	if ( ! $first ) {
+		$first = ! empty( $row->id ) ? (int) $row->id : time();
+	}
+	return (string) $first;
+}
+
+/**
  * Import a contact into a group. The external ID is required, and ActiveTrail
  * turned down an address given only beside the contact without saying why. So
- * it goes both beside the contact and in it, as the lead's number in our table
- * and, when that is turned down, as the address. An ID that exists (the same
- * lead in another group, or sent again) joins the group by that ID instead.
+ * it goes both beside the contact and in it, as the person's number and, when
+ * that is turned down, as the address. An ID that exists (the same person in
+ * another group or on another lead) joins the group by that ID instead.
  *
  * @param object $row     Lead row; without an ID, a test.
  * @param array  $contact Body of sella_at_contact().
@@ -1071,7 +1093,7 @@ function sella_at_external_error( $result, $count ) {
  * @return string The error, '' when it went in.
  */
 function sella_at_import( $row, $contact, $group ) {
-	$ids   = array( (string) ( ! empty( $row->id ) ? (int) $row->id : time() ), strtolower( (string) $contact['email'] ) );
+	$ids   = array( sella_at_person_id( $row ), strtolower( (string) $contact['email'] ) );
 	$error = '';
 
 	foreach ( $ids as $id ) {
