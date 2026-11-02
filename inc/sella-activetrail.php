@@ -1041,7 +1041,7 @@ function sella_at_contact( $row, $route ) {
  * @param string     $path   After /api/.
  * @param array|null $body   JSON body.
  * @param string     $token  Token; the saved one when empty.
- * @return array{code: int, data: mixed, error: string}
+ * @return array{code: int, data: mixed, error: string, raw?: string, headers?: mixed}
  */
 function sella_at_request( $method, $path, $body = null, $token = '' ) {
 	$token = '' !== $token ? $token : sella_at_settings()['token'];
@@ -1103,9 +1103,11 @@ function sella_at_request( $method, $path, $body = null, $token = '' ) {
 	}
 
 	return array(
-		'code'  => $code,
-		'data'  => $data,
-		'error' => $error,
+		'code'    => $code,
+		'data'    => $data,
+		'error'   => $error,
+		'raw'     => $raw,
+		'headers' => wp_remote_retrieve_headers( $response ),
 	);
 }
 
@@ -1159,6 +1161,224 @@ function sella_at_groups( $refresh = false, $token = '' ) {
 		delete_transient( SELLA_AT_GROUPS_ERROR );
 	}
 	return $groups;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Diagnosis
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * The group the diagnosis tries: the default's, else the first a route has,
+ * else the first in the account.
+ *
+ * @param array $settings Settings.
+ * @return int 0 when there is none.
+ */
+function sella_at_diagnose_group( $settings ) {
+	if ( ! empty( $settings['default']['groups'] ) ) {
+		return (int) $settings['default']['groups'][0];
+	}
+	foreach ( (array) $settings['routes'] as $route ) {
+		if ( ! empty( $route['groups'] ) ) {
+			return (int) $route['groups'][0];
+		}
+	}
+	$groups = get_transient( SELLA_AT_GROUPS_CACHE );
+	return is_array( $groups ) && $groups ? (int) array_key_first( $groups ) : 0;
+}
+
+/**
+ * What one answer means.
+ *
+ * @param string $kind  read, write or method.
+ * @param int    $code  HTTP status; 0 when there was no answer.
+ * @param string $error The answer's error.
+ * @return string net, ok, blocked, open, unclear or info.
+ */
+function sella_at_diagnose_state( $kind, $code, $error ) {
+	if ( 0 === $code ) {
+		return 'net';
+	}
+	if ( 'method' === $kind ) {
+		return 'info';
+	}
+	if ( 'read' === $kind ) {
+		return $code >= 200 && $code < 300 ? 'ok' : 'blocked';
+	}
+	if ( in_array( $code, array( 401, 403, 405 ), true ) || false !== stripos( $error, 'not permitted' ) ) {
+		return 'blocked';
+	}
+	// An empty body turned down for what it lacks has passed whatever blocks.
+	return ( $code >= 200 && $code < 300 ) || in_array( $code, array( 400, 409, 415, 422 ), true ) ? 'open' : 'unclear';
+}
+
+/**
+ * What the steps add up to. It says what the answers show and leaves the
+ * reason to ActiveTrail where they do not show it.
+ *
+ * @param array $steps Steps of sella_at_diagnose().
+ * @return array{state: string, text: string}
+ */
+function sella_at_diagnose_verdict( $steps ) {
+	$first = $steps[0] ?? null;
+	if ( ! $first ) {
+		return array(
+			'state' => 'error',
+			'text'  => 'אין טוקן שמור. מדביקים טוקן, שומרים ומריצים שוב.',
+		);
+	}
+
+	foreach ( $steps as $step ) {
+		if ( 'net' === $step['state'] ) {
+			return array(
+				'state' => 'error',
+				'text'  => 'השרת של האתר לא קיבל תשובה מאקטיב טרייל בבדיקה "' . $step['label'] . '": ' . $step['error'] . '. זו בעיית תקשורת, לא הרשאה.',
+			);
+		}
+	}
+
+	if ( 401 === $first['code'] ) {
+		return array(
+			'state' => 'error',
+			'text'  => 'אקטיב טרייל לא מקבלים את הטוקן (401). הטוקן שגוי, פג תוקף או בוטל, או שהוא מוגבל לכתובות IP אחרות. צריך לבדוק אותו ב-API Apps.',
+		);
+	}
+	if ( 'ok' !== $first['state'] ) {
+		return array(
+			'state' => 'error',
+			'text'  => 'גם קריאת הקבוצות נכשלה (' . $first['code'] . '). הטוקן לא עובד כרגע מהשרת הזה, ולכן הבעיה לא מוגבלת להוספת אנשי קשר.',
+		);
+	}
+
+	$writes  = array_filter( $steps, function ( $step ) { return 'write' === $step['kind']; } );
+	$blocked = array_filter( $writes, function ( $step ) { return 'blocked' === $step['state']; } );
+	$open    = array_filter( $writes, function ( $step ) { return 'open' === $step['state']; } );
+
+	if ( $writes && count( $blocked ) === count( $writes ) ) {
+		return array(
+			'state' => 'error',
+			'text'  => 'הטוקן תקף וקורא נתונים, אבל כל ניסיון להוסיף איש קשר נחסם, גם בקשה ריקה בלי שום שדה. לכן הסיבה לא בשדות, לא במיפוי ולא בלידים. התשובות לא מראות מה בדיוק חוסם: צריך לשלוח את הדוח לתמיכה של אקטיב טרייל ולשאול אותם.',
+		);
+	}
+	if ( $blocked && $open ) {
+		return array(
+			'state' => 'skip',
+			'text'  => 'חלק מהדרכים להוסיף איש קשר נחסמות וחלק פתוחות (' . implode( ', ', wp_list_pluck( $open, 'path' ) ) . '). יכול להיות שאפשר לעבור לשליחה בדרך שפתוחה.',
+		);
+	}
+	if ( $open && ! $blocked ) {
+		return array(
+			'state' => 'ok',
+			'text'  => 'הוספת אנשי קשר לא חסומה עכשיו: הבקשות הריקות נדחו רק בגלל מה שחסר בהן. צריך להריץ "שליחת בדיקה" כדי לראות שליחה אמיתית.',
+		);
+	}
+	return array(
+		'state' => 'skip',
+		'text'  => 'התשובות לא חד-משמעיות. כדאי לשלוח את הדוח לתמיכה של אקטיב טרייל.',
+	);
+}
+
+/**
+ * Run the checks and build the report. The requests that write have an empty
+ * body, with no address, so that none of them can create a contact. Answers
+ * that succeed are not kept, since they may list people.
+ *
+ * @return array{time: string, site: string, token: string, ip: string, group: int, steps: array, verdict: array}
+ */
+function sella_at_diagnose() {
+	$settings = sella_at_settings();
+	$token    = $settings['token'];
+	$group    = sella_at_diagnose_group( $settings );
+	$empty    = new stdClass();
+	$checks   = array(
+		array( 'read', 'קריאת הקבוצות', 'GET', 'groups?Page=1&Limit=1', null ),
+		array( 'read', 'יתרת החשבון', 'GET', 'account/balance', null ),
+		array( 'read', 'קריאת אנשי קשר', 'GET', 'contacts?Page=1&Limit=1', null ),
+	);
+	if ( $group ) {
+		$checks[] = array( 'read', 'קריאת הקבוצה', 'GET', 'groups/' . $group, null );
+		$checks[] = array( 'write', 'הוספה לקבוצה (כך האתר שולח)', 'POST', 'groups/' . $group . '/members', $empty );
+	}
+	$checks[] = array( 'write', 'יצירת איש קשר בלי קבוצה', 'POST', 'contacts', $empty );
+	$checks[] = array( 'write', 'ייבוא אנשי קשר', 'POST', 'contacts/Import', $empty );
+	if ( $group ) {
+		$checks[] = array( 'method', 'אילו פעולות מותרות בהוספה לקבוצה', 'OPTIONS', 'groups/' . $group . '/members', null );
+	}
+
+	$ip    = wp_remote_retrieve_body( wp_remote_get( 'https://api.ipify.org', array( 'timeout' => 5 ) ) );
+	$steps = array();
+
+	foreach ( '' !== $token ? $checks : array() as $check ) {
+		list( $kind, $label, $method, $path, $body ) = $check;
+
+		$result  = sella_at_request( $method, $path, $body );
+		$code    = (int) $result['code'];
+		$headers = array();
+		foreach ( array( 'allow', 'server', 'via', 'x-powered-by', 'cf-ray', 'www-authenticate' ) as $name ) {
+			$value = $result['headers'][ $name ] ?? '';
+			if ( '' !== $value && array() !== $value ) {
+				$headers[ $name ] = implode( ', ', (array) $value );
+			}
+		}
+		$failed  = $code < 200 || $code >= 300;
+		$steps[] = array(
+			'kind'    => $kind,
+			'label'   => $label,
+			'method'  => $method,
+			'path'    => $path,
+			'code'    => $code,
+			'error'   => (string) $result['error'],
+			'state'   => sella_at_diagnose_state( $kind, $code, (string) $result['error'] ),
+			'headers' => $headers,
+			'raw'     => $failed ? mb_substr( wp_strip_all_tags( (string) ( $result['raw'] ?? '' ) ), 0, 300 ) : '',
+		);
+		// Every next check would wait out the same timeout.
+		if ( 0 === $code ) {
+			break;
+		}
+	}
+
+	return array(
+		'time'    => wp_date( 'Y-m-d H:i:s' ),
+		'site'    => home_url( '/' ),
+		'token'   => mb_strlen( $token ) > 8 ? mb_substr( $token, 0, 4 ) . '…' . mb_substr( $token, -4 ) : ( '' !== $token ? '…' : '' ),
+		'ip'      => preg_match( '/^[0-9a-f:.]{3,45}$/i', trim( $ip ) ) ? trim( $ip ) : '',
+		'group'   => $group,
+		'steps'   => $steps,
+		'verdict' => sella_at_diagnose_verdict( $steps ),
+	);
+}
+
+/**
+ * The report as text, to send to ActiveTrail's support.
+ *
+ * @param array $report Report of sella_at_diagnose().
+ * @return string
+ */
+function sella_at_diagnose_text( $report ) {
+	$lines = array(
+		'ActiveTrail API check, ' . $report['time'],
+		'Site: ' . $report['site'],
+		'Outgoing IP: ' . ( '' !== $report['ip'] ? $report['ip'] : 'unknown' ),
+		'Token: ' . $report['token'],
+		'Base URL: ' . SELLA_AT_API,
+		'The POST requests were sent with an empty JSON body ({}).',
+		'',
+	);
+	foreach ( $report['steps'] as $step ) {
+		$lines[] = $step['method'] . ' ' . $step['path'] . ' -> ' . ( $step['code'] ? $step['code'] : 'no response' );
+		foreach ( $step['headers'] as $name => $value ) {
+			$lines[] = '  ' . $name . ': ' . $value;
+		}
+		if ( '' !== $step['raw'] ) {
+			$lines[] = '  body: ' . $step['raw'];
+		} elseif ( '' !== $step['error'] ) {
+			$lines[] = '  error: ' . $step['error'];
+		}
+	}
+	return implode( "\n", $lines );
 }
 
 /**
@@ -1483,6 +1703,9 @@ function sella_at_handle_admin_actions() {
 			sella_fc_forget_forms();
 		}
 		$notice = 'refreshed';
+	} elseif ( 'diagnose' === $form ) {
+		set_transient( 'sella_at_diagnosis_' . get_current_user_id(), sella_at_diagnose(), HOUR_IN_SECONDS );
+		$notice = 'diagnosed';
 	} elseif ( 'test' === $form ) {
 		$email   = isset( $_POST['test_email'] ) ? sanitize_email( wp_unslash( $_POST['test_email'] ) ) : '';
 		$channel = isset( $_POST['test_channel'] ) ? sanitize_text_field( wp_unslash( $_POST['test_channel'] ) ) : '';
@@ -1777,6 +2000,54 @@ function sella_at_card( $args ) {
 }
 
 /**
+ * The diagnosis's result: what it means, each check, and the text for support.
+ *
+ * @param array $report Report of sella_at_diagnose().
+ */
+function sella_at_diagnose_render( $report ) {
+	$states = array(
+		'ok'      => array( 'ok', 'תקין' ),
+		'blocked' => array( 'error', 'נחסם' ),
+		'open'    => array( 'ok', 'לא חסום' ),
+		'unclear' => array( 'skip', 'לא ברור' ),
+		'net'     => array( 'error', 'אין תשובה' ),
+		'info'    => array( 'none', 'מידע' ),
+	);
+	?>
+	<div class="sella-at-box sella-at-diagnosis">
+		<h2>תוצאת האבחון <span class="description"><?php echo esc_html( $report['time'] ); ?></span></h2>
+		<p class="sella-at-diagnosis__verdict sella-at-diagnosis__verdict--<?php echo esc_attr( $report['verdict']['state'] ); ?>"><?php echo esc_html( $report['verdict']['text'] ); ?></p>
+		<?php if ( $report['steps'] ) : ?>
+			<table class="widefat striped sella-at-diagnosis__table">
+				<thead>
+					<tr><th>בדיקה</th><th>בקשה</th><th>קוד</th><th>תוצאה</th><th>תשובת השרת</th></tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $report['steps'] as $step ) : ?>
+						<?php
+						$state = $states[ $step['state'] ];
+						$note  = isset( $step['headers']['allow'] ) ? 'Allow: ' . $step['headers']['allow'] : $step['error'];
+						?>
+						<tr>
+							<td><?php echo esc_html( $step['label'] ); ?></td>
+							<td dir="ltr"><code><?php echo esc_html( $step['method'] . ' ' . $step['path'] ); ?></code></td>
+							<td dir="ltr"><?php echo $step['code'] ? (int) $step['code'] : '—'; ?></td>
+							<td><span class="sella-at-mark sella-at-mark--<?php echo esc_attr( $state[0] ); ?>"><?php echo esc_html( $state[1] ); ?></span></td>
+							<td dir="ltr"><?php echo esc_html( $note ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+		<p>
+			<label for="sella-at-diagnosis-text"><strong>דוח לשליחה לתמיכה של אקטיב טרייל</strong> (בלי הטוקן המלא ובלי פרטי לקוחות)</label>
+			<textarea id="sella-at-diagnosis-text" class="large-text code" rows="10" dir="ltr" readonly onclick="this.select();"><?php echo esc_textarea( sella_at_diagnose_text( $report ) ); ?></textarea>
+		</p>
+	</div>
+	<?php
+}
+
+/**
  * The screen.
  */
 function sella_at_render_admin_page() {
@@ -1803,6 +2074,7 @@ function sella_at_render_admin_page() {
 	if ( 'tested' === $notice ) {
 		delete_transient( 'sella_at_test_' . get_current_user_id() );
 	}
+	$diagnosis = 'diagnosed' === $notice ? get_transient( 'sella_at_diagnosis_' . get_current_user_id() ) : false;
 
 	$sections = array(
 		'contact'        => 'צור קשר',
@@ -1873,6 +2145,11 @@ function sella_at_render_admin_page() {
 		<?php if ( '' !== $error ) : ?>
 			<div class="notice notice-error"><p>לא הצלחנו לקרוא את הקבוצות מאקטיב טרייל: <?php echo esc_html( $error ); ?></p></div>
 		<?php endif; ?>
+		<?php
+		if ( is_array( $diagnosis ) ) {
+			sella_at_diagnose_render( $diagnosis );
+		}
+		?>
 
 		<p class="sella-leads-lead">
 			כל הרשמה ופנייה שנרשמת ב"פניות ולידים" נשלחת גם לאקטיב טרייל. לכל טופס כרטיס: פותחים אותו, בוחרים את הקבוצה שאיש הקשר נכנס אליה,
@@ -2047,6 +2324,14 @@ function sella_at_render_admin_page() {
 		</form>
 
 		<div class="sella-at-side">
+			<form method="post" class="sella-at-box">
+				<?php wp_nonce_field( 'sella_at_manage' ); ?>
+				<input type="hidden" name="sella_at_form" value="diagnose" />
+				<h2>אבחון החיבור</h2>
+				<p class="description">בודק מה הטוקן השמור מצליח לעשות ומה נחסם, ומכין דוח לתמיכה של אקטיב טרייל. הבקשות נשלחות ריקות, בלי מייל, ולכן לא נוצר איש קשר. כתובת ה-IP של האתר מתקבלת מהשירות ipify.</p>
+				<button type="submit" class="button">הרצת אבחון</button>
+			</form>
+
 			<form method="post" class="sella-at-box">
 				<?php wp_nonce_field( 'sella_at_manage' ); ?>
 				<input type="hidden" name="sella_at_form" value="test" />

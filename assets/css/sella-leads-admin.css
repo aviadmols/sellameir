@@ -576,6 +576,38 @@
   flex: 1 1 380px;
 }
 
+.sella-at-diagnosis h2 .description {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.sella-at-diagnosis__verdict {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fcf3e6;
+  color: #8a5a00;
+}
+
+.sella-at-diagnosis__verdict--error {
+  background: #fcf0f1;
+  color: #b32d2e;
+}
+
+.sella-at-diagnosis__verdict--ok {
+  background: #edf7f0;
+  color: #1a7a3c;
+}
+
+.sella-at-diagnosis__table {
+  margin-bottom: 14px;
+}
+
+.sella-at-diagnosis__table td {
+  overflow-wrap: anywhere;
+}
+
 .sella-leads-table__activetrail {
   white-space: nowrap;
 }
