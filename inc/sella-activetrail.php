@@ -1035,6 +1035,58 @@ function sella_at_contact( $row, $route ) {
  */
 
 /**
+ * The calls made in this request, for the test to show.
+ *
+ * @param array|null $call A call to add; null only reads the list.
+ * @return array[] method, url, body, code, answer.
+ */
+function sella_at_calls( $call = null ) {
+	static $calls = array();
+	if ( null !== $call ) {
+		$calls[] = $call;
+	}
+	return $calls;
+}
+
+/**
+ * A token as it may be shown: its two ends.
+ *
+ * @param string $token Token.
+ * @return string
+ */
+function sella_at_mask_token( $token ) {
+	return mb_strlen( $token ) > 8 ? mb_substr( $token, 0, 4 ) . '…' . mb_substr( $token, -4 ) : ( '' !== $token ? '…' : '' );
+}
+
+/**
+ * Calls as text: each as a curl command with the body it sent, then the
+ * answer. The token stays masked.
+ *
+ * @param array[] $calls Calls of sella_at_calls().
+ * @return string
+ */
+function sella_at_calls_text( $calls ) {
+	$token = sella_at_mask_token( sella_at_settings()['token'] );
+	$parts = array();
+	foreach ( $calls as $call ) {
+		$lines = array(
+			'curl -i -X ' . $call['method'] . " '" . $call['url'] . "' \\",
+			"  -H 'Authorization: " . $token . "' \\",
+			"  -H 'Accept: application/json' \\",
+			"  -H 'Content-Type: application/json; charset=utf-8'" . ( '' !== $call['body'] ? ' \\' : '' ),
+		);
+		if ( '' !== $call['body'] ) {
+			$lines[] = "  -d '" . str_replace( "'", "'\\''", $call['body'] ) . "'";
+		}
+		$lines[] = '';
+		$lines[] = 'Response: ' . ( $call['code'] ? 'HTTP ' . $call['code'] : 'no response' );
+		$lines[] = $call['answer'];
+		$parts[] = implode( "\n", $lines );
+	}
+	return implode( "\n\n", $parts );
+}
+
+/**
  * One call.
  *
  * @param string     $method GET or POST.
@@ -1067,7 +1119,17 @@ function sella_at_request( $method, $path, $body = null, $token = '' ) {
 		$args['body'] = wp_json_encode( $body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 	}
 
-	$response = wp_remote_request( SELLA_AT_API . ltrim( $path, '/' ), $args );
+	$url      = SELLA_AT_API . ltrim( $path, '/' );
+	$response = wp_remote_request( $url, $args );
+	sella_at_calls(
+		array(
+			'method' => $method,
+			'url'    => $url,
+			'body'   => $args['body'] ?? '',
+			'code'   => is_wp_error( $response ) ? 0 : (int) wp_remote_retrieve_response_code( $response ),
+			'answer' => is_wp_error( $response ) ? $response->get_error_message() : (string) wp_remote_retrieve_body( $response ),
+		)
+	);
 	if ( is_wp_error( $response ) ) {
 		return array(
 			'code'  => 0,
@@ -1343,7 +1405,7 @@ function sella_at_diagnose() {
 	return array(
 		'time'    => wp_date( 'Y-m-d H:i:s' ),
 		'site'    => home_url( '/' ),
-		'token'   => mb_strlen( $token ) > 8 ? mb_substr( $token, 0, 4 ) . '…' . mb_substr( $token, -4 ) : ( '' !== $token ? '…' : '' ),
+		'token'   => sella_at_mask_token( $token ),
 		'ip'      => preg_match( '/^[0-9a-f:.]{3,45}$/i', trim( $ip ) ) ? trim( $ip ) : '',
 		'group'   => $group,
 		'steps'   => $steps,
@@ -1738,6 +1800,7 @@ function sella_at_handle_admin_actions() {
 			}
 			$result   = sella_at_send_lead( $row, true );
 			set_transient( 'sella_at_test_' . get_current_user_id(), $result['note'], 5 * MINUTE_IN_SECONDS );
+			set_transient( 'sella_at_test_calls_' . get_current_user_id(), sella_at_calls_text( sella_at_calls() ), 5 * MINUTE_IN_SECONDS );
 			$notice = 'tested';
 		}
 	}
@@ -2071,8 +2134,10 @@ function sella_at_render_admin_page() {
 		'test_email' => 'כתובת המייל לבדיקה לא תקינה.',
 	);
 	$test    = 'tested' === $notice ? (string) get_transient( 'sella_at_test_' . get_current_user_id() ) : '';
+	$calls   = 'tested' === $notice ? (string) get_transient( 'sella_at_test_calls_' . get_current_user_id() ) : '';
 	if ( 'tested' === $notice ) {
 		delete_transient( 'sella_at_test_' . get_current_user_id() );
+		delete_transient( 'sella_at_test_calls_' . get_current_user_id() );
 	}
 	$diagnosis = 'diagnosed' === $notice ? get_transient( 'sella_at_diagnosis_' . get_current_user_id() ) : false;
 
@@ -2141,6 +2206,13 @@ function sella_at_render_admin_page() {
 			<div class="notice <?php echo 0 === strpos( $test, 'ok' ) ? 'notice-success' : 'notice-error'; ?> is-dismissible"><p>
 				<?php echo 0 === strpos( $test, 'ok' ) ? 'הבדיקה נשלחה: ' : 'הבדיקה נכשלה: '; ?><code><?php echo esc_html( $test ); ?></code>
 			</p></div>
+		<?php endif; ?>
+		<?php if ( '' !== $calls ) : ?>
+			<div class="sella-at-box">
+				<h2>הקריאה שנשלחה בבדיקה</h2>
+				<p class="description">כולל הבודי ותשובת השרת. הטוקן מוצג חלקית: כדי להריץ את הפקודה מדביקים במקומו את הטוקן המלא.</p>
+				<textarea class="large-text code" rows="12" dir="ltr" readonly onclick="this.select();"><?php echo esc_textarea( $calls ); ?></textarea>
+			</div>
 		<?php endif; ?>
 		<?php if ( '' !== $error ) : ?>
 			<div class="notice notice-error"><p>לא הצלחנו לקרוא את הקבוצות מאקטיב טרייל: <?php echo esc_html( $error ); ?></p></div>
