@@ -42,6 +42,9 @@ define( 'SELLA_AT_SLUG', 'sella-activetrail' );
 define( 'SELLA_AT_API', 'https://webapi.mymarketing.co.il/api/' );
 define( 'SELLA_AT_GROUPS_CACHE', 'sella_at_groups' );
 define( 'SELLA_AT_FIELDS_CACHE', 'sella_at_fields' );
+define( 'SELLA_AT_GROUPS_ERROR', 'sella_at_groups_error' );
+define( 'SELLA_AT_HOSTS_CACHE', 'sella_at_template_hosts' );
+define( 'SELLA_AT_SHORTCODES_CACHE', 'sella_at_shortcode_posts' );
 // A form that sent a lead this recently is in use, wherever it is shown.
 define( 'SELLA_AT_RECENT_DAYS', 90 );
 
@@ -247,7 +250,8 @@ function sella_at_referenced_templates( $data ) {
 }
 
 /**
- * The published posts that show each template.
+ * The published posts that show each template. Kept until a page changes,
+ * since finding them reads the Elementor data of every page.
  *
  * @return array<int, int[]> Template ID => post IDs.
  */
@@ -256,6 +260,12 @@ function sella_at_template_hosts() {
 	static $hosts = null;
 
 	if ( null !== $hosts ) {
+		return $hosts;
+	}
+
+	$cached = get_transient( SELLA_AT_HOSTS_CACHE );
+	if ( is_array( $cached ) ) {
+		$hosts = $cached;
 		return $hosts;
 	}
 
@@ -271,8 +281,18 @@ function sella_at_template_hosts() {
 			$hosts[ $template ][] = (int) $row->ID;
 		}
 	}
+	set_transient( SELLA_AT_HOSTS_CACHE, $hosts, WEEK_IN_SECONDS );
 	return $hosts;
 }
+
+/**
+ * Forget which pages show which template and shortcode.
+ */
+function sella_at_forget_places() {
+	delete_transient( SELLA_AT_HOSTS_CACHE );
+	delete_transient( SELLA_AT_SHORTCODES_CACHE );
+}
+add_action( 'sella_fc_forms_forgotten', 'sella_at_forget_places' );
 
 /**
  * Where a Theme Builder display condition shows its template.
@@ -379,19 +399,25 @@ function sella_at_url_places( $urls ) {
 function sella_at_shortcode_places( $tag ) {
 	global $wpdb;
 
-	$like = '%' . $wpdb->esc_like( '[' . $tag ) . '%';
-	$ids  = $wpdb->get_col(
-		$wpdb->prepare(
-			"SELECT DISTINCT p.ID FROM {$wpdb->posts} p
-			LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_elementor_data'
-			WHERE p.post_type <> 'revision' AND p.post_status = 'publish' AND ( p.post_content LIKE %s OR m.meta_value LIKE %s )",
-			$like,
-			$like
-		)
-	);
+	$cached = get_transient( SELLA_AT_SHORTCODES_CACHE );
+	$cached = is_array( $cached ) ? $cached : array();
+
+	if ( ! isset( $cached[ $tag ] ) ) {
+		$like           = '%' . $wpdb->esc_like( '[' . $tag ) . '%';
+		$cached[ $tag ] = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT DISTINCT p.ID FROM {$wpdb->posts} p
+				LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_elementor_data'
+				WHERE p.post_type <> 'revision' AND p.post_status = 'publish' AND ( p.post_content LIKE %s OR m.meta_value LIKE %s )",
+				$like,
+				$like
+			)
+		);
+		set_transient( SELLA_AT_SHORTCODES_CACHE, $cached, WEEK_IN_SECONDS );
+	}
 
 	$places = array();
-	foreach ( (array) $ids as $post_id ) {
+	foreach ( $cached[ $tag ] as $post_id ) {
 		$places = array_merge( $places, sella_at_post_places( (int) $post_id ) );
 	}
 	return array_values( array_unique( $places ) );
@@ -1084,8 +1110,9 @@ function sella_at_request( $method, $path, $body = null, $token = '' ) {
 }
 
 /**
- * The account's groups, id => name. Cached for an hour, with the account's
- * field names.
+ * The account's groups, id => name. Cached for a day, with the account's
+ * field names. A failure is kept for a few minutes, so a screen does not wait
+ * out the timeout on every load while ActiveTrail does not answer.
  *
  * @param bool   $refresh Fetch again.
  * @param string $token   A token to try instead of the saved one.
@@ -1097,12 +1124,19 @@ function sella_at_groups( $refresh = false, $token = '' ) {
 		if ( is_array( $cached ) ) {
 			return $cached;
 		}
+		$failed = get_transient( SELLA_AT_GROUPS_ERROR );
+		if ( false !== $failed ) {
+			return new WP_Error( 'sella_at', (string) $failed );
+		}
 	}
 
 	$groups = array();
 	for ( $page = 1; $page <= 10; $page++ ) {
 		$result = sella_at_request( 'GET', 'groups?Page=' . $page . '&Limit=200', null, $token );
 		if ( '' !== $result['error'] ) {
+			if ( '' === $token ) {
+				set_transient( SELLA_AT_GROUPS_ERROR, $result['error'], 5 * MINUTE_IN_SECONDS );
+			}
 			return new WP_Error( 'sella_at', $result['error'] );
 		}
 		if ( ! is_array( $result['data'] ) || ! $result['data'] ) {
@@ -1120,8 +1154,9 @@ function sella_at_groups( $refresh = false, $token = '' ) {
 
 	natcasesort( $groups );
 	if ( '' === $token ) {
-		set_transient( SELLA_AT_GROUPS_CACHE, $groups, HOUR_IN_SECONDS );
-		set_transient( SELLA_AT_FIELDS_CACHE, sella_at_fetch_fields(), HOUR_IN_SECONDS );
+		set_transient( SELLA_AT_GROUPS_CACHE, $groups, DAY_IN_SECONDS );
+		set_transient( SELLA_AT_FIELDS_CACHE, sella_at_fetch_fields(), DAY_IN_SECONDS );
+		delete_transient( SELLA_AT_GROUPS_ERROR );
 	}
 	return $groups;
 }
@@ -1433,6 +1468,7 @@ function sella_at_handle_admin_actions() {
 		if ( $token !== $current['token'] ) {
 			delete_transient( SELLA_AT_GROUPS_CACHE );
 			delete_transient( SELLA_AT_FIELDS_CACHE );
+			delete_transient( SELLA_AT_GROUPS_ERROR );
 		}
 		$notice = 'saved';
 		$place  = isset( $posted['place'] ) ? sanitize_text_field( $posted['place'] ) : '';
@@ -1442,6 +1478,10 @@ function sella_at_handle_admin_actions() {
 	} elseif ( 'refresh' === $form ) {
 		delete_transient( SELLA_AT_GROUPS_CACHE );
 		delete_transient( SELLA_AT_FIELDS_CACHE );
+		delete_transient( SELLA_AT_GROUPS_ERROR );
+		if ( function_exists( 'sella_fc_forget_forms' ) ) {
+			sella_fc_forget_forms();
+		}
 		$notice = 'refreshed';
 	} elseif ( 'test' === $form ) {
 		$email   = isset( $_POST['test_email'] ) ? sanitize_email( wp_unslash( $_POST['test_email'] ) ) : '';
@@ -1485,7 +1525,8 @@ function sella_at_handle_admin_actions() {
 add_action( 'admin_init', 'sella_at_handle_admin_actions' );
 
 /**
- * The select of ActiveTrail fields in a map's row.
+ * The select of ActiveTrail fields in a map's row. It holds only the chosen
+ * field; the rest come from the page's list when its card opens.
  *
  * @param string $name    Input name.
  * @param string $field   Chosen field.
@@ -1494,13 +1535,13 @@ add_action( 'admin_init', 'sella_at_handle_admin_actions' );
  */
 function sella_at_target_select( $name, $field, $targets, $empty ) {
 	?>
-	<select name="<?php echo esc_attr( $name ); ?>" class="sella-at-field" aria-label="לאיזה שדה באקטיב טרייל">
+	<select name="<?php echo esc_attr( $name ); ?>" class="sella-at-field" data-sella-at-options="targets" aria-label="לאיזה שדה באקטיב טרייל">
 		<?php if ( '' !== $empty ) : ?>
 			<option value=""><?php echo esc_html( $empty ); ?></option>
 		<?php endif; ?>
-		<?php foreach ( $targets as $key => $label ) : ?>
-			<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $field, $key ); ?>><?php echo esc_html( $label . ' (' . $key . ')' ); ?></option>
-		<?php endforeach; ?>
+		<?php if ( isset( $targets[ $field ] ) ) : ?>
+			<option value="<?php echo esc_attr( $field ); ?>" selected data-sella-at-chosen><?php echo esc_html( $targets[ $field ] . ' (' . $field . ')' ); ?></option>
+		<?php endif; ?>
 	</select>
 	<?php
 }
@@ -1596,13 +1637,10 @@ function sella_at_book_groups( $prefix, $books, $saved, $groups ) {
 						<td class="sella-at-map__src"><span class="sella-at-map__label"><?php echo esc_html( $book ); ?></span></td>
 						<td class="sella-at-map__arrow" aria-hidden="true">←</td>
 						<td class="sella-at-map__field">
-							<select name="<?php echo esc_attr( $prefix . '[books][' . $chapter_id . ']' ); ?>" class="sella-at-book-group" aria-label="<?php echo esc_attr( 'הקבוצה של ' . $book ); ?>">
+							<select name="<?php echo esc_attr( $prefix . '[books][' . $chapter_id . ']' ); ?>" class="sella-at-book-group" data-sella-at-options="groups" aria-label="<?php echo esc_attr( 'הקבוצה של ' . $book ); ?>">
 								<option value="">הקבוצה שלמעלה</option>
-								<?php foreach ( $groups as $id => $label ) : ?>
-									<option value="<?php echo (int) $id; ?>" <?php selected( $chosen, $id ); ?>><?php echo esc_html( $label ); ?></option>
-								<?php endforeach; ?>
-								<?php if ( $chosen && ! isset( $groups[ $chosen ] ) ) : ?>
-									<option value="<?php echo (int) $chosen; ?>" selected>קבוצה <?php echo (int) $chosen; ?></option>
+								<?php if ( $chosen ) : ?>
+									<option value="<?php echo (int) $chosen; ?>" selected data-sella-at-chosen><?php echo esc_html( $groups[ $chosen ] ?? 'קבוצה ' . $chosen ); ?></option>
 								<?php endif; ?>
 							</select>
 						</td>
@@ -1670,16 +1708,13 @@ function sella_at_card( $args ) {
 				<div class="sella-at-card__group">
 					<label>
 						<span>קבוצה באקטיב טרייל</span>
-						<select name="<?php echo esc_attr( $name ); ?>[group]" class="sella-at-group">
+						<select name="<?php echo esc_attr( $name ); ?>[group]" class="sella-at-group" data-sella-at-options="groups">
 							<option value=""><?php echo esc_html( $args['empty_label'] ); ?></option>
 							<?php if ( 'default' !== $name ) : ?>
 								<option value="off" <?php selected( $chosen, 'off' ); ?>>לא לשלוח</option>
 							<?php endif; ?>
-							<?php foreach ( $groups as $id => $label ) : ?>
-								<option value="<?php echo (int) $id; ?>" <?php selected( $chosen, (string) $id ); ?>><?php echo esc_html( $label ); ?></option>
-							<?php endforeach; ?>
-							<?php if ( ctype_digit( $chosen ) && ! isset( $groups[ (int) $chosen ] ) ) : ?>
-								<option value="<?php echo (int) $chosen; ?>" selected>קבוצה <?php echo (int) $chosen; ?></option>
+							<?php if ( ctype_digit( $chosen ) ) : ?>
+								<option value="<?php echo (int) $chosen; ?>" selected data-sella-at-chosen><?php echo esc_html( $groups[ (int) $chosen ] ?? 'קבוצה ' . $chosen ); ?></option>
 							<?php endif; ?>
 						</select>
 					</label>
@@ -1807,8 +1842,22 @@ function sella_at_render_admin_page() {
 	unset( $options );
 	$place = isset( $_GET['place'] ) ? sanitize_text_field( wp_unslash( $_GET['place'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$books = sella_at_books( array_keys( (array) ( $settings['routes']['first_chapter']['books'] ?? array() ) ) );
+
+	// Every card has selects of these, hundreds of options each: once here, and
+	// a card's selects are filled from it when it opens.
+	$lists = array(
+		'groups'  => array(),
+		'targets' => array(),
+	);
+	foreach ( $groups as $id => $label ) {
+		$lists['groups'][] = array( (string) $id, $label );
+	}
+	foreach ( $targets as $key => $label ) {
+		$lists['targets'][] = array( $key, $label . ' (' . $key . ')' );
+	}
 	?>
 	<div class="wrap sella-leads-admin sella-at-admin" dir="rtl">
+		<script type="application/json" id="sella-at-lists"><?php echo wp_json_encode( $lists, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON with its tags escaped. ?></script>
 		<h1 class="wp-heading-inline">אקטיב טרייל</h1>
 		<a class="page-title-action" href="<?php echo esc_url( $leads ); ?>">לרשימת הפניות והלידים</a>
 		<hr class="wp-header-end" />
@@ -1832,7 +1881,7 @@ function sella_at_render_admin_page() {
 			מוצגים רק טפסים שבשימוש: בדף או מוצר מפורסמים, בתבנית שמוצגת באתר, או כאלה ששלחו פנייה ב-<?php echo (int) SELLA_AT_RECENT_DAYS; ?> הימים האחרונים.
 		</p>
 
-		<form method="post" class="sella-at-settings">
+		<form method="post" class="sella-at-settings" autocomplete="off">
 			<?php wp_nonce_field( 'sella_at_manage' ); ?>
 			<input type="hidden" name="sella_at_form" value="settings" />
 
@@ -2021,7 +2070,7 @@ function sella_at_render_admin_page() {
 				<?php wp_nonce_field( 'sella_at_manage' ); ?>
 				<input type="hidden" name="sella_at_form" value="refresh" />
 				<h2>הקבוצות והשדות</h2>
-				<p class="description">נשמרים לשעה. אחרי שפותחים קבוצה חדשה או משנים שם של שדה באקטיב טרייל, טוענים מחדש.</p>
+				<p class="description">נשמרים ליום. אחרי שפותחים קבוצה חדשה או משנים שם של שדה באקטיב טרייל, טוענים מחדש.</p>
 				<button type="submit" class="button">טעינה מחדש מאקטיב טרייל</button>
 			</form>
 		</div>

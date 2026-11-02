@@ -2,16 +2,48 @@
  * The ActiveTrail screen (inc/sella-activetrail.php): the cards' map rows
  * are added and removed here, a fixed-text source shows its text box, the
  * card's summary follows the chosen group, the cards open and close
- * together, and the filter shows the forms of one page or product.
+ * together, the filter shows the forms of one page or product, and a card's
+ * selects get their groups and fields when it opens.
  */
 (function () {
   'use strict';
+
+  var lists = {};
 
   function onReady(fn) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', fn);
     } else {
       fn();
+    }
+  }
+
+  // The page comes with each select holding only its chosen option, which is
+  // all a closed card needs to save as it is. The whole list replaces it here.
+  function fillSelect(select) {
+    var list = lists[select.getAttribute('data-sella-at-options')];
+    if (!list) {
+      return;
+    }
+    var value = select.value;
+    var chosen = select.querySelector('[data-sella-at-chosen]');
+    var fragment = document.createDocumentFragment();
+    for (var i = 0; i < list.length; i++) {
+      if (chosen && chosen.value === list[i][0]) {
+        select.removeChild(chosen);
+        chosen = null;
+      }
+      fragment.appendChild(new Option(list[i][1], list[i][0]));
+    }
+    select.appendChild(fragment);
+    select.value = value;
+    select.removeAttribute('data-sella-at-options');
+  }
+
+  function fillSelects(root) {
+    var selects = root.querySelectorAll('[data-sella-at-options]');
+    for (var i = 0; i < selects.length; i++) {
+      fillSelect(selects[i]);
     }
   }
 
@@ -98,6 +130,7 @@
     holder.innerHTML = html;
     var row = holder.querySelector('.sella-at-map-row');
     if (row) {
+      fillSelects(row);
       body.appendChild(row);
       var src = row.querySelector('.sella-at-src');
       if (src) {
@@ -157,6 +190,20 @@
     if (!screen) {
       return;
     }
+
+    var data = document.getElementById('sella-at-lists');
+    lists = data ? JSON.parse(data.textContent) : {};
+
+    var opened = screen.querySelectorAll('.sella-at-card[open]');
+    for (var o = 0; o < opened.length; o++) {
+      fillSelects(opened[o]);
+    }
+    // "toggle" does not bubble, so it is caught on its way down.
+    screen.addEventListener('toggle', function (event) {
+      if (event.target.classList.contains('sella-at-card') && event.target.open) {
+        fillSelects(event.target);
+      }
+    }, true);
 
     applyFilter(screen);
 

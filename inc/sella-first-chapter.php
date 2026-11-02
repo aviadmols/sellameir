@@ -37,6 +37,7 @@ define( 'SELLA_FC_SETTINGS', 'sella_first_chapter_settings' );
 define( 'SELLA_FC_SENT_SLUG', 'sella-chapters-sent' );
 define( 'SELLA_FC_SETTINGS_SLUG', 'sella-chapters-settings' );
 define( 'SELLA_FC_PER_PAGE', 50 );
+define( 'SELLA_FC_FORMS_CACHE', 'sella_fc_forms' );
 
 /**
  * ---------------------------------------------------------------------------
@@ -1031,12 +1032,18 @@ add_action( 'wp_ajax_nopriv_sella_first_chapter', 'sella_fc_ajax_request' );
  * Every Elementor Pro form on the site, with its fields, for the settings
  * screen. Read from each page's and template's _elementor_data. A copied page
  * holds its forms under the same IDs: a form is described by its published
- * copy, on a page before a template, and posts lists all of them.
+ * copy, on a page before a template, and posts lists all of them. Reading
+ * every page's data is slow, so the answer is kept until a page changes.
  *
  * @return array[] id, name, post_id, post_title, posts, fields [{id, label, type, options [{label, value}]}].
  */
 function sella_fc_elementor_forms() {
 	global $wpdb;
+
+	$cached = get_transient( SELLA_FC_FORMS_CACHE );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
 
 	$rows = $wpdb->get_results(
 		$wpdb->prepare(
@@ -1056,8 +1063,54 @@ function sella_fc_elementor_forms() {
 			sella_fc_collect_forms( $data, $row, $forms );
 		}
 	}
-	return array_values( $forms );
+
+	$forms = array_values( $forms );
+	set_transient( SELLA_FC_FORMS_CACHE, $forms, WEEK_IN_SECONDS );
+	return $forms;
 }
+
+/**
+ * Forget what was read from the pages' Elementor data.
+ */
+function sella_fc_forget_forms() {
+	delete_transient( SELLA_FC_FORMS_CACHE );
+
+	/**
+	 * What was read from the pages' Elementor data is out of date.
+	 */
+	do_action( 'sella_fc_forms_forgotten' );
+}
+add_action( 'deleted_post', 'sella_fc_forget_forms' );
+
+/**
+ * A page's Elementor data changed.
+ *
+ * @param mixed  $meta_id Meta row (or rows, when deleted).
+ * @param int    $post_id Post.
+ * @param string $key     Meta key.
+ */
+function sella_fc_forms_meta_changed( $meta_id, $post_id, $key ) {
+	if ( '_elementor_data' === $key ) {
+		sella_fc_forget_forms();
+	}
+}
+add_action( 'added_post_meta', 'sella_fc_forms_meta_changed', 10, 3 );
+add_action( 'updated_post_meta', 'sella_fc_forms_meta_changed', 10, 3 );
+add_action( 'deleted_post_meta', 'sella_fc_forms_meta_changed', 10, 3 );
+
+/**
+ * A page or template was saved, which may change its title or whether it is
+ * published. Orders and the like have no place in the forms' list.
+ *
+ * @param int     $post_id Post.
+ * @param WP_Post $post    Post.
+ */
+function sella_fc_forms_post_saved( $post_id, $post ) {
+	if ( ! wp_is_post_revision( $post_id ) && ( 'elementor_library' === $post->post_type || is_post_type_viewable( $post->post_type ) ) ) {
+		sella_fc_forget_forms();
+	}
+}
+add_action( 'save_post', 'sella_fc_forms_post_saved', 10, 2 );
 
 /**
  * Walk Elementor's element tree and collect its form widgets.
