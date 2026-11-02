@@ -27,8 +27,10 @@
  * there.
  *
  * API: https://webapi.mymarketing.co.il/api/docs — the token goes in the
- * Authorization header as is; POST groups/{id}/members adds (or updates) a
- * contact in a group, POST contacts without a group.
+ * Authorization header as is; POST external/import adds a contact to a group
+ * (ActiveTrail's support pointed to this call: for this account the others
+ * answer Forbidden). The contact's status is a number there: 1 subscribed,
+ * 2 removed, 3 waiting for confirmation. See sella_at_import() for its ID.
  *
  * @package HelloElementorChild
  */
@@ -42,6 +44,8 @@ define( 'SELLA_AT_SLUG', 'sella-activetrail' );
 define( 'SELLA_AT_API', 'https://webapi.mymarketing.co.il/api/' );
 define( 'SELLA_AT_GROUPS_CACHE', 'sella_at_groups' );
 define( 'SELLA_AT_FIELDS_CACHE', 'sella_at_fields' );
+// With the external ID, what names a contact on external/import: this site.
+define( 'SELLA_AT_EXTERNAL_NAME', 'sellameir' );
 define( 'SELLA_AT_GROUPS_ERROR', 'sella_at_groups_error' );
 define( 'SELLA_AT_HOSTS_CACHE', 'sella_at_template_hosts' );
 define( 'SELLA_AT_SHORTCODES_CACHE', 'sella_at_shortcode_posts' );
@@ -61,8 +65,8 @@ function sella_at_defaults() {
 	return array(
 		'token'    => '',
 		'enabled'  => false,
-		// ApiStatusTypes of the contact in the group.
-		'status'   => 'Subscribe',
+		// The contact's status: 1 subscribed, 3 waiting for confirmation, '' not sent.
+		'status'   => '1',
 		// Where the mobile number goes: sms, phone1 or both.
 		'phone_to' => 'both',
 		// Fields for every contact: {map}.
@@ -87,6 +91,15 @@ function sella_at_settings() {
 	// The first version kept "ext1={book}" lines in 'fields'.
 	if ( isset( $saved['fields'] ) && ! isset( $saved['global'] ) ) {
 		$saved['global'] = array( 'map' => sella_at_map_from_lines( $saved['fields'] ) );
+	}
+
+	// Saved by name, before the status was known to be a number.
+	$named = array(
+		'Subscribe' => '1',
+		'None'      => '',
+	);
+	if ( isset( $saved['status'], $named[ $saved['status'] ] ) ) {
+		$saved['status'] = $named[ $saved['status'] ];
 	}
 
 	return array_merge( sella_at_defaults(), $saved );
@@ -1019,13 +1032,66 @@ function sella_at_contact( $row, $route ) {
 	}
 
 	if ( '' !== $settings['status'] ) {
-		$contact['status'] = $settings['status'];
-		if ( isset( $contact['sms'] ) ) {
-			$contact['sms_status'] = $settings['status'];
-		}
+		$contact['subscriptionStatus'] = (int) $settings['status'];
 	}
 
 	return $contact;
+}
+
+/**
+ * The error in an answer of the external calls, which can say 200 and still
+ * turn the contact down in contact_errors.
+ *
+ * @param array  $result Result of sella_at_request().
+ * @param string $count  The answer's field that counts the contacts that went in.
+ * @return string The error, '' when it went in.
+ */
+function sella_at_external_error( $result, $count ) {
+	if ( '' !== $result['error'] ) {
+		return $result['error'];
+	}
+	$data = is_array( $result['data'] ) ? $result['data'] : array();
+	if ( ! empty( $data['contact_errors'] ) ) {
+		$first = (array) reset( $data['contact_errors'] );
+		return ! empty( $first['message'] ) ? (string) $first['message'] : 'איש הקשר נדחה';
+	}
+	return isset( $data[ $count ] ) && ! (int) $data[ $count ] ? 'איש הקשר לא נכנס' : '';
+}
+
+/**
+ * Import a contact into a group. The docs do not say whether the external ID
+ * is required, so it first goes without one. When that is turned down it goes
+ * with the address as its ID, and an ID that exists (the same address, on
+ * another lead or group) joins the group by that ID instead.
+ *
+ * @param array $contact Body of sella_at_contact().
+ * @param int   $group   Group.
+ * @return string The error, '' when it went in.
+ */
+function sella_at_import( $contact, $group ) {
+	$body   = array(
+		'group'    => (int) $group,
+		'contacts' => array( array( 'contact' => $contact ) ),
+	);
+	$result = sella_at_request( 'POST', 'external/import', $body );
+	$error  = sella_at_external_error( $result, 'success_count' );
+	// Refused outright: the ID has nothing to do with it.
+	if ( '' === $error || in_array( (int) $result['code'], array( 0, 401, 403, 405 ), true ) ) {
+		return $error;
+	}
+
+	$external = array(
+		'externalId'   => strtolower( (string) $contact['email'] ),
+		'externalName' => SELLA_AT_EXTERNAL_NAME,
+	);
+
+	$body['contacts'][0] = $external + array( 'contact' => $contact );
+	$error               = sella_at_external_error( sella_at_request( 'POST', 'external/import', $body ), 'success_count' );
+	if ( false === stripos( $error, 'exist' ) ) {
+		return $error;
+	}
+
+	return sella_at_external_error( sella_at_request( 'POST', 'external/group/' . (int) $group, array( 'contacts' => array( $external ) ) ), 'success' );
 }
 
 /**
@@ -1319,6 +1385,15 @@ function sella_at_diagnose_verdict( $steps ) {
 	$blocked = array_filter( $writes, function ( $step ) { return 'blocked' === $step['state']; } );
 	$open    = array_filter( $writes, function ( $step ) { return 'open' === $step['state']; } );
 
+	foreach ( $writes as $step ) {
+		if ( 'external/import' === $step['path'] && 'open' === $step['state'] ) {
+			return array(
+				'state' => 'ok',
+				'text'  => 'הדרך שהאתר שולח בה (external/import) לא חסומה: הבקשה הריקה נדחתה רק בגלל מה שחסר בה, או שלא היה בה מה לייבא. צריך להריץ "שליחת בדיקה" כדי לראות שליחה אמיתית.',
+			);
+		}
+	}
+
 	if ( $writes && count( $blocked ) === count( $writes ) ) {
 		return array(
 			'state' => 'error',
@@ -1329,12 +1404,6 @@ function sella_at_diagnose_verdict( $steps ) {
 		return array(
 			'state' => 'skip',
 			'text'  => 'חלק מהדרכים להוסיף איש קשר נחסמות וחלק פתוחות (' . implode( ', ', wp_list_pluck( $open, 'path' ) ) . '). יכול להיות שאפשר לעבור לשליחה בדרך שפתוחה.',
-		);
-	}
-	if ( $open && ! $blocked ) {
-		return array(
-			'state' => 'ok',
-			'text'  => 'הוספת אנשי קשר לא חסומה עכשיו: הבקשות הריקות נדחו רק בגלל מה שחסר בהן. צריך להריץ "שליחת בדיקה" כדי לראות שליחה אמיתית.',
 		);
 	}
 	return array(
@@ -1362,13 +1431,14 @@ function sella_at_diagnose() {
 	);
 	if ( $group ) {
 		$checks[] = array( 'read', 'קריאת הקבוצה', 'GET', 'groups/' . $group, null );
-		$checks[] = array( 'write', 'הוספה לקבוצה (כך האתר שולח)', 'POST', 'groups/' . $group . '/members', $empty );
+	}
+	$checks[] = array( 'write', 'ייבוא חיצוני (כך האתר שולח)', 'POST', 'external/import', $empty );
+	if ( $group ) {
+		$checks[] = array( 'write', 'הוספה לקבוצה', 'POST', 'groups/' . $group . '/members', $empty );
 	}
 	$checks[] = array( 'write', 'יצירת איש קשר בלי קבוצה', 'POST', 'contacts', $empty );
 	$checks[] = array( 'write', 'ייבוא אנשי קשר', 'POST', 'contacts/Import', $empty );
-	if ( $group ) {
-		$checks[] = array( 'method', 'אילו פעולות מותרות בהוספה לקבוצה', 'OPTIONS', 'groups/' . $group . '/members', null );
-	}
+	$checks[] = array( 'method', 'אילו פעולות מותרות בייבוא החיצוני', 'OPTIONS', 'external/import', null );
 
 	$ip    = wp_remote_retrieve_body( wp_remote_get( 'https://api.ipify.org', array( 'timeout' => 5 ) ) );
 	$steps = array();
@@ -1496,18 +1566,15 @@ function sella_at_send_lead( $lead, $force = false ) {
 	$contact = sella_at_contact( $row, $route );
 	$sent    = array();
 
+	// The import needs a group, and a contact without one gets no mail anyway.
 	if ( ! $route['groups'] ) {
-		$result = sella_at_request( 'POST', 'contacts', $contact );
-		if ( '' !== $result['error'] ) {
-			return $save( 'error:' . $result['error'] );
-		}
-		return $save( 'ok:ללא קבוצה' );
+		return $save( 'skip:אין קבוצה' );
 	}
 
 	foreach ( $route['groups'] as $group_id ) {
-		$result = sella_at_request( 'POST', 'groups/' . (int) $group_id . '/members', $contact );
-		if ( '' !== $result['error'] ) {
-			return $save( 'error:' . ( $sent ? 'נכנס ל-' . implode( ',', $sent ) . '; ' : '' ) . 'קבוצה ' . (int) $group_id . ': ' . $result['error'] );
+		$error = sella_at_import( $contact, (int) $group_id );
+		if ( '' !== $error ) {
+			return $save( 'error:' . ( $sent ? 'נכנס ל-' . implode( ',', $sent ) . '; ' : '' ) . 'קבוצה ' . (int) $group_id . ': ' . $error );
 		}
 		$sent[] = (int) $group_id;
 	}
@@ -1722,7 +1789,7 @@ function sella_at_handle_admin_actions() {
 		$posted   = wp_unslash( $_POST ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- each field below.
 		$current  = sella_at_settings();
 		$token    = isset( $posted['token'] ) ? trim( sanitize_text_field( $posted['token'] ) ) : '';
-		$status   = isset( $posted['status'] ) ? trim( sanitize_text_field( $posted['status'] ) ) : 'Subscribe';
+		$status   = isset( $posted['status'] ) && in_array( $posted['status'], array( '1', '3', '' ), true ) ? $posted['status'] : '1';
 		$phone_to = isset( $posted['phone_to'] ) && in_array( $posted['phone_to'], array( 'sms', 'phone1', 'both' ), true ) ? $posted['phone_to'] : 'both';
 
 		// The screen has no card for these (a form since removed), so they stay as they are.
@@ -1745,7 +1812,7 @@ function sella_at_handle_admin_actions() {
 			array(
 				'token'    => $token,
 				'enabled'  => ! empty( $posted['enabled'] ),
-				'status'   => '' !== $status ? $status : 'Subscribe',
+				'status'   => $status,
 				'phone_to' => $phone_to,
 				'global'   => array( 'map' => sella_at_sanitize_map( $posted['global']['map'] ?? array() ) ),
 				'default'  => array(
@@ -2254,12 +2321,9 @@ function sella_at_render_admin_page() {
 					<label>
 						<span>סטטוס איש הקשר</span>
 						<select name="status">
-							<?php foreach ( array( 'Subscribe' => 'רשום (Subscribe)', 'None' => 'כפי שאקטיב טרייל קובע (None)' ) as $value => $label ) : ?>
-								<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['status'], $value ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php foreach ( array( '1' => 'רשום (1)', '3' => 'ממתין לאישור (3)', '' => 'בלי סטטוס: כפי שאקטיב טרייל קובע' ) as $value => $label ) : ?>
+								<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['status'], (string) $value ); ?>><?php echo esc_html( $label ); ?></option>
 							<?php endforeach; ?>
-							<?php if ( ! in_array( $settings['status'], array( 'Subscribe', 'None' ), true ) ) : ?>
-								<option value="<?php echo esc_attr( $settings['status'] ); ?>" selected><?php echo esc_html( $settings['status'] ); ?></option>
-							<?php endif; ?>
 						</select>
 					</label>
 					<label>
