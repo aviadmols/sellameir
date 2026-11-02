@@ -20,6 +20,11 @@
 	margin: 0;
 }
 
+/* The top bar of the site header (promo text and WhatsApp), Elementor section 51f1434, is not shown on this page. */
+body.page-template-templatesnetanyahu1000-php .elementor-location-header .elementor-element-51f1434 {
+	display: none;
+}
+
 /*
  * "ה-header מעל ה-hero": the site header floats over the hero, so the map
  * shows behind it as on the source page. sella-netanyahu1000.js keeps
@@ -29,7 +34,7 @@
  */
 body.sella-n1000-header-over {
 	position: relative;
-	--n1000-header-h: 157px;
+	--n1000-header-h: 116px;
 }
 
 body.sella-n1000-header-over .elementor-location-header {
@@ -298,7 +303,7 @@ html.sella-n1000-locked {
 
 @media screen and (max-width: 910px) {
 	body.sella-n1000-header-over {
-		--n1000-header-h: 137px;
+		--n1000-header-h: 100px;
 	}
 
 	.sella-n1000__hero-grid {
