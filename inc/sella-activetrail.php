@@ -1059,39 +1059,46 @@ function sella_at_external_error( $result, $count ) {
 }
 
 /**
- * Import a contact into a group. The docs do not say whether the external ID
- * is required, so it first goes without one. When that is turned down it goes
- * with the address as its ID, and an ID that exists (the same address, on
- * another lead or group) joins the group by that ID instead.
+ * Import a contact into a group. The external ID is required, and ActiveTrail
+ * turned down an address given only beside the contact without saying why. So
+ * it goes both beside the contact and in it, as the lead's number in our table
+ * and, when that is turned down, as the address. An ID that exists (the same
+ * lead in another group, or sent again) joins the group by that ID instead.
  *
- * @param array $contact Body of sella_at_contact().
- * @param int   $group   Group.
+ * @param object $row     Lead row; without an ID, a test.
+ * @param array  $contact Body of sella_at_contact().
+ * @param int    $group   Group.
  * @return string The error, '' when it went in.
  */
-function sella_at_import( $contact, $group ) {
-	$body   = array(
-		'group'    => (int) $group,
-		'contacts' => array( array( 'contact' => $contact ) ),
-	);
-	$result = sella_at_request( 'POST', 'external/import', $body );
-	$error  = sella_at_external_error( $result, 'success_count' );
-	// Refused outright: the ID has nothing to do with it.
-	if ( '' === $error || in_array( (int) $result['code'], array( 0, 401, 403, 405 ), true ) ) {
-		return $error;
+function sella_at_import( $row, $contact, $group ) {
+	$ids   = array( (string) ( ! empty( $row->id ) ? (int) $row->id : time() ), strtolower( (string) $contact['email'] ) );
+	$error = '';
+
+	foreach ( $ids as $id ) {
+		$external = array(
+			'externalId'   => $id,
+			'externalName' => SELLA_AT_EXTERNAL_NAME,
+		);
+		$result   = sella_at_request(
+			'POST',
+			'external/import',
+			array(
+				'group'    => (int) $group,
+				'contacts' => array( $external + array( 'contact' => $contact + $external ) ),
+			)
+		);
+		$error    = sella_at_external_error( $result, 'success_count' );
+
+		if ( false !== stripos( $error, 'exist' ) ) {
+			return sella_at_external_error( sella_at_request( 'POST', 'external/group/' . (int) $group, array( 'contacts' => array( $external ) ) ), 'success' );
+		}
+		// In, or turned down for something another ID would not change.
+		if ( false === stripos( $error, 'externalId' ) ) {
+			return $error;
+		}
 	}
 
-	$external = array(
-		'externalId'   => strtolower( (string) $contact['email'] ),
-		'externalName' => SELLA_AT_EXTERNAL_NAME,
-	);
-
-	$body['contacts'][0] = $external + array( 'contact' => $contact );
-	$error               = sella_at_external_error( sella_at_request( 'POST', 'external/import', $body ), 'success_count' );
-	if ( false === stripos( $error, 'exist' ) ) {
-		return $error;
-	}
-
-	return sella_at_external_error( sella_at_request( 'POST', 'external/group/' . (int) $group, array( 'contacts' => array( $external ) ) ), 'success' );
+	return $error;
 }
 
 /**
@@ -1572,7 +1579,7 @@ function sella_at_send_lead( $lead, $force = false ) {
 	}
 
 	foreach ( $route['groups'] as $group_id ) {
-		$error = sella_at_import( $contact, (int) $group_id );
+		$error = sella_at_import( $row, $contact, (int) $group_id );
 		if ( '' !== $error ) {
 			return $save( 'error:' . ( $sent ? 'נכנס ל-' . implode( ',', $sent ) . '; ' : '' ) . 'קבוצה ' . (int) $group_id . ': ' . $error );
 		}
