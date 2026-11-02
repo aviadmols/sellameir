@@ -1070,6 +1070,7 @@ function sella_at_calls_text( $calls ) {
 	$parts = array();
 	foreach ( $calls as $call ) {
 		$lines = array(
+			'Sent:',
 			'curl -i -X ' . $call['method'] . " '" . $call['url'] . "' \\",
 			"  -H 'Authorization: " . $token . "' \\",
 			"  -H 'Accept: application/json' \\",
@@ -1079,7 +1080,7 @@ function sella_at_calls_text( $calls ) {
 			$lines[] = "  -d '" . str_replace( "'", "'\\''", $call['body'] ) . "'";
 		}
 		$lines[] = '';
-		$lines[] = 'Response: ' . ( $call['code'] ? 'HTTP ' . $call['code'] : 'no response' );
+		$lines[] = 'Received: ' . ( $call['code'] ? 'HTTP ' . $call['code'] : 'no response' );
 		$lines[] = mb_substr( $call['answer'], 0, 2000 );
 		$parts[] = implode( "\n", $lines );
 	}
@@ -1600,7 +1601,7 @@ function sella_at_status_cell( $row ) {
 
 	return '<span class="sella-at-mark sella-at-mark--' . esc_attr( $state ) . '" title="' . esc_attr( $detail ) . '">' . esc_html( $label ) . '</span>'
 		. ( '' !== $detail ? '<span class="sella-at-detail">' . esc_html( mb_substr( $detail, 0, 60 ) ) . '</span>' : '' )
-		. ( '' !== $log ? '<details class="sella-at-log"><summary>מה נשלח</summary><textarea class="code" rows="14" dir="ltr" readonly onclick="this.select();" aria-label="מה נשלח לאקטיב טרייל">' . esc_textarea( $log ) . '</textarea></details>' : '' );
+		. ( '' !== $log ? '<details class="sella-at-log"><summary>מה נשלח ומה התקבל</summary><textarea class="code" rows="14" dir="ltr" readonly onclick="this.select();" aria-label="מה נשלח לאקטיב טרייל ומה התקבל">' . esc_textarea( $log ) . '</textarea></details>' : '' );
 }
 
 /**
