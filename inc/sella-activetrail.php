@@ -107,6 +107,7 @@ function sella_at_on() {
  */
 function sella_at_target_fields() {
 	$fields = array(
+		'email'      => 'אימייל',
 		'first_name' => 'שם פרטי',
 		'last_name'  => 'שם משפחה',
 		'sms'        => 'נייד (SMS)',
@@ -984,6 +985,10 @@ function sella_at_contact( $row, $route ) {
 		if ( '' === $value ) {
 			continue;
 		}
+		// The contact is found by its address: only another address may replace it.
+		if ( 'email' === $field && ! is_email( $value ) ) {
+			continue;
+		}
 		$contact[ $field ] = 0 === strpos( $field, 'num' ) ? (int) preg_replace( '/[^\d\-]/', '', $value ) : mb_substr( $value, 0, 250 );
 	}
 
@@ -1329,6 +1334,10 @@ function sella_at_sanitize_map( $posted ) {
 		if ( 'text' === $src && '' === $text ) {
 			continue;
 		}
+		// The address always goes to the email field. Kept as a row, it would make an empty card a route.
+		if ( '{email}' === $src && 'email' === $field ) {
+			continue;
+		}
 		$map[] = array(
 			'src'   => $src,
 			'field' => $field,
@@ -1481,12 +1490,14 @@ add_action( 'admin_init', 'sella_at_handle_admin_actions' );
  * @param string $name    Input name.
  * @param string $field   Chosen field.
  * @param array  $targets ActiveTrail fields.
- * @param string $empty   The first option's text.
+ * @param string $empty   The first option's text; '' for a select without an empty option.
  */
 function sella_at_target_select( $name, $field, $targets, $empty ) {
 	?>
 	<select name="<?php echo esc_attr( $name ); ?>" class="sella-at-field" aria-label="לאיזה שדה באקטיב טרייל">
-		<option value=""><?php echo esc_html( $empty ); ?></option>
+		<?php if ( '' !== $empty ) : ?>
+			<option value=""><?php echo esc_html( $empty ); ?></option>
+		<?php endif; ?>
 		<?php foreach ( $targets as $key => $label ) : ?>
 			<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $field, $key ); ?>><?php echo esc_html( $label . ' (' . $key . ')' ); ?></option>
 		<?php endforeach; ?>
@@ -1496,7 +1507,8 @@ function sella_at_target_select( $name, $field, $targets, $empty ) {
 
 /**
  * A row for one of the form's own fields: it is always there, and goes
- * nowhere until a field is chosen for it.
+ * nowhere until a field is chosen for it. The address is the exception: it is
+ * always sent, so its row starts on the email field and has no "don't send".
  *
  * @param string $prefix  Input name prefix, up to [map].
  * @param string $index   Row index.
@@ -1506,15 +1518,16 @@ function sella_at_target_select( $name, $field, $targets, $empty ) {
  * @param array  $targets ActiveTrail fields.
  */
 function sella_at_map_fixed_row( $prefix, $index, $token, $label, $field, $targets ) {
-	$name = $prefix . '[map][' . $index . ']';
+	$name  = $prefix . '[map][' . $index . ']';
+	$email = '{email}' === $token;
 	?>
-	<tr class="sella-at-map-row sella-at-map-row--fixed">
+	<tr class="sella-at-map-row sella-at-map-row--fixed<?php echo $email ? ' sella-at-map-row--email' : ''; ?>">
 		<td class="sella-at-map__src">
 			<input type="hidden" name="<?php echo esc_attr( $name ); ?>[src]" value="<?php echo esc_attr( $token ); ?>" />
 			<span class="sella-at-map__label"><?php echo esc_html( $label ); ?></span>
 		</td>
 		<td class="sella-at-map__arrow" aria-hidden="true">←</td>
-		<td class="sella-at-map__field"><?php sella_at_target_select( $name . '[field]', $field, $targets, 'לא לשלוח' ); ?></td>
+		<td class="sella-at-map__field"><?php sella_at_target_select( $name . '[field]', $email && '' === $field ? 'email' : $field, $targets, $email ? '' : 'לא לשלוח' ); ?></td>
 		<td class="sella-at-map__remove"></td>
 	</tr>
 	<?php

@@ -29,12 +29,14 @@
     }
   }
 
-  // The rows that send something: a row without a field goes nowhere.
+  // The rows that send something: a row without a field goes nowhere, and the
+  // address on its own field is what is sent anyway.
   function mappedRows(card) {
     var selects = card.querySelectorAll('.sella-at-map__table tbody .sella-at-field');
     var count = 0;
     for (var i = 0; i < selects.length; i++) {
-      if (selects[i].value !== '') {
+      var always = selects[i].value === 'email' && selects[i].closest('.sella-at-map-row--email');
+      if (selects[i].value !== '' && !always) {
         count++;
       }
     }
