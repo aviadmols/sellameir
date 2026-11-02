@@ -1080,7 +1080,7 @@ function sella_at_calls_text( $calls ) {
 		}
 		$lines[] = '';
 		$lines[] = 'Response: ' . ( $call['code'] ? 'HTTP ' . $call['code'] : 'no response' );
-		$lines[] = $call['answer'];
+		$lines[] = mb_substr( $call['answer'], 0, 2000 );
 		$parts[] = implode( "\n", $lines );
 	}
 	return implode( "\n\n", $parts );
@@ -1461,9 +1461,15 @@ function sella_at_send_lead( $lead, $force = false ) {
 		);
 	}
 
-	$save = function ( $note ) use ( $row, $wpdb ) {
+	$before = count( sella_at_calls() );
+
+	$save = function ( $note ) use ( $row, $wpdb, $before ) {
 		if ( ! empty( $row->id ) && function_exists( 'sella_leads_table' ) ) {
 			$wpdb->update( sella_leads_table(), array( 'activetrail' => mb_substr( $note, 0, 255 ) ), array( 'id' => (int) $row->id ) );
+
+			// What this attempt sent, on its own: a table still without the column keeps the result above.
+			$calls = array_slice( sella_at_calls(), $before );
+			$wpdb->update( sella_leads_table(), array( 'activetrail_log' => $calls ? wp_date( 'Y-m-d H:i:s' ) . "\n\n" . sella_at_calls_text( $calls ) : '' ), array( 'id' => (int) $row->id ) );
 		}
 		return array(
 			'ok'   => 0 === strpos( $note, 'ok' ),
@@ -1590,9 +1596,11 @@ function sella_at_status_cell( $row ) {
 		'pending' => 'בדרך',
 	);
 	$label  = $labels[ $state ] ?? $state;
+	$log    = (string) ( $row->activetrail_log ?? '' );
 
 	return '<span class="sella-at-mark sella-at-mark--' . esc_attr( $state ) . '" title="' . esc_attr( $detail ) . '">' . esc_html( $label ) . '</span>'
-		. ( '' !== $detail ? '<span class="sella-at-detail">' . esc_html( mb_substr( $detail, 0, 60 ) ) . '</span>' : '' );
+		. ( '' !== $detail ? '<span class="sella-at-detail">' . esc_html( mb_substr( $detail, 0, 60 ) ) . '</span>' : '' )
+		. ( '' !== $log ? '<details class="sella-at-log"><summary>מה נשלח</summary><textarea class="code" rows="14" dir="ltr" readonly onclick="this.select();" aria-label="מה נשלח לאקטיב טרייל">' . esc_textarea( $log ) . '</textarea></details>' : '' );
 }
 
 /**

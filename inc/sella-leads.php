@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SELLA_LEADS_DB_VERSION', '2' );
+define( 'SELLA_LEADS_DB_VERSION', '3' );
 define( 'SELLA_LEADS_SLUG', 'sella-leads' );
 define( 'SELLA_LEADS_SETTINGS', 'sella_leads_settings' );
 define( 'SELLA_LEADS_PER_PAGE', 50 );
@@ -82,6 +82,7 @@ function sella_leads_maybe_install() {
 		fields longtext NULL,
 		channel varchar(190) NOT NULL DEFAULT '',
 		activetrail varchar(255) NOT NULL DEFAULT '',
+		activetrail_log longtext NULL,
 		created_at datetime NOT NULL,
 		PRIMARY KEY  (id),
 		KEY type_status (type,status),

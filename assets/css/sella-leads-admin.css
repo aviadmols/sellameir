@@ -647,6 +647,22 @@
   text-overflow: ellipsis;
 }
 
+.sella-at-log summary {
+  margin-top: 2px;
+  color: #2271b1;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sella-at-log textarea {
+  display: block;
+  width: 380px;
+  max-width: 70vw;
+  margin-top: 4px;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
 .sella-at-resend {
   display: block;
   margin-top: 2px;
