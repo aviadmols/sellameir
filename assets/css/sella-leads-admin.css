@@ -564,6 +564,38 @@
   align-items: center;
 }
 
+/* Buyers into groups (inc/sella-activetrail-buyers.php). */
+.sella-atb__rows {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.sella-atb__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+@media (min-width: 900px) {
+  .sella-atb__row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.sella-atb__row label > span {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.sella-atb__row select {
+  width: 100%;
+  max-width: none;
+}
+
 .sella-at-side {
   display: flex;
   flex-wrap: wrap;

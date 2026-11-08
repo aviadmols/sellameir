@@ -1074,6 +1074,10 @@ function sella_at_person_id( $row ) {
 		$table = sella_leads_table();
 		$first = (int) $wpdb->get_var( $wpdb->prepare( "SELECT MIN(id) FROM {$table} WHERE email = %s", strtolower( (string) ( $row->email ?? '' ) ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
+	// A buyer with no lead (sella-activetrail-buyers.php) is known by the address.
+	if ( ! $first && ! empty( $row->external_fallback ) ) {
+		return (string) $row->external_fallback;
+	}
 	if ( ! $first ) {
 		$first = ! empty( $row->id ) ? (int) $row->id : time();
 	}
@@ -1093,7 +1097,7 @@ function sella_at_person_id( $row ) {
  * @return string The error, '' when it went in.
  */
 function sella_at_import( $row, $contact, $group ) {
-	$ids   = array( sella_at_person_id( $row ), strtolower( (string) $contact['email'] ) );
+	$ids   = array_values( array_unique( array( sella_at_person_id( $row ), strtolower( (string) $contact['email'] ) ) ) );
 	$error = '';
 
 	foreach ( $ids as $id ) {
@@ -2496,6 +2500,16 @@ function sella_at_render_admin_page() {
 				<?php submit_button( 'שמירת ההגדרות', 'primary', 'submit', false ); ?>
 			</div>
 		</form>
+
+		<?php
+		/**
+		 * More boxes under the routing form, each a form of its own (buyers into
+		 * groups: sella-activetrail-buyers.php).
+		 *
+		 * @param array $groups ActiveTrail groups, ID => name.
+		 */
+		do_action( 'sella_at_after_settings', $groups );
+		?>
 
 		<div class="sella-at-side">
 			<form method="post" class="sella-at-box">

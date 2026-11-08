@@ -60,6 +60,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-leads.php';
 	require_once get_stylesheet_directory() . '/inc/sella-first-chapter.php';
 	require_once get_stylesheet_directory() . '/inc/sella-activetrail.php';
+	require_once get_stylesheet_directory() . '/inc/sella-activetrail-buyers.php';
 	require_once get_stylesheet_directory() . '/inc/sella-seo.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shopify-import.php';
 	require_once get_stylesheet_directory() . '/inc/sella-shopify-app.php';
