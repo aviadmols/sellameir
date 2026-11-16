@@ -3,7 +3,7 @@
 
   /**
    * The first-chapter form ([sella_first_chapter], inc/sella-first-chapter.php):
-   * checks the name and email as the server does, sends them with the chapter
+   * checks the name, mobile and email as the server does, sends them with the chapter
    * and product, and swaps the form for the "on its way" note. The server
    * checks everything again and its messages win.
    */
@@ -13,15 +13,28 @@
     nameEmpty: 'נא למלא שם',
     emailEmpty: 'נא למלא כתובת אימייל',
     emailBad: 'כתובת האימייל לא תקינה',
+    phoneEmpty: 'נא למלא מספר טלפון נייד',
+    phoneBad: 'מספר הטלפון לא תקין. למשל: 050-1234567',
     fix: 'יש לתקן את השדות המסומנים.',
     sending: 'שולח...',
     failed: 'לא הצלחנו לשלוח את הפרק. בדקו את החיבור ונסו שוב.'
   };
 
+  /* The same numbers sella_contact_normalize_phone() accepts. */
+  function phoneOk(value) {
+    var phone = value.replace(/[\s\-.()/]/g, '');
+    return /^(?:(?:\+|00)?972|0)5\d{8}$/.test(phone) ||
+      (/^(?:\+|00)[1-9]\d{7,14}$/.test(phone) && !/^(?:\+|00)972/.test(phone));
+  }
+
   function check(name, value) {
     value = value.trim();
     if (name === 'name') {
       return value.length < 2 ? MESSAGES.nameEmpty : '';
+    }
+    if (name === 'phone') {
+      if (!value) return MESSAGES.phoneEmpty;
+      return phoneOk(value) ? '' : MESSAGES.phoneBad;
     }
     if (name === 'email') {
       if (!value) return MESSAGES.emailEmpty;
@@ -61,7 +74,7 @@
 
     function validateAll() {
       var first = null;
-      ['name', 'email'].forEach(function (name) {
+      ['name', 'phone', 'email'].forEach(function (name) {
         var input = field(name).querySelector('input');
         var message = check(name, input.value);
         showError(name, message);

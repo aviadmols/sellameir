@@ -5,7 +5,7 @@
  * - פרקים ראשונים (post type sella_chapter): each chapter is a book's name, its
  *   file (uploaded to the media library or linked from elsewhere) and a cover
  *   for the email.
- * - [sella_first_chapter]: a name and email form for the product page. It shows
+ * - [sella_first_chapter]: a name, mobile and email form for the product page. It shows
  *   only on the products given a chapter on the settings screen, and on those
  *   it is added under the description by itself (once, even when the template
  *   has the shortcode too).
@@ -859,7 +859,7 @@ function sella_fc_shortcode( $atts ) {
 			'chapter' => '',
 			'product' => '',
 			'title'   => 'קבלו פרק ראשון לדוגמה, ישירות למייל',
-			'text'    => 'השאירו שם ומייל ונשלח אליכם את הפרק הראשון של {book}.',
+			'text'    => 'השאירו שם, טלפון ומייל ונשלח אליכם את הפרק הראשון של {book}.',
 			'button'  => 'שלחו לי את הפרק',
 		),
 		$atts,
@@ -914,7 +914,12 @@ function sella_fc_shortcode( $atts ) {
 					<input class="sella-fc__input" type="text" id="<?php echo esc_attr( $p ); ?>-name" name="name" autocomplete="name" maxlength="190" required aria-required="true" aria-describedby="<?php echo esc_attr( $p ); ?>-name-error" />
 					<p class="sella-fc__error" id="<?php echo esc_attr( $p ); ?>-name-error" hidden></p>
 				</div>
-				<div class="sella-fc__field" data-field="email">
+				<div class="sella-fc__field" data-field="phone">
+					<label class="sella-fc__label" for="<?php echo esc_attr( $p ); ?>-phone">טלפון נייד</label>
+					<input class="sella-fc__input" type="tel" id="<?php echo esc_attr( $p ); ?>-phone" name="phone" autocomplete="tel" inputmode="tel" dir="ltr" maxlength="20" required aria-required="true" aria-describedby="<?php echo esc_attr( $p ); ?>-phone-error" />
+					<p class="sella-fc__error" id="<?php echo esc_attr( $p ); ?>-phone-error" hidden></p>
+				</div>
+				<div class="sella-fc__field sella-fc__field--wide" data-field="email">
 					<label class="sella-fc__label" for="<?php echo esc_attr( $p ); ?>-email">אימייל</label>
 					<input class="sella-fc__input" type="email" id="<?php echo esc_attr( $p ); ?>-email" name="email" autocomplete="email" inputmode="email" dir="ltr" maxlength="190" required aria-required="true" aria-describedby="<?php echo esc_attr( $p ); ?>-email-error" />
 					<p class="sella-fc__error" id="<?php echo esc_attr( $p ); ?>-email-error" hidden></p>
@@ -970,10 +975,16 @@ function sella_fc_ajax_request() {
 
 	$name   = trim( sanitize_text_field( $input['name'] ?? '' ) );
 	$email  = sanitize_email( $input['email'] ?? '' );
+	$phone  = sella_contact_normalize_phone( $input['phone'] ?? '' );
 	$errors = array();
 
 	if ( mb_strlen( $name ) < 2 ) {
 		$errors['name'] = 'נא למלא שם';
+	}
+	if ( '' === trim( (string) ( $input['phone'] ?? '' ) ) ) {
+		$errors['phone'] = 'נא למלא מספר טלפון נייד';
+	} elseif ( '' === $phone ) {
+		$errors['phone'] = 'מספר הטלפון לא תקין. למשל: 050-1234567';
 	}
 	if ( '' === trim( (string) ( $input['email'] ?? '' ) ) ) {
 		$errors['email'] = 'נא למלא כתובת אימייל';
@@ -1005,6 +1016,7 @@ function sella_fc_ajax_request() {
 			'product_id' => $product_id && 'product' === get_post_type( $product_id ) ? $product_id : 0,
 			'name'       => $name,
 			'email'      => $email,
+			'phone'      => $phone,
 			'source'     => 'shortcode',
 			'form_name'  => 'טופס פרק ראשון',
 			'page_url'   => sella_leads_page_url( $input['page_url'] ?? '' ),

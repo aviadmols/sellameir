@@ -81,6 +81,11 @@ body .sella-fc .sella-fc__text {
   margin-top: 26px;
 }
 
+/* Name and mobile side by side, the email under them. */
+.sella-fc__field--wide {
+  grid-column: 1 / -1;
+}
+
 body .sella-fc .sella-fc__label {
   display: block;
   margin: 0 6px 9px;
