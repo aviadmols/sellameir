@@ -13,10 +13,16 @@
  *     deals in the cart      "מבצע", the deal's name (Smart Cart plugin)
  *   A line counts once, for the first of these it carries, in that order.
  *   Published popups and checkout offers that sold nothing are listed too.
+ * - משלוחים: what customers paid for shipping (the shipping lines, with tax),
+ *   per method, and how many orders shipped free or not at all.
+ * - קופונים: each coupon used — how often, the discount it gave, the orders'
+ *   total, the first and last use, and every use with its date and amount.
  * - הזמנות ולקוחות: the orders of the period, filtered by what was bought
  *   (a subscription and books in the same order, only books, chosen books —
- *   any of them or all of them), with the customer's contact and full address,
- *   and an export of the same list to a CSV file Excel opens in Hebrew.
+ *   any of them or all of them), by shipping method and by coupon, with the
+ *   customer's contact and full address. The export button submits the filter
+ *   form itself, so the file holds exactly the orders of the filters chosen,
+ *   in the layout of the LETS gift list (see the export section below).
  *
  * Only paid orders count (wc_get_is_paid_statuses(): processing, completed).
  * A subscription line is one LETS marks with _lets_subscription, or a product
@@ -87,6 +93,8 @@ function sella_sd_tabs() {
 	return array(
 		'overview' => 'סקירה כללית',
 		'offers'   => 'הצעות ופופאפים',
+		'shipping' => 'משלוחים',
+		'coupons'  => 'קופונים',
 		'orders'   => 'הזמנות ולקוחות',
 	);
 }
@@ -122,7 +130,7 @@ function sella_sd_what_options() {
 /**
  * The screen's state, read once.
  *
- * @return array{tab: string, period: string, from: string, to: string, what: string, products: int[], match: string, paged: int}
+ * @return array{tab: string, period: string, from: string, to: string, what: string, products: int[], match: string, ship: string, coupon: string, paged: int}
  */
 function sella_sd_state() {
 	static $state = null;
@@ -157,6 +165,8 @@ function sella_sd_state() {
 		'what'     => isset( sella_sd_what_options()[ $what ] ) ? $what : 'all',
 		'products' => $products,
 		'match'    => 'all' === $get( 'match' ) ? 'all' : 'any',
+		'ship'     => $get( 'ship' ),
+		'coupon'   => $get( 'coupon' ),
 		'paged'    => max( 1, absint( $get( 'paged' ) ) ),
 	);
 
@@ -191,6 +201,12 @@ function sella_sd_url( $args = array() ) {
 	if ( $state['products'] ) {
 		$query['products'] = $state['products'];
 		$query['match']    = $state['match'];
+	}
+	if ( '' !== $state['ship'] ) {
+		$query['ship'] = $state['ship'];
+	}
+	if ( '' !== $state['coupon'] ) {
+		$query['coupon'] = $state['coupon'];
 	}
 	if ( $state['paged'] > 1 ) {
 		$query['paged'] = $state['paged'];
@@ -361,16 +377,21 @@ function sella_sd_orders( $from, $to ) {
 			'id'     => $id,
 			'total'  => 0.0,
 			'date'   => '',
-			'lines'  => array(),
-			'sub'    => false,
-			'book'   => false,
-			'offer'  => false,
+			'lines'      => array(),
+			'sub'        => false,
+			'book'       => false,
+			'offer'      => false,
+			'shipping'   => array(),
+			'ship_total' => 0.0,
+			'coupons'    => array(),
+			'discount'   => 0.0,
 		);
 	}
 
 	foreach ( array_chunk( $ids, 500 ) as $chunk ) {
 		sella_sd_fill_totals( $orders, $chunk );
 		sella_sd_fill_lines( $orders, $chunk );
+		sella_sd_fill_shipping_coupons( $orders, $chunk );
 	}
 
 	$cache[ $key ] = $orders;
@@ -478,6 +499,110 @@ function sella_sd_fill_lines( &$orders, $ids ) {
 }
 
 /**
+ * Shipping lines (method name, what the customer paid for it with its tax)
+ * and coupons (code, discount with its tax), for a chunk of IDs.
+ *
+ * @param array $orders Orders, by reference.
+ * @param int[] $ids    IDs.
+ */
+function sella_sd_fill_shipping_coupons( &$orders, $ids ) {
+	global $wpdb;
+	$in = implode( ',', array_map( 'intval', $ids ) );
+
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- integer IDs.
+	$rows = $wpdb->get_results(
+		"SELECT oi.order_item_id, oi.order_id, oi.order_item_type, oi.order_item_name, m.meta_key, m.meta_value
+		FROM {$wpdb->prefix}woocommerce_order_items oi
+		LEFT JOIN {$wpdb->prefix}woocommerce_order_itemmeta m ON m.order_item_id = oi.order_item_id
+			AND m.meta_key IN ('cost', 'total_tax', 'discount_amount', 'discount_amount_tax')
+		WHERE oi.order_item_type IN ('shipping', 'coupon') AND oi.order_id IN ({$in})
+		ORDER BY oi.order_item_id"
+	);
+	// phpcs:enable
+
+	$items = array();
+	foreach ( $rows as $row ) {
+		$id = (int) $row->order_item_id;
+		if ( ! isset( $items[ $id ] ) ) {
+			$items[ $id ] = array(
+				'order_id' => (int) $row->order_id,
+				'type'     => (string) $row->order_item_type,
+				'name'     => trim( (string) $row->order_item_name ),
+				'meta'     => array(),
+			);
+		}
+		if ( null !== $row->meta_key ) {
+			$items[ $id ]['meta'][ $row->meta_key ] = (float) $row->meta_value;
+		}
+	}
+
+	foreach ( $items as $item ) {
+		if ( ! isset( $orders[ $item['order_id'] ] ) ) {
+			continue;
+		}
+		$m     = $item['meta'];
+		$order = &$orders[ $item['order_id'] ];
+		if ( 'shipping' === $item['type'] ) {
+			$total               = ( $m['cost'] ?? 0 ) + ( $m['total_tax'] ?? 0 );
+			$order['shipping'][] = array(
+				'name'  => '' !== $item['name'] ? $item['name'] : 'משלוח',
+				'total' => $total,
+			);
+			$order['ship_total'] += $total;
+		} else {
+			$discount           = ( $m['discount_amount'] ?? 0 ) + ( $m['discount_amount_tax'] ?? 0 );
+			$order['coupons'][] = array(
+				'code'     => $item['name'],
+				'discount' => $discount,
+			);
+			$order['discount'] += $discount;
+		}
+		unset( $order );
+	}
+}
+
+/**
+ * Whether an order passes the shipping filter.
+ *
+ * @param array  $order Order.
+ * @param string $ship  '' (any), '__none', '__free' or a method name.
+ * @return bool
+ */
+function sella_sd_ship_passes( $order, $ship ) {
+	if ( '' === $ship ) {
+		return true;
+	}
+	if ( '__none' === $ship ) {
+		return ! $order['shipping'];
+	}
+	if ( '__free' === $ship ) {
+		return $order['shipping'] && $order['ship_total'] <= 0;
+	}
+	return in_array( $ship, array_column( $order['shipping'], 'name' ), true );
+}
+
+/**
+ * Whether an order passes the coupon filter.
+ *
+ * @param array  $order  Order.
+ * @param string $coupon '' (any), '__any', '__none' or a coupon code.
+ * @return bool
+ */
+function sella_sd_coupon_passes( $order, $coupon ) {
+	if ( '' === $coupon ) {
+		return true;
+	}
+	if ( '__any' === $coupon ) {
+		return (bool) $order['coupons'];
+	}
+	if ( '__none' === $coupon ) {
+		return ! $order['coupons'];
+	}
+	$codes = array_map( 'wc_strtolower', array_column( $order['coupons'], 'code' ) );
+	return in_array( wc_strtolower( $coupon ), $codes, true );
+}
+
+/**
  * What brought a line into the order, if an offer did.
  *
  * @param array $m Line meta.
@@ -549,7 +674,11 @@ function sella_sd_filtered_orders( $state ) {
 			default:
 				$pass = true;
 		}
-		if ( $pass && sella_sd_has_products( $order, $state['products'], $state['match'] ) ) {
+		if ( $pass
+			&& sella_sd_has_products( $order, $state['products'], $state['match'] )
+			&& sella_sd_ship_passes( $order, $state['ship'] )
+			&& sella_sd_coupon_passes( $order, $state['coupon'] )
+		) {
 			$out[ $id ] = $order;
 		}
 	}
@@ -698,6 +827,10 @@ function sella_sd_render_page() {
 		<?php
 		if ( 'offers' === $state['tab'] ) {
 			sella_sd_render_offers( $range );
+		} elseif ( 'shipping' === $state['tab'] ) {
+			sella_sd_render_shipping( $range );
+		} elseif ( 'coupons' === $state['tab'] ) {
+			sella_sd_render_coupons( $range );
 		} elseif ( 'orders' === $state['tab'] ) {
 			sella_sd_render_orders( $state, $range );
 		} else {
@@ -754,6 +887,11 @@ function sella_sd_hidden_filters( $state ) {
 	if ( $state['products'] ) {
 		echo '<input type="hidden" name="match" value="' . esc_attr( $state['match'] ) . '" />';
 	}
+	foreach ( array( 'ship', 'coupon' ) as $key ) {
+		if ( '' !== $state[ $key ] ) {
+			echo '<input type="hidden" name="' . esc_attr( $key ) . '" value="' . esc_attr( $state[ $key ] ) . '" />';
+		}
+	}
 }
 
 /**
@@ -795,8 +933,17 @@ function sella_sd_render_overview( $range ) {
 	$top       = array();
 	$sub_kinds = array();
 
+	$shipping = 0.0;
+	$discount = 0.0;
+	$coupons  = 0;
+
 	foreach ( $orders as $order ) {
-		$revenue += $order['total'];
+		$revenue  += $order['total'];
+		$shipping += $order['ship_total'];
+		$discount += $order['discount'];
+		if ( $order['coupons'] ) {
+			++$coupons;
+		}
 		if ( $order['sub'] && $order['book'] ) {
 			++$both;
 		}
@@ -832,6 +979,8 @@ function sella_sd_render_overview( $range ) {
 			array( 'label' => 'ספרים שנמכרו', 'value' => number_format_i18n( $books ) ),
 			array( 'label' => 'מנויים חדשים', 'value' => number_format_i18n( $subs ), 'note' => $both ? number_format_i18n( $both ) . ' מהם קנו גם ספרים' : '' ),
 			array( 'label' => 'הכניסו ההצעות והפופאפים', 'value' => sella_sd_money( $offer_sum ), 'note' => sella_sd_percent( $offer_sum, $revenue ) . ' מכלל המכירות' ),
+			array( 'label' => 'דמי משלוח ששולמו', 'value' => sella_sd_money( $shipping ), 'note' => 'מתוך סך המכירות' ),
+			array( 'label' => 'הנחות בקופונים', 'value' => sella_sd_money( $discount ), 'note' => $coupons ? number_format_i18n( $coupons ) . ' הזמנות עם קופון' : 'לא הופעלו קופונים' ),
 		)
 	);
 
@@ -1091,13 +1240,47 @@ function sella_sd_render_orders( $state, $range ) {
 	$paged  = min( $state['paged'], $pages );
 	$shown  = array_slice( $orders, ( $paged - 1 ) * SELLA_SD_PER_PAGE, SELLA_SD_PER_PAGE, true );
 
-	$export = wp_nonce_url(
-		add_query_arg( 'action', 'sella_sd_export', str_replace( admin_url( 'admin.php' ), admin_url( 'admin-post.php' ), sella_sd_url() ) ),
-		'sella_sd_export'
+	// The shipping methods and coupons of the period, for the two selects.
+	$methods = array();
+	$codes   = array();
+	foreach ( sella_sd_orders( $range['from'], $range['to'] ) as $order ) {
+		foreach ( $order['shipping'] as $line ) {
+			$methods[ $line['name'] ] = true;
+		}
+		foreach ( $order['coupons'] as $line ) {
+			$codes[ wc_strtolower( $line['code'] ) ] = true;
+		}
+	}
+	// A chosen one stays in the list even when the period has none of it.
+	if ( '' !== $state['ship'] && '__' !== substr( $state['ship'], 0, 2 ) ) {
+		$methods[ $state['ship'] ] = true;
+	}
+	if ( '' !== $state['coupon'] && '__' !== substr( $state['coupon'], 0, 2 ) ) {
+		$codes[ wc_strtolower( $state['coupon'] ) ] = true;
+	}
+	ksort( $methods );
+	ksort( $codes );
+
+	$ship_options = array(
+		''       => 'כל שיטות המשלוח',
+		'__free' => 'משלוח חינם (0 ₪)',
+		'__none' => 'בלי משלוח',
 	);
+	foreach ( array_keys( $methods ) as $name ) {
+		$ship_options[ $name ] = $name;
+	}
+	$coupon_options = array(
+		''       => 'עם קופון או בלי',
+		'__any'  => 'רק הזמנות עם קופון',
+		'__none' => 'רק הזמנות בלי קופון',
+	);
+	foreach ( array_keys( $codes ) as $code ) {
+		$coupon_options[ $code ] = 'קופון: ' . $code;
+	}
 	?>
-	<form class="sella-sd__filters" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
+	<form id="sella-sd-filters" class="sella-sd__filters" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
 		<input type="hidden" name="page" value="<?php echo esc_attr( SELLA_SD_SLUG ); ?>" />
+		<?php wp_nonce_field( 'sella_sd_export', 'sd_nonce', false ); ?>
 		<input type="hidden" name="tab" value="orders" />
 		<input type="hidden" name="period" value="<?php echo esc_attr( $state['period'] ); ?>" />
 		<?php if ( 'custom' === $state['period'] ) : ?>
@@ -1130,10 +1313,30 @@ function sella_sd_render_orders( $state, $range ) {
 			</div>
 		</div>
 
+		<div class="sella-sd__filter">
+			<div class="sella-sd__filter-title">3. משלוח וקופון <span class="sella-sd__muted">(לא חובה)</span></div>
+			<div class="sella-sd__selects">
+				<label>שיטת משלוח
+					<select name="ship">
+						<?php foreach ( $ship_options as $value => $label ) : ?>
+							<option value="<?php echo esc_attr( (string) $value ); ?>" <?php selected( $state['ship'], (string) $value ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<label>קופון
+					<select name="coupon">
+						<?php foreach ( $coupon_options as $value => $label ) : ?>
+							<option value="<?php echo esc_attr( (string) $value ); ?>" <?php selected( wc_strtolower( $state['coupon'] ), (string) $value ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+			</div>
+		</div>
+
 		<div class="sella-sd__filter-actions">
 			<button type="submit" class="button button-primary button-hero">הצגת ההזמנות</button>
-			<?php if ( 'all' !== $state['what'] || $state['products'] ) : ?>
-				<a class="sella-sd__reset" href="<?php echo esc_url( sella_sd_url( array( 'what' => 'all', 'products' => array() ) ) ); ?>">ניקוי הסינון</a>
+			<?php if ( 'all' !== $state['what'] || $state['products'] || '' !== $state['ship'] || '' !== $state['coupon'] ) : ?>
+				<a class="sella-sd__reset" href="<?php echo esc_url( sella_sd_url( array( 'what' => 'all', 'products' => array(), 'ship' => '', 'coupon' => '' ) ) ); ?>">ניקוי הסינון</a>
 			<?php endif; ?>
 		</div>
 	</form>
@@ -1146,7 +1349,17 @@ function sella_sd_render_orders( $state, $range ) {
 			<?php endif; ?>
 		</div>
 		<?php if ( $count ) : ?>
-			<a class="button button-primary sella-sd__export" href="<?php echo esc_url( $export ); ?>"><span class="dashicons dashicons-download" aria-hidden="true"></span> ייצוא לאקסל</a>
+			<?php
+			/*
+			 * Submits the filter form itself, to the export: the file holds the
+			 * orders of the filters as they are in the form now, even ones
+			 * picked after the list was last shown.
+			 */
+			?>
+			<div class="sella-sd__export-wrap">
+				<button type="submit" form="sella-sd-filters" formaction="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" name="action" value="sella_sd_export" class="button button-primary sella-sd__export"><span class="dashicons dashicons-download" aria-hidden="true"></span> ייצוא ההזמנות המסוננות לאקסל</button>
+				<span class="sella-sd__muted">הקובץ כולל רק את ההזמנות שמתאימות לסינון שבחרתם</span>
+			</div>
 		<?php endif; ?>
 	</div>
 
@@ -1187,7 +1400,15 @@ function sella_sd_render_orders( $state, $range ) {
 							<span class="sella-sd__item<?php echo $line['sub'] ? ' is-sub' : ''; ?><?php echo $line['source'] ? ' is-offer' : ''; ?>"<?php echo $line['source'] ? ' title="' . esc_attr( 'נוסף מהצעה: ' . sella_sd_offer_types()[ $line['source']['type'] ]['short'] ) . '"' : ''; ?>><?php echo esc_html( $line['name'] . ( $line['qty'] > 1 ? ' (' . $line['qty'] . ')' : '' ) ); ?></span>
 						<?php endforeach; ?>
 					</td>
-					<td class="num"><strong><?php echo esc_html( sella_sd_money( $data['total'] ) ); ?></strong></td>
+					<td class="num">
+						<strong><?php echo esc_html( sella_sd_money( $data['total'] ) ); ?></strong>
+						<?php if ( $data['shipping'] ) : ?>
+							<div class="sella-sd__muted"><?php echo esc_html( $data['ship_total'] > 0 ? 'משלוח ' . sella_sd_money( $data['ship_total'] ) : 'משלוח חינם' ); ?></div>
+						<?php endif; ?>
+						<?php foreach ( $data['coupons'] as $coupon ) : ?>
+							<div class="sella-sd__coupon-note"><span dir="ltr"><?php echo esc_html( $coupon['code'] ); ?></span> −<?php echo esc_html( sella_sd_money( $coupon['discount'] ) ); ?></div>
+						<?php endforeach; ?>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
@@ -1207,22 +1428,383 @@ function sella_sd_render_orders( $state, $range ) {
 }
 
 /**
- * The filtered orders as a CSV file.
+ * ---------------------------------------------------------------------------
+ * Tab: shipping
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * What customers paid for shipping, per method.
+ *
+ * @param array $range Dates.
+ */
+function sella_sd_render_shipping( $range ) {
+	$orders  = sella_sd_orders( $range['from'], $range['to'] );
+	$methods = array();
+	$total   = 0.0;
+	$paid    = 0;
+	$free    = 0;
+	$none    = 0;
+
+	foreach ( $orders as $order ) {
+		if ( ! $order['shipping'] ) {
+			++$none;
+			continue;
+		}
+		$total += $order['ship_total'];
+		if ( $order['ship_total'] > 0 ) {
+			++$paid;
+		} else {
+			++$free;
+		}
+		foreach ( $order['shipping'] as $line ) {
+			if ( ! isset( $methods[ $line['name'] ] ) ) {
+				$methods[ $line['name'] ] = array( 'orders' => 0, 'paid' => 0, 'free' => 0, 'total' => 0.0 );
+			}
+			$row = &$methods[ $line['name'] ];
+			++$row['orders'];
+			$row['total'] += $line['total'];
+			if ( $line['total'] > 0 ) {
+				++$row['paid'];
+			} else {
+				++$row['free'];
+			}
+			unset( $row );
+		}
+	}
+
+	uasort(
+		$methods,
+		function ( $a, $b ) {
+			return $b['total'] <=> $a['total'] ?: $b['orders'] <=> $a['orders'];
+		}
+	);
+
+	sella_sd_render_cards(
+		array(
+			array( 'label' => 'סך דמי המשלוח ששולמו', 'value' => sella_sd_money( $total ), 'tone' => 'main', 'note' => count( $orders ) ? 'ממוצע ' . sella_sd_money( $paid ? $total / $paid : 0 ) . ' להזמנה עם משלוח בתשלום' : '' ),
+			array( 'label' => 'הזמנות עם משלוח בתשלום', 'value' => number_format_i18n( $paid ) ),
+			array( 'label' => 'הזמנות עם משלוח חינם', 'value' => number_format_i18n( $free ) ),
+			array( 'label' => 'הזמנות בלי משלוח', 'value' => number_format_i18n( $none ), 'note' => 'למשל מנוי בלבד' ),
+		)
+	);
+	?>
+	<p class="sella-sd__explain">הסכומים הם דמי המשלוח שהלקוחות שילמו באתר, כולל מע״מ. מה שהמשלוח עלה לכם מול חברת השליחויות לא נשמר באתר.</p>
+
+	<section class="sella-sd__panel">
+		<h2>לפי שיטת משלוח</h2>
+		<?php if ( $methods ) : ?>
+			<table class="sella-sd__table">
+				<thead><tr><th>שיטת משלוח</th><th class="num">הזמנות</th><th class="num">בתשלום</th><th class="num">חינם</th><th class="num">שולם על משלוח</th><th class="num">ממוצע</th><th></th></tr></thead>
+				<tbody>
+				<?php foreach ( $methods as $name => $row ) : ?>
+					<tr>
+						<td><?php echo esc_html( $name ); ?></td>
+						<td class="num"><?php echo esc_html( number_format_i18n( $row['orders'] ) ); ?></td>
+						<td class="num"><?php echo esc_html( number_format_i18n( $row['paid'] ) ); ?></td>
+						<td class="num"><?php echo esc_html( number_format_i18n( $row['free'] ) ); ?></td>
+						<td class="num"><strong><?php echo esc_html( sella_sd_money( $row['total'] ) ); ?></strong></td>
+						<td class="num"><?php echo esc_html( sella_sd_money( $row['paid'] ? $row['total'] / $row['paid'] : 0 ) ); ?></td>
+						<td class="num"><a href="<?php echo esc_url( sella_sd_url( array( 'tab' => 'orders', 'what' => 'all', 'products' => array(), 'coupon' => '', 'ship' => (string) $name ) ) ); ?>">להזמנות ←</a></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php else : ?>
+			<p class="sella-sd__muted">אין הזמנות עם משלוח בתאריכים האלה.</p>
+		<?php endif; ?>
+	</section>
+	<?php
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Tab: coupons
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Which coupons were used, how often, when and for how much.
+ *
+ * @param array $range Dates.
+ */
+function sella_sd_render_coupons( $range ) {
+	$orders  = sella_sd_orders( $range['from'], $range['to'] );
+	$coupons = array();
+	$revenue = 0.0;
+	$with    = 0;
+
+	foreach ( $orders as $order ) {
+		$revenue += $order['total'];
+		if ( ! $order['coupons'] ) {
+			continue;
+		}
+		++$with;
+		foreach ( $order['coupons'] as $line ) {
+			$code = wc_strtolower( $line['code'] );
+			if ( ! isset( $coupons[ $code ] ) ) {
+				$coupons[ $code ] = array( 'uses' => array(), 'discount' => 0.0, 'sales' => 0.0, 'first' => $order['date'], 'last' => $order['date'] );
+			}
+			$row               = &$coupons[ $code ];
+			$row['uses'][]     = array( 'id' => $order['id'], 'discount' => $line['discount'], 'total' => $order['total'] );
+			$row['discount']  += $line['discount'];
+			$row['sales']     += $order['total'];
+			$row['first']      = min( $row['first'], $order['date'] );
+			$row['last']       = max( $row['last'], $order['date'] );
+			unset( $row );
+		}
+	}
+
+	uasort(
+		$coupons,
+		function ( $a, $b ) {
+			return count( $b['uses'] ) <=> count( $a['uses'] ) ?: $b['discount'] <=> $a['discount'];
+		}
+	);
+
+	$discount = array_sum( array_column( $coupons, 'discount' ) );
+	$sales    = 0.0;
+	foreach ( $orders as $order ) {
+		if ( $order['coupons'] ) {
+			$sales += $order['total'];
+		}
+	}
+	$day = function ( $date ) {
+		$d = DateTimeImmutable::createFromFormat( '!Y-m-d', $date );
+		return $d ? $d->format( 'j.n.Y' ) : $date;
+	};
+
+	sella_sd_render_cards(
+		array(
+			array( 'label' => 'סך ההנחות בקופונים', 'value' => sella_sd_money( $discount ), 'tone' => 'main' ),
+			array( 'label' => 'הזמנות עם קופון', 'value' => number_format_i18n( $with ), 'note' => sella_sd_percent( $with, count( $orders ) ) . ' מכלל ההזמנות' ),
+			array( 'label' => 'מכירות בהזמנות עם קופון', 'value' => sella_sd_money( $sales ), 'note' => sella_sd_percent( $sales, $revenue ) . ' מכלל המכירות' ),
+			array( 'label' => 'קופונים שונים שהופעלו', 'value' => number_format_i18n( count( $coupons ) ) ),
+		)
+	);
+
+	if ( ! $coupons ) {
+		echo '<div class="sella-sd__empty">לא הופעלו קופונים בתאריכים האלה.</div>';
+		return;
+	}
+	?>
+	<section class="sella-sd__panel">
+		<h2>הקופונים שהופעלו</h2>
+		<table class="sella-sd__table">
+			<thead><tr><th>קופון</th><th class="num">שימושים</th><th class="num">סך ההנחה</th><th class="num">סכום ההזמנות</th><th class="num">שימוש ראשון</th><th class="num">שימוש אחרון</th><th></th></tr></thead>
+			<tbody>
+			<?php foreach ( $coupons as $code => $row ) : ?>
+				<tr>
+					<td><strong dir="ltr"><?php echo esc_html( (string) $code ); ?></strong></td>
+					<td class="num"><?php echo esc_html( number_format_i18n( count( $row['uses'] ) ) ); ?></td>
+					<td class="num"><strong><?php echo esc_html( sella_sd_money( $row['discount'] ) ); ?></strong></td>
+					<td class="num"><?php echo esc_html( sella_sd_money( $row['sales'] ) ); ?></td>
+					<td class="num"><?php echo esc_html( $day( $row['first'] ) ); ?></td>
+					<td class="num"><?php echo esc_html( $day( $row['last'] ) ); ?></td>
+					<td class="num"><a href="<?php echo esc_url( sella_sd_url( array( 'tab' => 'orders', 'what' => 'all', 'products' => array(), 'ship' => '', 'coupon' => (string) $code ) ) ); ?>">להזמנות ←</a></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+	</section>
+
+	<section class="sella-sd__panel">
+		<h2>מתי ובאיזה סכום — כל שימוש בכל קופון</h2>
+		<?php foreach ( $coupons as $code => $row ) : ?>
+			<details class="sella-sd__coupon">
+				<summary><strong dir="ltr"><?php echo esc_html( (string) $code ); ?></strong> · <?php echo esc_html( number_format_i18n( count( $row['uses'] ) ) ); ?> שימושים · הנחה של <?php echo esc_html( sella_sd_money( $row['discount'] ) ); ?></summary>
+				<table class="sella-sd__table">
+					<thead><tr><th>תאריך ושעה</th><th>הזמנה</th><th>לקוח</th><th class="num">הנחה</th><th class="num">סכום ההזמנה</th></tr></thead>
+					<tbody>
+					<?php foreach ( $row['uses'] as $use ) : ?>
+						<?php
+						$order = wc_get_order( $use['id'] );
+						if ( ! $order ) {
+							continue;
+						}
+						$date = $order->get_date_created();
+						?>
+						<tr>
+							<td><?php echo esc_html( $date ? $date->date_i18n( 'j.n.Y H:i' ) : '' ); ?></td>
+							<td><a href="<?php echo esc_url( $order->get_edit_order_url() ); ?>">#<?php echo esc_html( $order->get_order_number() ); ?></a></td>
+							<td><?php echo esc_html( trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ) ); ?></td>
+							<td class="num"><?php echo esc_html( sella_sd_money( $use['discount'] ) ); ?></td>
+							<td class="num"><?php echo esc_html( sella_sd_money( $use['total'] ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			</details>
+		<?php endforeach; ?>
+	</section>
+	<?php
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Export: the courier's sheet of LETS (app.lets.co.il, GiftListExporter)
+ * ---------------------------------------------------------------------------
+ *
+ * The same columns, in the same order and with the same headers, as the gift
+ * list LETS exports: first name, last name, phone, city, street, house,
+ * entrance, apartment, floor, the note to write on the delivery. Then, only
+ * when the file has a subscription in it, LETS's two membership columns (the
+ * date they joined, which is the order's date here, and the subscription).
+ * Last, the books of the order.
+ *
+ * The address is split as LETS splits it (GiftShippingAddress::splitLines):
+ * the house, apartment, floor and entrance fields of the checkout when the
+ * order has them, else the number at the end of the street and the labelled
+ * parts of the second line; what is left of that line goes into the note,
+ * before the customer's note. Cells are guarded against formulas as LETS
+ * guards them (CsvCell): a number such as a phone is left as it is.
+ */
+
+/** A house number at the end of the street: "הרצל 12", "הרצל 12א", "הרצל 12/3". */
+define( 'SELLA_SD_TRAILING_BUILDING', '/^(.*\S)\s+(\d+[א-תa-zA-Z]?(?:\/\d+)?)$/u' );
+
+/**
+ * The labels of the parts in a second address line.
+ *
+ * @return array<string, string>
+ */
+function sella_sd_address2_labels() {
+	return array(
+		'apartment' => 'דירה|apt\.?|apartment',
+		'floor'     => 'קומה|floor',
+		'entrance'  => 'כניסה|entrance',
+	);
+}
+
+/**
+ * One order's courier columns, in LETS's order.
+ *
+ * @param WC_Order $order Order.
+ * @return string[]
+ */
+function sella_sd_courier_fields( $order ) {
+	$type = '' !== trim( $order->get_shipping_address_1() . $order->get_shipping_city() ) ? 'shipping' : 'billing';
+	$get  = function ( $field ) use ( $order, $type ) {
+		$method = 'get_' . $type . '_' . $field;
+		return is_callable( array( $order, $method ) ) ? trim( (string) $order->$method() ) : '';
+	};
+	$a = sella_sd_address( $order );
+
+	// Name: the block's two fields, else the billing ones, else one name split.
+	$first = $get( 'first_name' );
+	$last  = $get( 'last_name' );
+	if ( '' === $first . $last ) {
+		$first = trim( $order->get_billing_first_name() );
+		$last  = trim( $order->get_billing_last_name() );
+	}
+	if ( '' === $last ) {
+		$parts = preg_split( '/\s+/u', $first, 2 );
+		$first = (string) ( $parts[0] ?? '' );
+		$last  = (string) ( $parts[1] ?? '' );
+	}
+
+	$phone = $get( 'phone' );
+	if ( '' === $phone ) {
+		$phone = trim( $order->get_billing_phone() );
+	}
+
+	// Street and house.
+	$street   = $a['street'];
+	$building = $a['building'];
+	if ( '' !== $building ) {
+		$suffix = ' ' . $building;
+		if ( $street !== $building && substr( $street, -strlen( $suffix ) ) === $suffix ) {
+			$street = substr( $street, 0, -strlen( $suffix ) );
+		}
+	} elseif ( preg_match( SELLA_SD_TRAILING_BUILDING, $street, $match ) ) {
+		$street   = $match[1];
+		$building = $match[2];
+	}
+
+	// Apartment, floor, entrance: their fields, else lifted out of line 2.
+	$parts = array(
+		'apartment' => $a['apartment'],
+		'floor'     => $a['floor'],
+		'entrance'  => $a['entrance'],
+	);
+	$rest  = $a['line2'];
+	foreach ( sella_sd_address2_labels() as $part => $labels ) {
+		$pattern = '/(?:^|[,·])\s*(?:' . $labels . ')\s*:?\s*([^,·]+)/iu';
+		if ( preg_match( $pattern, $rest, $match ) ) {
+			if ( '' === $parts[ $part ] ) {
+				$parts[ $part ] = trim( $match[1] );
+			}
+			$rest = (string) preg_replace( $pattern, '', $rest, 1 );
+		}
+	}
+	$rest = trim( (string) preg_replace( '/^[\s,·\-]+|[\s,·\-]+$/u', '', $rest ) );
+
+	// The note: what is left of line 2, then the customer's note, said once.
+	$note = trim( (string) $order->get_customer_note() );
+	if ( '' !== $rest && '' !== $note && false !== mb_stripos( $note, $rest ) ) {
+		$rest = '';
+	}
+
+	return array(
+		$first,
+		$last,
+		$phone,
+		$a['city'],
+		trim( $street ),
+		trim( $building ),
+		$parts['entrance'],
+		$parts['apartment'],
+		$parts['floor'],
+		implode( ' · ', array_filter( array( $rest, $note ), 'strlen' ) ),
+	);
+}
+
+/**
+ * A cell that would start a formula gets an apostrophe; a number is left alone.
+ *
+ * @param mixed $value Cell.
+ * @return string
+ */
+function sella_sd_csv_cell( $value ) {
+	$value = (string) $value;
+	if ( '' === $value || ! in_array( $value[0], array( '=', '+', '-', '@', "\t", "\r" ), true ) || is_numeric( $value ) ) {
+		return $value;
+	}
+	return "'" . $value;
+}
+
+/**
+ * The filtered orders as a CSV file, in LETS's courier sheet layout.
  */
 function sella_sd_export() {
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		wp_die( 'אין הרשאה.' );
 	}
-	check_admin_referer( 'sella_sd_export' );
+	check_admin_referer( 'sella_sd_export', 'sd_nonce' );
 
 	$state  = sella_sd_state();
 	$range  = sella_sd_range( $state );
 	$orders = sella_sd_filtered_orders( $state );
-	$types  = sella_sd_offer_types();
 
 	if ( function_exists( 'set_time_limit' ) ) {
 		set_time_limit( 300 ); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
 	}
+
+	// LETS's membership columns, only when a subscription is in the file.
+	$with_subs = false;
+	foreach ( $orders as $data ) {
+		if ( $data['sub'] ) {
+			$with_subs = true;
+			break;
+		}
+	}
+
+	$headers = array( 'שם פרטי', 'שם משפחה', 'טלפון', 'עיר', 'רחוב', 'בית', 'כניסה', 'דירה', 'קומה', 'הערות שייכתבו על המשלוח' );
+	if ( $with_subs ) {
+		$headers[] = 'תאריך הצטרפות';
+		$headers[] = 'מנוי';
+	}
+	$headers[] = 'ספרים';
 
 	nocache_headers();
 	header( 'Content-Type: text/csv; charset=utf-8' );
@@ -1230,73 +1812,33 @@ function sella_sd_export() {
 
 	$out = fopen( 'php://output', 'w' );
 	fwrite( $out, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
-	fputcsv(
-		$out,
-		array( 'מספר הזמנה', 'תאריך', 'סטטוס', 'שם פרטי', 'שם משפחה', 'טלפון', 'אימייל', 'רחוב', 'מספר בית', 'דירה', 'קומה', 'כניסה', 'עיר', 'מיקוד', 'כתובת מלאה', 'משלוח', 'הערה להזמנה', 'מנויים', 'ספרים', 'מספר ספרים', 'נוסף מהצעה', 'סכום ההזמנה' )
-	);
+	fputcsv( $out, $headers, ',', '"', '' );
 
-	$statuses = wc_get_order_statuses();
 	foreach ( $orders as $id => $data ) {
 		$order = wc_get_order( $id );
 		if ( ! $order ) {
 			continue;
 		}
-		$address = sella_sd_address( $order );
-		$subs    = array();
-		$books   = array();
-		$offers  = array();
-		$count   = 0;
-		foreach ( $data['lines'] as $line ) {
-			$text = $line['name'] . ( $line['qty'] > 1 ? ' (' . $line['qty'] . ' עותקים)' : '' );
-			if ( $line['sub'] ) {
-				$subs[] = $text;
-			} else {
-				$books[] = $text;
-				$count  += $line['qty'];
-			}
-			if ( $line['source'] ) {
-				$offers[] = $line['name'] . ' (' . $types[ $line['source']['type'] ]['short'] . ')';
-			}
-		}
-		$date = $order->get_date_created();
 
-		$cells = array(
-			$order->get_order_number(),
-			$date ? $date->date_i18n( 'd/m/Y H:i' ) : '',
-			$statuses[ 'wc-' . $order->get_status() ] ?? $order->get_status(),
-			$order->get_billing_first_name(),
-			$order->get_billing_last_name(),
-			$order->get_billing_phone(),
-			$order->get_billing_email(),
-			$address['street'],
-			$address['building'],
-			$address['apartment'],
-			$address['floor'],
-			$address['entrance'],
-			$address['city'],
-			$address['postcode'],
-			sella_sd_address_line( $address ),
-			$order->get_shipping_method(),
-			$order->get_customer_note(),
-			implode( ' | ', $subs ),
-			implode( ' | ', $books ),
-			$count,
-			implode( ' | ', $offers ),
-			wc_format_decimal( $data['total'], 2 ),
-		);
-		// A cell starting with = + - @ would run as a formula in Excel; a phone number is safe.
-		$cells = array_map(
-			function ( $cell ) {
-				$cell = (string) $cell;
-				return preg_match( '/^[=+\-@]/', $cell ) && ! preg_match( '/^\+?[\d\s\-]+$/', $cell ) ? "'" . $cell : $cell;
-			},
-			$cells
-		);
-		// Excel drops a phone number's leading zero unless it is written as text.
-		if ( preg_match( '/^0\d{6,}$/', $cells[5] ) ) {
-			$cells[5] = '="' . $cells[5] . '"';
+		$subs  = array();
+		$books = array();
+		foreach ( $data['lines'] as $line ) {
+			if ( $line['sub'] ) {
+				$subs[ $line['name'] ] = true;
+			} else {
+				$books[] = $line['name'] . ( $line['qty'] > 1 ? ' (' . $line['qty'] . ' עותקים)' : '' );
+			}
 		}
-		fputcsv( $out, $cells );
+
+		$cells = sella_sd_courier_fields( $order );
+		if ( $with_subs ) {
+			$date    = $order->get_date_created();
+			$cells[] = $subs && $date ? $date->date_i18n( 'd/m/Y' ) : '';
+			$cells[] = implode( ', ', array_keys( $subs ) );
+		}
+		$cells[] = implode( ' | ', $books );
+
+		fputcsv( $out, array_map( 'sella_sd_csv_cell', $cells ), ',', '"', '' );
 	}
 	fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 	exit;
