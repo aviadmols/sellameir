@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.59' );
+define( 'HELLO_ELEMENTOR_CHILD_VERSION', '2.2.60' );
 
 require_once get_stylesheet_directory() . '/inc/cursor-db-bridge.php';
 require_once get_stylesheet_directory() . '/inc/sella-performance.php';
@@ -70,6 +70,7 @@ function sella_load_woocommerce_modules() {
 	require_once get_stylesheet_directory() . '/inc/sella-hidden-subscriptions.php';
 	require_once get_stylesheet_directory() . '/inc/sella-promo-five-books.php';
 	require_once get_stylesheet_directory() . '/inc/sella-members-only.php';
+	require_once get_stylesheet_directory() . '/inc/sella-sales-dashboard.php';
 }
 add_action( 'after_setup_theme', 'sella_load_woocommerce_modules', 20 );
 

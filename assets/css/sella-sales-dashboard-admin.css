@@ -1,0 +1,538 @@
+/* Sales dashboard (inc/sella-sales-dashboard.php). */
+
+.sella-sd {
+	--sd-ink: #1d2327;
+	--sd-muted: #646970;
+	--sd-line: #e3e5e8;
+	--sd-surface: #fff;
+	--sd-soft: #f6f7f7;
+	--sd-accent: #2a78d6;
+	--sd-accent-soft: #eaf2fc;
+	--sd-sub: #6250d6;
+	--sd-sub-soft: #efedfc;
+	--sd-offer: #b35c00;
+	--sd-offer-soft: #fff4e5;
+	max-width: 1280px;
+	color: var(--sd-ink);
+}
+
+.sella-sd__title {
+	font-size: 28px;
+	font-weight: 700;
+	margin: 8px 0 18px;
+}
+
+.sella-sd__muted {
+	color: var(--sd-muted);
+	font-size: 13px;
+}
+
+/* Tabs */
+.sella-sd__tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 18px;
+}
+
+.sella-sd__tab {
+	padding: 10px 20px;
+	border-radius: 999px;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	color: var(--sd-ink);
+	font-size: 15px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.sella-sd__tab:hover,
+.sella-sd__tab:focus {
+	border-color: var(--sd-accent);
+	color: var(--sd-accent);
+}
+
+.sella-sd__tab.is-active {
+	background: var(--sd-ink);
+	border-color: var(--sd-ink);
+	color: #fff;
+}
+
+/* Period */
+.sella-sd__period {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 14px 16px;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	border-radius: 12px;
+}
+
+.sella-sd__period-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.sella-sd__chip {
+	display: inline-block;
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: var(--sd-soft);
+	color: var(--sd-ink);
+	font-size: 14px;
+	text-decoration: none;
+}
+
+.sella-sd__chip:hover,
+.sella-sd__chip:focus {
+	background: var(--sd-accent-soft);
+	color: var(--sd-accent);
+}
+
+.sella-sd__chip.is-active {
+	background: var(--sd-accent);
+	color: #fff;
+}
+
+.sella-sd__custom {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+}
+
+.sella-sd__custom label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.sella-sd__custom.is-active input[type="date"] {
+	border-color: var(--sd-accent);
+}
+
+.sella-sd__range {
+	margin: 10px 4px 18px;
+	color: var(--sd-muted);
+	font-size: 14px;
+}
+
+.sella-sd__range strong {
+	color: var(--sd-ink);
+}
+
+/* Number cards */
+.sella-sd__cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 12px;
+	margin-bottom: 18px;
+}
+
+.sella-sd__card {
+	padding: 18px 20px;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	border-radius: 12px;
+}
+
+.sella-sd__card.is-main {
+	background: var(--sd-ink);
+	border-color: var(--sd-ink);
+	color: #fff;
+}
+
+.sella-sd__card-label {
+	font-size: 14px;
+	color: var(--sd-muted);
+}
+
+.sella-sd__card.is-main .sella-sd__card-label,
+.sella-sd__card.is-main .sella-sd__card-note {
+	color: #c3c4c7;
+}
+
+.sella-sd__card-value {
+	margin-top: 6px;
+	font-size: 30px;
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.sella-sd__card-note {
+	margin-top: 6px;
+	font-size: 13px;
+	color: var(--sd-muted);
+}
+
+/* Panels and tables */
+.sella-sd__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+	gap: 18px;
+}
+
+.sella-sd__panel {
+	margin-bottom: 18px;
+	padding: 18px 20px;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	border-radius: 12px;
+}
+
+.sella-sd__panel h2 {
+	margin: 0 0 12px;
+	font-size: 18px;
+}
+
+.sella-sd__panel-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 12px;
+	margin-bottom: 12px;
+}
+
+.sella-sd__panel-head h2 {
+	margin: 0;
+}
+
+.sella-sd__table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+
+.sella-sd__table th {
+	padding: 8px 10px;
+	text-align: right;
+	font-weight: 600;
+	color: var(--sd-muted);
+	border-bottom: 1px solid var(--sd-line);
+}
+
+.sella-sd__table td {
+	padding: 10px;
+	border-bottom: 1px solid var(--sd-line);
+	vertical-align: top;
+}
+
+.sella-sd__table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.sella-sd__table .num {
+	text-align: left;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.sella-sd__table tr.is-zero td {
+	color: var(--sd-muted);
+}
+
+.sella-sd__share-col {
+	width: 200px;
+	white-space: nowrap;
+}
+
+.sella-sd__meter {
+	display: inline-block;
+	width: 120px;
+	height: 8px;
+	vertical-align: middle;
+	background: var(--sd-soft);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.sella-sd__meter span {
+	display: block;
+	height: 100%;
+	background: var(--sd-accent);
+	border-radius: 4px;
+}
+
+.sella-sd__link-row {
+	margin: 12px 0 0;
+}
+
+.sella-sd__explain {
+	margin: -6px 4px 18px;
+	color: var(--sd-muted);
+	font-size: 13px;
+}
+
+.sella-sd__empty {
+	padding: 40px 20px;
+	text-align: center;
+	background: var(--sd-surface);
+	border: 1px dashed var(--sd-line);
+	border-radius: 12px;
+	color: var(--sd-muted);
+	font-size: 15px;
+}
+
+/* Chart */
+.sella-sd__chart {
+	position: relative;
+	padding-top: 22px;
+}
+
+.sella-sd__chart-max {
+	position: absolute;
+	top: 0;
+	right: 0;
+	font-size: 12px;
+	color: var(--sd-muted);
+}
+
+.sella-sd__bars {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
+	height: 220px;
+	padding-bottom: 22px;
+	border-top: 1px dashed var(--sd-line);
+	border-bottom: 1px solid var(--sd-line);
+	/* Time runs left to right, as on every chart, also in a Hebrew page. */
+	direction: ltr;
+}
+
+.sella-sd__bar-slot {
+	position: relative;
+	flex: 1 1 0;
+	display: flex;
+	align-items: flex-end;
+	min-width: 0;
+	outline: none;
+	cursor: default;
+}
+
+.sella-sd__bar {
+	width: 100%;
+	min-height: 0;
+	background: var(--sd-accent);
+	border-radius: 4px 4px 0 0;
+	transition: opacity 0.15s;
+}
+
+.sella-sd__bars:hover .sella-sd__bar {
+	opacity: 0.55;
+}
+
+.sella-sd__bars .sella-sd__bar-slot:hover .sella-sd__bar,
+.sella-sd__bar-slot:focus .sella-sd__bar {
+	opacity: 1;
+}
+
+.sella-sd__bar-label {
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-top: 4px;
+	font-size: 11px;
+	color: var(--sd-muted);
+	white-space: nowrap;
+}
+
+.sella-sd__bar-slot:hover::after,
+.sella-sd__bar-slot:focus::after {
+	content: attr(data-tip);
+	position: absolute;
+	bottom: calc(100% - 22px);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 2;
+	padding: 6px 10px;
+	background: var(--sd-ink);
+	color: #fff;
+	border-radius: 6px;
+	font-size: 12px;
+	white-space: nowrap;
+	direction: rtl;
+	pointer-events: none;
+}
+
+.sella-sd__as-table {
+	margin-top: 12px;
+}
+
+.sella-sd__as-table summary {
+	cursor: pointer;
+	color: var(--sd-accent);
+	font-size: 13px;
+}
+
+/* Orders filters */
+.sella-sd__filters {
+	display: grid;
+	gap: 18px;
+	margin-bottom: 18px;
+	padding: 20px;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	border-radius: 12px;
+}
+
+.sella-sd__filter-title {
+	margin-bottom: 10px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.sella-sd__radios {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.sella-sd__radios.is-small {
+	margin-top: 10px;
+}
+
+.sella-sd__radio {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	background: var(--sd-soft);
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.sella-sd__radio:has(input:checked) {
+	background: var(--sd-accent-soft);
+	border-color: var(--sd-accent);
+	color: var(--sd-accent);
+	font-weight: 600;
+}
+
+.sella-sd__radio input {
+	margin: 0;
+}
+
+.sella-sd .select2-container {
+	width: 100% !important;
+	max-width: 640px;
+}
+
+.sella-sd__filter-actions {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.sella-sd__reset {
+	font-size: 14px;
+}
+
+.sella-sd__result-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+	font-size: 16px;
+}
+
+.sella-sd__export.button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 18px;
+	font-size: 15px;
+}
+
+.sella-sd__table-wrap {
+	overflow-x: auto;
+	background: var(--sd-surface);
+	border: 1px solid var(--sd-line);
+	border-radius: 12px;
+}
+
+.sella-sd__orders td {
+	padding: 12px 10px;
+}
+
+.sella-sd__orders td:nth-child(3) {
+	min-width: 180px;
+}
+
+.sella-sd__orders td:nth-child(4) {
+	min-width: 220px;
+}
+
+.sella-sd__orders [dir="ltr"] {
+	text-align: right;
+}
+
+.sella-sd__order-link {
+	font-weight: 700;
+	font-size: 15px;
+	text-decoration: none;
+}
+
+.sella-sd__item {
+	display: inline-block;
+	margin: 0 0 4px 4px;
+	padding: 2px 10px;
+	background: var(--sd-soft);
+	border: 1px solid var(--sd-line);
+	border-radius: 999px;
+	font-size: 13px;
+}
+
+.sella-sd__item.is-sub {
+	background: var(--sd-sub-soft);
+	border-color: transparent;
+	color: var(--sd-sub);
+	font-weight: 600;
+}
+
+.sella-sd__item.is-offer {
+	border-color: var(--sd-offer);
+	border-style: dashed;
+}
+
+.sella-sd__item.is-offer::before {
+	content: "★ ";
+	color: var(--sd-offer);
+}
+
+.sella-sd__legend {
+	margin: 10px 4px;
+	color: var(--sd-muted);
+	font-size: 13px;
+}
+
+.sella-sd__pages {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 12px;
+}
+
+@media (max-width: 782px) {
+	.sella-sd__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.sella-sd__card-value {
+		font-size: 24px;
+	}
+
+	.sella-sd__share-col {
+		display: none;
+	}
+}
