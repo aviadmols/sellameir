@@ -13,8 +13,9 @@
  *     _sella_event_product_id on the event). Saving the event keeps the
  *     product's name, price, image and stock status in step.
  *
- * On the event's page, the Elementor add-to-cart widget of the single-event
- * template is printed as a quantity and the "buy" button, which puts the
+ * On the event's page, the button of the Elementor add-to-cart widget in the
+ * single-event template is swapped, on the finished page, for a quantity and
+ * the "buy" button (in the widget's text, icon and style), which puts the
  * ticket in the cart (Smart Cart catches the form and opens the drawer;
  * without JavaScript the form posts to the shop). Once the event has started
  * the button reads "אירוע עבר", and with the checkbox on it reads "SOLD OUT";
@@ -22,7 +23,8 @@
  * button is the [sella_event_buy] shortcode (id="" for another event).
  *
  * [sella_events] lists every event: upcoming ones first, soonest first, then
- * past ones, latest first. show="upcoming" or show="past" for one group.
+ * past ones, latest first. show="upcoming" or show="past" for one group. On
+ * /events/ it takes the place of the old list (the "next event" snippet).
  *
  * The guests' page cache keeps pages for hours, so it is emptied when an
  * event starts (a single cron event per event).
@@ -931,43 +933,127 @@ function sella_ev_buy_html( $event_id, $args = array() ) {
 	return (string) ob_get_clean();
 }
 
-/**
- * The single-event template's add-to-cart widget becomes the buy form, in
- * the widget's own button style. With no product it is left as it was.
+/*
+ * The event's page and the events page are changed on the finished HTML,
+ * not inside Elementor: the single-event template is shared by every event,
+ * and Elementor's element cache keeps a copy of a widget's output for a day.
+ * A buy button rendered inside the widget would show one event's ticket on
+ * another, or an old button until the cache expires.
  *
- * @param string                 $content Widget HTML.
- * @param \Elementor\Widget_Base $widget  Widget.
+ * The HTML is built when the page starts (output buffering cannot be used
+ * inside a buffer callback), and the callback only swaps strings.
+ */
+
+/**
+ * What the page buffer will put in: the buy form (with the widget's text and
+ * icon left as placeholders) and the events list.
+ *
+ * @var array{form:string,list:string}
+ */
+$GLOBALS['sella_ev_swap'] = array(
+	'form' => '',
+	'list' => '',
+);
+
+/**
+ * Whether this is the page the events list replaces the old list on.
+ *
+ * @return bool
+ */
+function sella_ev_is_events_page() {
+	return is_page( (string) apply_filters( 'sella_events_page', 'events' ) );
+}
+
+/**
+ * Build the replacements and start the buffer. After the page cache's and
+ * the tracking buffers start, so this one runs first and the cached page
+ * holds the result.
+ */
+function sella_ev_page_start() {
+	if ( is_admin() || is_feed() ) {
+		return;
+	}
+	if ( is_singular( SELLA_EV_POST_TYPE ) ) {
+		$event_id = (int) get_queried_object_id();
+		$form     = sella_ev_buy_html(
+			$event_id,
+			array(
+				'text'      => '%%SELLA_EV_TEXT%%',
+				'icon'      => '%%SELLA_EV_ICON%%',
+				'btn_class' => 'elementor-button elementor-size-%%SELLA_EV_SIZE%%',
+			)
+		);
+		if ( '' === $form ) {
+			return; // Nothing on sale: the widget stays as it is.
+		}
+		$GLOBALS['sella_ev_swap']['form'] = $form;
+	} elseif ( sella_ev_is_events_page() ) {
+		$GLOBALS['sella_ev_swap']['list'] = sella_ev_list_shortcode( array() );
+	} else {
+		return;
+	}
+	ob_start( 'sella_ev_page_swap' );
+}
+add_action( 'template_redirect', 'sella_ev_page_start', PHP_INT_MAX );
+
+/**
+ * The stepper's script, on the pages that may show the form.
+ */
+function sella_ev_enqueue() {
+	if ( is_singular( SELLA_EV_POST_TYPE ) ) {
+		wp_enqueue_script( 'sella-events', get_stylesheet_directory_uri() . '/assets/js/sella-events.js', array(), HELLO_ELEMENTOR_CHILD_VERSION, true );
+	}
+}
+add_action( 'wp_enqueue_scripts', 'sella_ev_enqueue' );
+
+/**
+ * Buffer callback: the add-to-cart widget's button becomes the buy form (in
+ * the button's own text, icon and size), and the old events list becomes
+ * the full one. A page without them passes through unchanged.
+ *
+ * @param string $html Page HTML.
  * @return string
  */
-function sella_ev_elementor_button( $content, $widget ) {
-	if ( 'wc-add-to-cart' !== $widget->get_name() || is_admin() ) {
-		return $content;
-	}
-	$event_id = (int) get_the_ID();
-	if ( ! $event_id || SELLA_EV_POST_TYPE !== get_post_type( $event_id ) ) {
-		return $content;
+function sella_ev_page_swap( $html ) {
+	$swap = $GLOBALS['sella_ev_swap'];
+
+	if ( '' !== $swap['form'] && false !== strpos( $html, 'elementor-widget-wc-add-to-cart' ) ) {
+		$out = preg_replace_callback(
+			'#(<div[^>]*\belementor-widget-wc-add-to-cart\b[^>]*>\s*(?:<div class="elementor-widget-container">\s*)?)(<a\b[^>]*\belementor-button\b[^>]*>.*?</a>)#s',
+			static function ( $m ) use ( $swap ) {
+				$text = sella_ev_text( 'buy' );
+				$icon = '';
+				$size = 'sm';
+				$t    = array();
+				$i    = array();
+				$s    = array();
+				if ( preg_match( '#<span class="elementor-button-text">(.*?)</span>#s', $m[2], $t ) ) {
+					$text = trim( html_entity_decode( wp_strip_all_tags( $t[1] ), ENT_QUOTES, 'UTF-8' ) );
+				}
+				if ( preg_match( '#<span class="elementor-button-icon">(.*?)</span>\s*<span class="elementor-button-text">#s', $m[2], $i ) ) {
+					$icon = trim( $i[1] );
+				}
+				if ( preg_match( '#\belementor-size-([a-z]+)#', $m[2], $s ) ) {
+					$size = $s[1];
+				}
+				return $m[1] . str_replace(
+					array( '%%SELLA_EV_TEXT%%', '%%SELLA_EV_ICON%%', '%%SELLA_EV_SIZE%%' ),
+					array( esc_html( $text ), $icon, esc_attr( $size ) ),
+					$swap['form']
+				);
+			},
+			$html
+		);
+		$html = is_string( $out ) ? $out : $html;
 	}
 
-	$settings = $widget->get_settings_for_display();
-	$icon     = '';
-	if ( ! empty( $settings['selected_icon']['value'] ) && class_exists( '\Elementor\Icons_Manager' ) ) {
-		ob_start();
-		\Elementor\Icons_Manager::render_icon( $settings['selected_icon'], array( 'aria-hidden' => 'true' ) );
-		$icon = (string) ob_get_clean();
+	if ( '' !== $swap['list'] && false !== strpos( $html, 'sibolet-events-section' ) ) {
+		$out  = preg_replace( '#<section class="sibolet-events-section">.*?</section>#s', str_replace( array( '\\', '$' ), array( '\\\\', '\\$' ), $swap['list'] ), $html, 1 );
+		$html = is_string( $out ) ? $out : $html;
 	}
-	$size = ! empty( $settings['size'] ) ? 'elementor-size-' . sanitize_html_class( $settings['size'] ) : 'elementor-size-sm';
 
-	return sella_ev_buy_html(
-		$event_id,
-		array(
-			'text'      => ! empty( $settings['text'] ) ? (string) $settings['text'] : sella_ev_text( 'buy' ),
-			'icon'      => $icon,
-			'btn_class' => 'elementor-button ' . $size,
-			'fallback'  => $content,
-		)
-	);
+	return $html;
 }
-add_filter( 'elementor/widget/render_content', 'sella_ev_elementor_button', 10, 2 );
 
 /**
  * [sella_event_buy id=""]: the button anywhere (the current event by default).
