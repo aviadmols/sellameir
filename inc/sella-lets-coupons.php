@@ -12,6 +12,13 @@
  * Its other settings (amount, products, minimum, expiry, usage limits) work
  * as on any coupon.
  *
+ * "סוג מנוי" narrows it to subscribers of chosen plans: the subscription
+ * products of the plans table (and any other subscription product). LETS
+ * tells which products a subscriber's running plans were sold as; a plan
+ * sold as a variation counts for its product. Left empty, any active
+ * subscription counts. A LETS server too old to tell the products gives a
+ * narrowed coupon to nobody.
+ *
  * "Active subscriber" is LETS's answer (the lets-payplus-woocommerce plugin,
  * POST account/subscriber-status: a recurring plan, paid and running; paused,
  * failing and installment plans do not count), cached per email for five
@@ -25,6 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'SELLA_LC_META', '_sella_lets_auto' );
+define( 'SELLA_LC_PLANS_META', '_sella_lets_plans' );
 define( 'SELLA_LC_CACHE', 'sella_lets_auto_coupons' );
 
 /*
@@ -47,16 +55,72 @@ function sella_lc_field( $coupon_id ) {
 			'value'       => 'yes' === get_post_meta( $coupon_id, SELLA_LC_META, true ) ? 'yes' : 'no',
 		)
 	);
+
+	$chosen = sella_lc_coupon_plans( $coupon_id );
+	?>
+	<p class="form-field">
+		<label for="sella_lets_plans">סוג מנוי</label>
+		<select id="sella_lets_plans" name="<?php echo esc_attr( SELLA_LC_PLANS_META ); ?>[]" class="wc-enhanced-select" multiple="multiple" style="width:50%" data-placeholder="כל מנוי פעיל">
+			<?php foreach ( sella_lc_plan_options() as $product_id => $label ) : ?>
+				<option value="<?php echo (int) $product_id; ?>" <?php selected( in_array( (int) $product_id, $chosen, true ) ); ?>><?php echo esc_html( $label ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<?php echo wc_help_tip( 'הקופון יופעל רק למנויים פעילים של סוגי המנוי שנבחרו. בלי בחירה: לכל מנוי פעיל.' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WooCommerce escapes the tip. ?>
+	</p>
+	<?php
 }
 add_action( 'woocommerce_coupon_options', 'sella_lc_field' );
 
 /**
- * Save the checkbox.
+ * The plans a coupon can be narrowed to: product ID => name. The plans
+ * table's plans first, by the name shown there, then other subscription
+ * products.
+ *
+ * @return array<int, string>
+ */
+function sella_lc_plan_options() {
+	$options = array();
+	if ( function_exists( 'sella_plans_get' ) ) {
+		foreach ( (array) sella_plans_get()['plans'] as $plan ) {
+			$product_id = isset( $plan['product_id'] ) ? (int) $plan['product_id'] : 0;
+			if ( $product_id && ! isset( $options[ $product_id ] ) ) {
+				$product_name           = get_the_title( $product_id );
+				$name                   = isset( $plan['name'] ) ? (string) $plan['name'] : '';
+				$options[ $product_id ] = trim( $name . ( $product_name && $product_name !== $name ? ' – ' . $product_name : '' ) . ' (#' . $product_id . ')' );
+			}
+		}
+	}
+	if ( function_exists( 'sella_hs_ids' ) ) {
+		foreach ( sella_hs_ids() as $product_id ) {
+			if ( ! isset( $options[ $product_id ] ) && 'product' === get_post_type( $product_id ) && 'trash' !== get_post_status( $product_id ) ) {
+				$options[ $product_id ] = get_the_title( $product_id ) . ' (#' . $product_id . ')';
+			}
+		}
+	}
+	return $options;
+}
+
+/**
+ * The plans a coupon is narrowed to (empty: any subscription).
+ *
+ * @param int $coupon_id Coupon ID.
+ * @return int[]
+ */
+function sella_lc_coupon_plans( $coupon_id ) {
+	return array_values( array_filter( array_map( 'intval', (array) get_post_meta( $coupon_id, SELLA_LC_PLANS_META, true ) ) ) );
+}
+
+/**
+ * Save the checkbox and the plans.
  *
  * @param int $coupon_id Coupon ID.
  */
 function sella_lc_save( $coupon_id ) {
-	update_post_meta( $coupon_id, SELLA_LC_META, isset( $_POST[ SELLA_LC_META ] ) ? 'yes' : 'no' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce checked the coupon form nonce.
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- WooCommerce checked the coupon form nonce.
+	update_post_meta( $coupon_id, SELLA_LC_META, isset( $_POST[ SELLA_LC_META ] ) ? 'yes' : 'no' );
+	$plans = isset( $_POST[ SELLA_LC_PLANS_META ] ) ? array_values( array_filter( array_map( 'absint', (array) wp_unslash( $_POST[ SELLA_LC_PLANS_META ] ) ) ) ) : array();
+	// phpcs:enable
+	update_post_meta( $coupon_id, SELLA_LC_PLANS_META, $plans );
 	delete_transient( SELLA_LC_CACHE );
 }
 add_action( 'woocommerce_coupon_options_save', 'sella_lc_save' );
@@ -172,39 +236,46 @@ function sella_lc_email() {
 }
 
 /**
- * Whether the email belongs to an active LETS subscriber. The plugin's own
- * check when it has one (cached per email); else the same request to LETS.
- * No LETS, no answer: false.
+ * What LETS says about the email: whether it is an active subscriber, and
+ * the store products its running plans were sold as (null when LETS did not
+ * say: an older server, or only the plugin's yes/no check at hand). Cached
+ * per email for five minutes, a failed call for thirty seconds. No LETS, no
+ * answer: not a subscriber.
  *
  * @param string $email Email.
- * @return bool
+ * @return array{active:bool,products:int[]|null}
  */
-function sella_lc_is_subscriber( $email ) {
+function sella_lc_status( $email ) {
 	static $memo = array();
 
+	$none  = array(
+		'active'   => false,
+		'products' => array(),
+	);
 	$email = strtolower( trim( (string) $email ) );
 	if ( '' === $email ) {
-		return false;
+		return $none;
 	}
 	if ( isset( $memo[ $email ] ) ) {
 		return $memo[ $email ];
 	}
 
-	if ( function_exists( 'lets_payplus_subscriber_discount_is_subscriber' ) ) {
-		$memo[ $email ] = (bool) lets_payplus_subscriber_discount_is_subscriber( $email );
-		return $memo[ $email ];
-	}
 	if ( ! function_exists( 'lets_payplus_signed_post' ) ) {
-		$memo[ $email ] = false;
-		return false;
+		$memo[ $email ] = function_exists( 'lets_payplus_subscriber_discount_is_subscriber' ) && lets_payplus_subscriber_discount_is_subscriber( $email )
+			? array(
+				'active'   => true,
+				'products' => null,
+			)
+			: $none;
+		return $memo[ $email ];
 	}
 
 	$ref    = is_user_logged_in() ? (string) get_current_user_id() : $email;
-	$key    = 'sella_lc_' . md5( $ref . '|' . $email );
+	$key    = 'sella_lc2_' . md5( $ref . '|' . $email );
 	$cached = get_transient( $key );
-	if ( false !== $cached ) {
-		$memo[ $email ] = '1' === $cached;
-		return $memo[ $email ];
+	if ( is_array( $cached ) && isset( $cached['active'] ) ) {
+		$memo[ $email ] = $cached;
+		return $cached;
 	}
 
 	$result = lets_payplus_signed_post(
@@ -214,14 +285,72 @@ function sella_lc_is_subscriber( $email ) {
 			'email'        => $email,
 		)
 	);
-	if ( is_wp_error( $result ) ) {
-		set_transient( $key, '0', 30 );
-		$memo[ $email ] = false;
+	if ( is_wp_error( $result ) || ! is_array( $result ) ) {
+		set_transient( $key, $none, 30 );
+		$memo[ $email ] = $none;
+		return $none;
+	}
+
+	$status = array(
+		'active'   => ! empty( $result['active'] ),
+		'products' => isset( $result['product_ids'] ) && is_array( $result['product_ids'] ) ? array_values( array_filter( array_map( 'intval', $result['product_ids'] ) ) ) : null,
+	);
+	set_transient( $key, $status, 5 * MINUTE_IN_SECONDS );
+	$memo[ $email ] = $status;
+	return $status;
+}
+
+/**
+ * Whether the email belongs to an active LETS subscriber.
+ *
+ * @param string $email Email.
+ * @return bool
+ */
+function sella_lc_is_subscriber( $email ) {
+	return sella_lc_status( $email )['active'];
+}
+
+/**
+ * Whether the email may have this coupon: an active subscriber, and, when
+ * the coupon is narrowed to plans, of one of them.
+ *
+ * @param WC_Coupon $coupon Coupon.
+ * @param string    $email  Email.
+ * @return bool
+ */
+function sella_lc_qualifies( $coupon, $email ) {
+	$status = sella_lc_status( $email );
+	if ( ! $status['active'] ) {
 		return false;
 	}
-	$memo[ $email ] = ! empty( $result['active'] );
-	set_transient( $key, $memo[ $email ] ? '1' : '0', 5 * MINUTE_IN_SECONDS );
-	return $memo[ $email ];
+	$plans = sella_lc_coupon_plans( $coupon->get_id() );
+	if ( ! $plans ) {
+		return true;
+	}
+	return is_array( $status['products'] ) && array() !== array_intersect( $plans, $status['products'] );
+}
+
+/**
+ * The names of the plans a coupon is narrowed to, for the shopper.
+ *
+ * @param WC_Coupon $coupon Coupon.
+ * @return string
+ */
+function sella_lc_plan_names( $coupon ) {
+	$names = array();
+	foreach ( sella_lc_coupon_plans( $coupon->get_id() ) as $product_id ) {
+		$name = '';
+		if ( function_exists( 'sella_plans_get' ) ) {
+			foreach ( (array) sella_plans_get()['plans'] as $plan ) {
+				if ( isset( $plan['product_id'], $plan['name'] ) && (int) $plan['product_id'] === $product_id ) {
+					$name = (string) $plan['name'];
+					break;
+				}
+			}
+		}
+		$names[] = '' !== $name ? $name : get_the_title( $product_id );
+	}
+	return implode( ', ', array_unique( array_filter( $names ) ) );
 }
 
 /*
@@ -247,13 +376,18 @@ function sella_lc_validate( $valid, $coupon, $discounts = null ) {
 	$object = $discounts instanceof WC_Discounts ? $discounts->get_object() : null;
 	$email  = $object instanceof WC_Order ? strtolower( (string) $object->get_billing_email() ) : sella_lc_email();
 
-	if ( ! sella_lc_is_subscriber( $email ) ) {
-		throw new Exception(
-			esc_html( '' === $email ? 'הקופון הזה למנויי LETS. הזינו את המייל שלכם בפרטי החיוב, והוא יופעל אם יש לכם מנוי פעיל.' : 'הקופון הזה למנויים פעילים של LETS בלבד, והמייל שהוזן אינו של מנוי פעיל.' ),
-			100 // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
-		);
+	if ( sella_lc_qualifies( $coupon, $email ) ) {
+		return $valid;
 	}
-	return $valid;
+	if ( '' === $email ) {
+		$message = 'הקופון הזה למנויי LETS. הזינו את המייל שלכם בפרטי החיוב, והוא יופעל אם יש לכם מנוי פעיל.';
+	} elseif ( sella_lc_is_subscriber( $email ) && sella_lc_coupon_plans( $coupon->get_id() ) ) {
+		$names   = sella_lc_plan_names( $coupon );
+		$message = '' !== $names ? 'הקופון הזה מיועד רק למנויים פעילים מסוג: ' . $names . '.' : 'הקופון הזה מיועד לסוג מנוי אחר.';
+	} else {
+		$message = 'הקופון הזה למנויים פעילים של LETS בלבד, והמייל שהוזן אינו של מנוי פעיל.';
+	}
+	throw new Exception( esc_html( $message ), 100 ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
 }
 add_filter( 'woocommerce_coupon_is_valid', 'sella_lc_validate', 20, 3 );
 
@@ -275,14 +409,17 @@ function sella_lc_sync( $email, $notices = true ) {
 	if ( ! $codes || ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
 		return;
 	}
-	$cart       = WC()->cart;
-	$subscriber = sella_lc_is_subscriber( $email );
-	$changed    = false;
+	$cart    = WC()->cart;
+	$changed = false;
 
 	foreach ( $codes as $code ) {
 		$applied = $cart->has_discount( $code );
+		$coupon  = new WC_Coupon( $code );
+		if ( ! $coupon->get_id() ) {
+			continue;
+		}
 
-		if ( ! $subscriber ) {
+		if ( ! sella_lc_qualifies( $coupon, $email ) ) {
 			if ( $applied ) {
 				$cart->remove_coupon( $code );
 				$changed = true;
@@ -293,11 +430,6 @@ function sella_lc_sync( $email, $notices = true ) {
 			continue;
 		}
 		if ( $applied ) {
-			continue;
-		}
-
-		$coupon = new WC_Coupon( $code );
-		if ( ! $coupon->get_id() ) {
 			continue;
 		}
 		// An individual-use coupon would push out the shopper's own code; and
