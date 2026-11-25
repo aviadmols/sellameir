@@ -1063,7 +1063,8 @@ function sella_ev_page_swap( $html ) {
  */
 function sella_ev_buy_shortcode( $atts ) {
 	$atts     = shortcode_atts( array( 'id' => 0 ), $atts, 'sella_event_buy' );
-	$event_id = $atts['id'] ? absint( $atts['id'] ) : (int) get_the_ID();
+	// In an Elementor template the current post may be the template; the page's event is the queried one.
+	$event_id = $atts['id'] ? absint( $atts['id'] ) : ( is_singular( SELLA_EV_POST_TYPE ) ? (int) get_queried_object_id() : (int) get_the_ID() );
 	if ( ! $event_id || SELLA_EV_POST_TYPE !== get_post_type( $event_id ) ) {
 		return '';
 	}
