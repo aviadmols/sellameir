@@ -3075,3 +3075,280 @@ body.woocommerce-cart .page-header .entry-title {
     font-size: 15px;
   }
 }
+
+/* ==========================================================================
+   Events (inc/sella-events.php): the ticket form on the event's page and
+   the [sella_events] cards.
+   ========================================================================== */
+
+.sella-event-buy {
+  display: flex;
+  flex-wrap: wrap !important; /* Elementor's add-to-cart widget sets nowrap on form.cart at (0,6,2). */
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.sella-event-buy > * {
+  flex: none;
+}
+
+/* A <button>, not the widget's <a>: no border from the base theme. */
+body .sella-event-buy button.sella-event-buy__btn {
+  border: 0;
+}
+
+.sella-event-buy__price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #171717;
+}
+
+.sella-event-qty {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  border: 1px solid var(--sella-field-border, #e7e7ee);
+  border-radius: 100px;
+  background: #fff;
+  overflow: hidden;
+}
+
+body .sella-event-qty .sella-event-qty__btn {
+  width: 34px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #171717;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+body .sella-event-qty .sella-event-qty__btn:hover,
+body .sella-event-qty .sella-event-qty__btn:focus {
+  background: #f7f7f9;
+  color: #171717;
+}
+
+body .sella-event-qty .sella-event-qty__input {
+  width: 38px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.sella-event-qty__input::-webkit-outer-spin-button,
+.sella-event-qty__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Outside Elementor (the shortcode): the event page's yellow pill. */
+.sella-event-buy__btn--theme {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 100px;
+  background: #f2e936;
+  color: #000;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Past or sold out: a grey pill that does nothing. Outranks the widget's own colors. */
+body .sella-event-buy .elementor-button.sella-event-buy__btn.is-off,
+body .sella-event-buy .sella-event-buy__btn.is-off {
+  background: #ececf0;
+  color: #6b6e78;
+  cursor: default;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+body .sella-event-buy--sold-out .elementor-button.sella-event-buy__btn.is-off,
+body .sella-event-buy--sold-out .sella-event-buy__btn.is-off {
+  background: #171717;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+
+/* The events page. */
+.sella-events__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.sella-events__heading {
+  margin: 48px 0 20px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sella-events__card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  color: #171717;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+
+.sella-events__card:hover {
+  color: #171717;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.sella-events__media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  background: #f0f0f3;
+}
+
+/* Outranks Elementor's img { height: auto }, so the cover is cropped to the frame. */
+.sella-events .sella-events__media .sella-events__img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sella-events__card--past .sella-events__img {
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.sella-events__badge {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  inset-inline-start: 12px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  background: #fff;
+  color: #171717;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sella-events__badge--sold-out {
+  background: #171717;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+
+.sella-events__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 20px 22px 22px;
+}
+
+.sella-events__title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #171717;
+}
+
+.sella-events__subtitle {
+  margin: 0 0 16px;
+  color: #6b6e78;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.sella-events__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #efeff3;
+  font-size: 14px;
+}
+
+.sella-events__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sella-events__meta-row::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: var(--sella-ev-icon) center / contain no-repeat;
+  mask: var(--sella-ev-icon) center / contain no-repeat;
+}
+
+.sella-events__meta-row--date {
+  --sella-ev-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
+}
+
+.sella-events__meta-row--place {
+  --sella-ev-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E");
+}
+
+.sella-events__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.sella-events__price {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sella-events__cta {
+  padding: 9px 20px;
+  border-radius: 100px;
+  background: #f2e936;
+  color: #000;
+  font-size: 14px;
+}
+
+.sella-events__empty {
+  text-align: center;
+  color: #6b6e78;
+}
+
+@media (max-width: 1024px) {
+  .sella-events__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .sella-events__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
